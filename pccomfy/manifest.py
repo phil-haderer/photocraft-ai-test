@@ -339,7 +339,6 @@ def describe_line(model_key: str, has) -> str:
 
 # node class prefix -> (pack, where to get it). Only what the shipped workflows use.
 NODE_PACKS = (
-    ("AUSBOSS_NODES_", "ComfyUI-AusBoss (version 2.13.0 or newer)", "https://github.com/ausboss/ComfyUI-AusBoss"),
     ("SeedVR2", "ComfyUI itself (SeedVR2 nodes): update ComfyUI", "https://github.com/comfyanonymous/ComfyUI"),
     ("GrowMaskWithBlur", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),
     ("MaskBoundingBox+", "ComfyUI_essentials", "https://github.com/cubiq/ComfyUI_essentials"),
@@ -363,7 +362,7 @@ CONTRIBUTORS = (
     ("Bria", "Fibo 2.0 Edit and the VGL prompt format", "https://huggingface.co/briaai"),
     ("OpenMOSS", "MOSS-Image", "https://huggingface.co/OpenMOSS-Team"),
     ("Krea", "Krea 2 Turbo", "https://www.krea.ai"),
-    ("ausboss", "ComfyUI-AusBoss (tiled upscale nodes) and the FLUX.3 Klein Restore LoRA", "https://github.com/ausboss/ComfyUI-AusBoss"),
+    ("ausboss", "the FLUX.3 Klein Restore and Outpaint LoRAs", "https://huggingface.co/ausboss"),
     ("lodestones", "MOSS-Image 8-step DMD2 LoRA", "https://huggingface.co/lodestones"),
     ("ThetaCursed", "Krea2-Style-Explorer, the style prompts of the Styles button (MIT)", "https://github.com/ThetaCursed/Krea2-Style-Explorer"),
 )
