@@ -1,0 +1,24 @@
+[project]
+name = "pccomfy"
+version = "0.3.0"
+description = "PhotoCraft ↔ ComfyUI bridge: generative fill, outpaint, img2img and txt2img as layers"
+requires-python = ">=3.11"
+dependencies = ["pillow", "numpy"]
+license = "MIT OR Apache-2.0"
+
+[project.optional-dependencies]
+progress = ["websocket-client"]
+dnd = ["tkinterdnd2"]      # drag and drop onto the reference slots (setup-windows.bat installs it)
+
+[project.scripts]
+pccomfy = "pccomfy.__main__:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pccomfy"]
+
+[tool.setuptools.package-data]
+pccomfy = ["assets/*.png", "assets/functions/*.png"]     # button icons (undo.png; redo is the mirrored undo)

@@ -1,0 +1,265 @@
+"""python -m pccomfy [gui|check|run] …"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+
+from . import config as cfgmod
+from .appname import APP_NAME
+from .bridge import MODES, Bridge, BridgeError, Request
+from .comfy import ComfyError, ComfyUI
+from .photocraft import PhotoCraft, PhotoCraftError
+from .workflows import GenParams
+
+
+def make(cfg: dict) -> Bridge:
+    pcc, cc = cfg["photocraft"], cfg["comfyui"]
+    pc = PhotoCraft(pcc["host"], int(pcc["port"]), token_file=pcc["token_file"], headless=bool(pcc["headless"]))
+    return Bridge(pc, ComfyUI(cc["url"]), pcc["exchange_dir"])
+
+
+def cmd_check(cfg: dict) -> int:
+    b = make(cfg)
+    ok = True
+    try:
+        info = b.pc.ping()
+        print(f"PhotoCraft: OK – open documents: {info['documents']}, active: {info['active']}")
+    except PhotoCraftError as e:
+        ok = False
+        print(f"PhotoCraft: ERROR – {e}")
+    try:
+        stats = b.comfy.system_stats()
+        dev = (stats.get("devices") or [{}])[0]
+        print(f"ComfyUI: OK – {stats.get('system', {}).get('comfyui_version', '?')}, {dev.get('name', '?')}")
+        ckpts = b.comfy.checkpoints()
+        print(f"  checkpoints ({len(ckpts)}):", *ckpts[:30], sep="\n    ")
+    except ComfyError as e:
+        ok = False
+        print(f"ComfyUI: ERROR – {e}")
+    return 0 if ok else 1
+
+
+def cmd_probe(cfg: dict, keys: list[str] | None = None) -> int:
+    """Debug: show what this PhotoCraft build answers on the control channel. With keys: those parts of ui.inspect in full."""
+    b = make(cfg)
+    if keys:
+        res = b.pc.call("ui.inspect")
+        for k in keys:
+            print(f"{k}: " + json.dumps(res.get(k), ensure_ascii=False)[:3000])
+        return 0
+    for label, fn in (("ui.inspect", lambda: b.pc.call("ui.inspect")),
+                      ("session.inspect", lambda: b.pc.execute("session.inspect")),
+                      ("document.inspect", lambda: b.pc.execute("document.inspect"))):
+        try:
+            res = fn()
+            text = json.dumps(res, ensure_ascii=False)
+            print(f"{label}: OK, top-level keys: {list(res) if isinstance(res, dict) else type(res).__name__}")
+            print("   " + text[:600] + (" ..." if len(text) > 600 else ""))
+        except PhotoCraftError as e:
+            print(f"{label}: ERROR - {e}")
+    return 0
+
+
+def cmd_layers(cfg: dict) -> int:
+    """Debug: the layers of the active document exactly as PhotoCraft reports them (does it say which are switched off?)."""
+    from .bridge import layer_visible
+    b = make(cfg)
+    doc = b.pc.document()
+    for i, layer in enumerate(doc.get("layers", [])):
+        print(f"{i} (0 = top): {json.dumps(layer, ensure_ascii=False)}  -> visible: {layer_visible(layer)}")
+    return 0
+
+
+def cmd_commands(cfg: dict, pattern: str) -> int:
+    """Debug: look for PhotoCraft commands whose name matches `pattern` (e.g. "history|undo|group")."""
+    import re
+    b = make(cfg)
+    found = None
+    for method in ("engine.commands", "engine.list", "engine.listCommands", "commands.list", "engine.describe", "help"):
+        try:
+            res = b.pc.call(method)
+        except PhotoCraftError as e:
+            print(f"{method}: {str(e)[:100]}")
+            continue
+        names = []
+
+        def walk(x):
+            if isinstance(x, str):
+                names.append(x)
+            elif isinstance(x, dict):
+                for k, v in x.items():
+                    names.append(str(k))
+                    walk(v)
+            elif isinstance(x, list):
+                for v in x:
+                    walk(v)
+        walk(res)
+        found = names
+        print(f"{method}: OK, {len(names)} names")
+        break
+    for probe in ("history.inspect", "history.list", "history.state", "document.history"):
+        try:
+            res = b.pc.execute(probe)
+            print(f"{probe}: OK " + json.dumps(res, ensure_ascii=False)[:300])
+        except PhotoCraftError as e:
+            print(f"{probe}: {str(e)[:100]}")
+    if found is not None:
+        rx = re.compile(pattern, re.I)
+        # show the full entry (usage text) of every matching command
+        def entries(x, key=None):
+            if isinstance(x, dict):
+                if rx.search(str(x.get("name") or x.get("command") or "")) and len(json.dumps(x)) < 600:
+                    print("  * " + json.dumps(x, ensure_ascii=False))
+                    return
+                for k, v in x.items():
+                    if rx.search(str(k)) and not isinstance(v, (dict, list)) and len(str(v)) < 400:
+                        print(f"  * {k}: {v}")
+                    entries(v, k)
+            elif isinstance(x, list):
+                for v in x:
+                    entries(v, key)
+        entries(res)
+        for n in sorted({n for n in found if rx.search(n) and len(n) < 80}):
+            print("  " + n)
+    return 0
+
+
+def cmd_viewtest(cfg: dict) -> int:
+    """Debug: find the control-channel call that sets zoom and position (sets the values it just read, so nothing moves)."""
+    b = make(cfg)
+    v = b.pc.call("ui.inspect").get("views") or []
+    if not v:
+        print("No document open.")
+        return 1
+    cur = v[0]
+    print("current:", json.dumps(cur))
+    z, c = cur["zoom"], cur["center"]
+    tries = []
+    for method in ("ui.view.set", "ui.view.setZoom", "ui.view.zoom", "ui.zoom", "ui.setZoom", "ui.view.center",
+                   "ui.viewport.set", "view.set", "view.setZoom", "view.zoom", "ui.view.pan", "ui.view.restore"):
+        for params in ({"zoom": z, "center": c}, {"zoom": z}, {"view": 0, "zoom": z, "center": c}):
+            tries.append((method, params))
+    seen = set()
+    for method, params in tries:
+        try:
+            res = b.pc.call(method, params)
+            print(f"OK    {method} {json.dumps(params)[:80]} -> {json.dumps(res)[:100]}")
+            break
+        except PhotoCraftError as e:
+            msg = str(e)[:160]
+            if (method, msg) not in seen:
+                seen.add((method, msg))
+                print(f"fail  {method}: {msg}")
+    return 0
+
+
+def cmd_run(cfg: dict, a) -> int:
+    d = cfg["defaults"]
+    p = GenParams(prompt=a.prompt, negative=a.negative if a.negative is not None else d["negative"],
+                  checkpoint=a.checkpoint or d["checkpoint"], steps=a.steps or d["steps"],
+                  cfg=a.cfg or d["cfg"], sampler=d["sampler"], scheduler=d["scheduler"], seed=a.seed,
+                  denoise=a.denoise if a.denoise is not None else (1.0 if a.mode in ("inpaint", "remove", "outpaint") else d["denoise"]))
+    req = Request(mode=a.mode, params=p, workflow=a.workflow, base_res=a.res or d["base_res"],
+                  context=d["context"], mask_grow=d["mask_grow"], mask_blur=d["mask_blur"],
+                  outpaint=tuple(a.expand), overlap=d["overlap"], variants=a.variants,
+                  layer_mask=a.layer_mask, enhance=not a.no_enhance, turbo=not a.no_turbo, scale=a.scale)
+    b = make(cfg)
+    if not p.checkpoint and not a.workflow:
+        try:
+            p.checkpoint = (b.comfy.checkpoints() or [""])[0]
+        except ComfyError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+    def progress(f, msg, **_kw):
+        pct = "   " if f < 0 else f"{int(f * 100):3d}%"
+        print(f"\r{pct} {msg:<50}", end="", flush=True)
+
+    try:
+        res = b.run(req, progress)
+    except (BridgeError, ComfyError, ValueError) as e:
+        print(f"\nError: {e}", file=sys.stderr)
+        return 1
+    print("\n" + json.dumps(res, ensure_ascii=False))
+    return 0
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(prog="pccomfy", description="PhotoCraft ↔ ComfyUI bridge")
+    ap.add_argument("--config", help="path to config.toml")
+    sub = ap.add_subparsers(dest="cmd")
+    sub.add_parser("gui", help="bridge window (default)")
+    sub.add_parser("check", help="check connections and list models")
+    w = sub.add_parser("windows", help="debug: list PhotoCraft's windows (what the bridge window is tied to)")
+    w.add_argument("--watch", type=int, metavar="SECONDS", default=0,
+                   help="for N seconds print every window that appears (open a PhotoCraft menu meanwhile)")
+    c = sub.add_parser("commands", help="debug: list PhotoCraft commands matching a pattern")
+    c.add_argument("pattern", nargs="?", default="history|undo|group|transaction|step")
+    sc = sub.add_parser("shortcut", help="a desktop shortcut (Windows) or menu entry (Linux) that starts PhotoCraft and the bridge window (no console)")
+    sc.add_argument("--photocraft", help="path to photocraft.exe / photocraft (default: search the usual places, else ask)")
+    sc.add_argument("--name", default=APP_NAME, help="name of the shortcut")
+    au = sub.add_parser("autostart", help="Windows: start the bridge window with PhotoCraft, without a starter .bat")
+    au.add_argument("action", choices=("install", "uninstall", "status"), nargs="?", default="status")
+    sub.add_parser("layers", help="debug: print the layers of the active document as PhotoCraft reports them")
+    sub.add_parser("viewtest", help="debug: find the call that sets zoom and position")
+    pr = sub.add_parser("probe", help="debug: print what PhotoCraft answers on the control channel")
+    pr.add_argument("keys", nargs="*", help="parts of ui.inspect to print in full (e.g. view views)")
+    r = sub.add_parser("run", help="one generation from the command line")
+    r.add_argument("mode", choices=MODES)
+    r.add_argument("-p", "--prompt", default="")
+    r.add_argument("-n", "--negative")
+    r.add_argument("-m", "--checkpoint")
+    r.add_argument("-w", "--workflow", help="custom workflow (API-format JSON)")
+    r.add_argument("--steps", type=int)
+    r.add_argument("--cfg", type=float)
+    r.add_argument("--denoise", type=float)
+    r.add_argument("--seed", type=int, default=-1)
+    r.add_argument("--res", type=int, help="base resolution (e.g. 512, 768, 1024)")
+    r.add_argument("--variants", type=int, default=1)
+    r.add_argument("--layer-mask", choices=("auto", "soft", "selection", "none"), default="auto",
+                   help="layer mask of the new layer: auto (default: none for Fill with a Fibo-type editor, else soft), "
+                        "soft, hard from the selection, or none")
+    r.add_argument("--no-enhance", action="store_true",
+                   help="text-model workflows: send the prompt as typed, without the text model writing it")
+    r.add_argument("--scale", type=float, default=2.0, help="upscale mode: factor per side (default 2)")
+    r.add_argument("--no-turbo", action="store_true",
+                   help="workflows with a turbo LoRA (Qwen Image 2.1): run without it, at the full step count")
+    r.add_argument("--expand", type=int, nargs=4, default=[0, 0, 0, 0], metavar=("L", "T", "R", "B"),
+                   help="outpaint: pixels to add on the left/top/right/bottom")
+    a = ap.parse_args(argv)
+    cfg = cfgmod.load(a.config)
+    if a.cmd == "check":
+        return cmd_check(cfg)
+    if a.cmd == "windows":
+        from . import winlink
+        if not winlink.available():
+            print("Only on Windows.")
+        elif a.watch:
+            winlink.watch(a.watch)
+        else:
+            print(winlink.describe())
+        return 0
+    if a.cmd == "shortcut":
+        from . import launcher
+        return launcher.main_shortcut(a.photocraft, a.name)
+    if a.cmd == "autostart":
+        from . import autostart
+        return autostart.main(a.action, cfg)
+    if a.cmd == "viewtest":
+        return cmd_viewtest(cfg)
+    if a.cmd == "layers":
+        return cmd_layers(cfg)
+    if a.cmd == "probe":
+        return cmd_probe(cfg, a.keys)
+    if a.cmd == "commands":
+        return cmd_commands(cfg, a.pattern)
+    if a.cmd == "run":
+        return cmd_run(cfg, a)
+    from .gui import run_gui
+    return run_gui(cfg)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

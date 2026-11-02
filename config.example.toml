@@ -1,0 +1,32 @@
+# Copy to ~/.config/pccomfy/config.toml and change only what you need.
+# Missing fields use the defaults.
+
+[photocraft]
+host = "127.0.0.1"
+port = 7878                                        # same as --control
+token_file = "~/.config/pccomfy/photocraft.token"  # same as --control-token-file
+exchange_dir = "~/.cache/pccomfy/exchange"         # same as --automation-read-root and --automation-write-root
+
+[comfyui]
+url = "http://127.0.0.1:8188"                      # Krita AI Diffusion's managed server also runs on 8188
+# workflows_dir = "~/my-workflows"                 # your own API-format workflows (*.json); default: the ones shipped with the plugin
+
+[defaults]
+checkpoint = ""          # e.g. "juggernautXL_v9.safetensors"; empty = first in the list
+negative = ""
+steps = 25
+cfg = 6.0
+sampler = "dpmpp_2m"
+scheduler = "karras"
+denoise = 0.6            # for Image → image; inpaint/outpaint start at 1.0
+base_res = 1024          # SD1.5: 512–768, SDXL/Flux: 1024
+context = 0.4            # how much of the selection's surroundings the model sees (0.4 = 40% of the longer side)
+mask_grow = 8            # px the model mask is grown by
+mask_blur = 8            # px the model mask is blurred by
+overlap = 48             # outpaint: overlap onto the existing image (px)
+variants = 1
+
+[window]
+# Linux only: the display scale of the plugin window (1.5 or 150 = 150 %). Without it the plugin takes PhotoCraft's own scale
+# (window.pixelsPerPoint), then Xft.dpi, else what Tk reports. The environment variable PCCOMFY_SCALE wins over this line.
+# scale = 1.5

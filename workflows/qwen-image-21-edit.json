@@ -1,0 +1,285 @@
+{
+ "1": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "qwen_image_2.1_int8_convrot.safetensors",
+   "weight_dtype": "default"
+  },
+  "_meta": {
+   "title": "Qwen Image 2.1"
+  }
+ },
+ "2": {
+  "class_type": "LoraLoaderModelOnly",
+  "inputs": {
+   "lora_name": "qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors",
+   "strength_model": 1,
+   "model": [
+    "1",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "pc:lora Qwen turbo LoRA",
+   "pc_lora_label": "Turbo LoRA",
+   "pc_lora_tip": "Turbo LoRA: 8 steps. Off = 25 steps, slower."
+  }
+ },
+ "3": {
+  "class_type": "QwenImage21Cache",
+  "inputs": {
+   "device": "auto",
+   "dtype": "default",
+   "model": [
+    "2",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Qwen Image 2.1 cache"
+  }
+ },
+ "4": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  },
+  "_meta": {
+   "title": "Qwen text encoder"
+  }
+ },
+ "5": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+  }
+ },
+ "6": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:image"
+  }
+ },
+ "7": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:mask"
+  }
+ },
+ "8": {
+  "class_type": "TextEncodeQwenImage21",
+  "inputs": {
+   "prompt": "",
+   "negative_prompt": "",
+   "resolution": 0,
+   "clip": [
+    "4",
+    0
+   ],
+   "vae": [
+    "5",
+    0
+   ],
+   "images.image_1": [
+    "6",
+    0
+   ],
+   "images.image_2": [
+    "13",
+    0
+   ],
+   "images.image_3": [
+    "14",
+    0
+   ],
+   "images.image_4": [
+    "15",
+    0
+   ],
+   "images.image_5": [
+    "16",
+    0
+   ],
+   "images.image_6": [
+    "17",
+    0
+   ],
+   "images.image_7": [
+    "18",
+    0
+   ],
+   "images.image_8": [
+    "19",
+    0
+   ],
+   "images.image_9": [
+    "20",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "pc:prompt",
+   "pc_image_tag": "<image1>",
+   "pc_size_multiple": 32
+  }
+ },
+ "10": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "3",
+    0
+   ],
+   "positive": [
+    "8",
+    0
+   ],
+   "negative": [
+    "8",
+    1
+   ],
+   "latent_image": [
+    "9",
+    0
+   ],
+   "seed": 1234,
+   "steps": 8,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1
+  },
+  "_meta": {
+   "title": "pc:sampler",
+   "pc_no_lora": {
+    "steps": 25
+   }
+  }
+ },
+ "11": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "10",
+    0
+   ],
+   "vae": [
+    "5",
+    0
+   ]
+  }
+ },
+ "12": {
+  "class_type": "PreviewImage",
+  "inputs": {
+   "images": [
+    "11",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "pc:output"
+  }
+ },
+ "13": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref",
+   "pc_slot": 1
+  }
+ },
+ "9": {
+  "class_type": "RepeatLatentBatch",
+  "inputs": {
+   "samples": [
+    "8",
+    2
+   ],
+   "amount": 1
+  },
+  "_meta": {
+   "title": "pc:latent"
+  }
+ },
+ "14": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref Reference 2",
+   "pc_slot": 2
+  }
+ },
+ "15": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref Reference 3",
+   "pc_slot": 3
+  }
+ },
+ "16": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref Reference 4",
+   "pc_slot": 4
+  }
+ },
+ "17": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref Reference 5",
+   "pc_slot": 5
+  }
+ },
+ "18": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref Reference 6",
+   "pc_slot": 6
+  }
+ },
+ "19": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref Reference 7",
+   "pc_slot": 7
+  }
+ },
+ "20": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:ref Reference 8",
+   "pc_slot": 8
+  }
+ }
+}
