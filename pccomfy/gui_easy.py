@@ -9,7 +9,7 @@ from PIL import Image
 from . import easymode as em, icons
 from .gui_theme import ICON_PX
 from .ui_downloads import browser_only, size_text
-from .ui_settings import FOOT_RESET_PADX, SET_ICON_PX, SET_STYLES
+from .ui_settings import ALL_FILES_BUTTON, FOOT_RESET_PADX, SET_ICON_PX, SET_STYLES
 
 
 class EasyMixin:
@@ -271,11 +271,18 @@ class EasyMixin:
         for row in self.inv.rows():
             if row["key"] not in em.STARTER_MODELS:
                 continue
+            ttk.Frame(box, style="SepWhite.TFrame", height=1).pack(fill="x", pady=(10, 0))      # a line before every heading (user 3.11.)
             line = ttk.Frame(box)
-            line.pack(anchor="w", pady=(6, 2))
+            line.pack(fill="x", pady=(6, 2))
             ready = row["status"].state == "ready"             # a green check or a red cross in front of the model (user 2.11.)
             ttk.Label(line, text="✓" if ready else "✗", style=SET_STYLES["ok" if ready else "bad"]).pack(side="left", padx=(0, 6))
             ttk.Label(line, text=row["label"], style=SET_STYLES["head"]).pack(side="left")
+            allm = [f for f, found, _lv in row["files"] if found is None and f.url and f.name not in self._dl and not self._dl_done(f)]
+            if allm:               # the whole package of this model, the optional files too (user 3.11.)
+                b = ttk.Button(line, text=f"{ALL_FILES_BUTTON} ({size_text(sum(f.size for f in allm if not browser_only(f)))})", style="SetSmall.TButton",
+                               command=lambda k=row["key"]: self.download_missing(k))
+                b.pack(side="right")          # on the right, level with the model name
+                Tooltip(b, f"Downloads every missing file of {row['label']}, the optional ones too. Files that need a website open their page in your browser.")
             if row["key"] == "flux3" and any(browser_only(f) for f in missing):
                 label(em.TAB_FLUX3_NOTE, "note", pady=(0, 2))
             for f in (f for f in missing if any(f is x for x, _fd, _lv in row["files"])):
@@ -304,7 +311,7 @@ class EasyMixin:
             self._dl_widgets_easy[f.name] = {"bar": bar, "label": lb}
             self._dl_paint(f.name)
         else:
-            if not self._dl_done(f):         # the same disk symbol as in "All supported models": one file at a time
+            if not self._dl_done(f):         # the same disk symbol as in "All models": one file at a time
                 b = ttk.Button(line, image=self._icon("save", px=SET_ICON_PX), style="Link.TButton", command=lambda n=f.name: self.download_file(n))
                 b.pack(side="right", padx=(4, 0))
                 Tooltip(b, ("Opens the page in your browser (needs a login or comes from another site)." if browser_only(f)

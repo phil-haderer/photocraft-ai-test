@@ -15,7 +15,7 @@ from __future__ import annotations
 import difflib
 import webbrowser
 
-from . import hostos, icons, inventory, manifest, sthead
+from . import comfyaddr, hostos, icons, inventory, manifest, sthead
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 from .gui_theme import ICON_PX
@@ -30,10 +30,77 @@ SETTINGS_W, SETTINGS_H = 640, 700      # the settings window at first (before th
 SET_ICON_PX = 16                       # the download and chain symbols next to a file
 SET_STYLES = {"head": "SetHead.TLabel", "ok": "SetOk.TLabel", "bad": "SetBad.TLabel", "note": "SetNote.TLabel",
               "muted": "SetMuted.TLabel", "green": "SetGreen.TLabel", "red": "SetRed.TLabel",
-              "head9": "SetHead9.TLabel"}
+              "head9": "SetHead9.TLabel", "warn": "SetWarn.TLabel"}
 SET_MIN_W, SET_MIN_H = 480, 300        # the smallest the settings window can be dragged to
 
 
+class ButtonTabs(ttk.Frame):
+    """The model tabs of the settings window as a row of buttons that wraps into more rows (user 3.11.): the full model names
+    do not fit side by side. Used like the part of ttk.Notebook the window needs: add, select, index, tab."""
+
+    GAP = 4
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.bar = ttk.Frame(self)
+        self.bar.pack(fill="x", pady=(4, 6))
+        self.body = ttk.Frame(self)
+        self.body.pack(fill="both", expand=True)
+        self.pages: list = []
+        self.buttons: list = []
+        self.current = tk.StringVar(value="")
+        self.bar.bind("<Configure>", lambda e: self._layout(e.width), add="+")
+
+    def add(self, page, text: str = ""):
+        b = ttk.Radiobutton(self.bar, text=text, value=str(page), variable=self.current, style="Set.Tab.Toolbutton",
+                            command=lambda p=page: self.select(p))
+        self.pages.append(page)
+        self.buttons.append(b)
+        if len(self.pages) == 1:
+            self.select(page)
+        self._layout(self.bar.winfo_width())
+
+    def select(self, page=None):
+        if page is None:
+            return next((p for p in self.pages if str(p) == self.current.get()), None)
+        if page not in self.pages:
+            raise tk.TclError("no such tab")
+        for p in self.pages:
+            p.pack_forget()
+        page.pack(in_=self.body, fill="both", expand=True)
+        self.current.set(str(page))
+        return None
+
+    def index(self, page) -> int:
+        return self.pages.index(page)
+
+    def tab(self, page, **kw):
+        self.buttons[self.pages.index(page)].configure(**kw)
+        self._layout(self.bar.winfo_width())
+
+    def _layout(self, width: int):
+        """Fill a row until the next button does not fit, then start the next row; every row's buttons share its extra room."""
+        rows, cur, used = [], [], 0
+        gap = self.GAP
+        for b in self.buttons:
+            w = b.winfo_reqwidth()
+            w = w if isinstance(w, int) else 0
+            if cur and isinstance(width, int) and width > 1 and used + gap + w > width:
+                rows.append(cur)
+                cur, used = [], 0
+            cur.append(b)
+            used += w + (gap if len(cur) > 1 else 0)
+        if cur:
+            rows.append(cur)
+        for b in self.buttons:
+            b.grid_forget()
+        for r, row in enumerate(rows):
+            for c, b in enumerate(row):
+                b.grid(row=r, column=c, sticky="ew", padx=(0, gap), pady=(0, gap))
+                self.bar.columnconfigure(c, weight=1)
+
+
+ALL_FILES_BUTTON = "Download all model files"      # one model's whole package, the optional files too (user 3.11.)
 OPTIONAL_HEAD = "These models are only needed for additional features:"
 NOT_ALL_WEIGHTS = ("You don't have all the necessary weights to run the standard settings of {name}. Download the files or try linking "
                    "your files manually if you are sure that you have them. The plugin reads ComfyUI's model lists, so files in "
@@ -163,6 +230,7 @@ class SettingsMixin(DownloadMixin):
         self._update_live_preview()
         self._update_llm_button()
         self._enforce_switch_files()
+        self._update_ready()
         m = self._model()
         if m is None or self.inv is None:
             return
@@ -242,10 +310,7 @@ class SettingsMixin(DownloadMixin):
                 if easy is not None and easy.winfo_manager():       # Easy Mode's model line stays right of it
                     easy.pack_forget()
                     easy.pack(side="left", padx=FOOT_RESET_PADX)
-        if state and self.v_status.get() == "Ready":
-            self.v_status.set("")
-        elif not state and not self.v_status.get():
-            self.v_status.set("Ready")
+        self._update_ready()
         if fit and getattr(self, "_sized", False):
             self._fit_height()
 
@@ -290,18 +355,66 @@ class SettingsMixin(DownloadMixin):
         except ComfyError:
             return None
 
+    def _pack_missing(self, inv) -> list[tuple]:
+        """(class, pack, link) of node classes of the chosen workflow that a custom node pack brings and ComfyUI does not list
+        (manifest.NODE_PACKS: e.g. ComfyUI-KJNodes for Flux 3 Upscale). Classes without a known pack are not reported (new core
+        nodes of a newer ComfyUI)."""
+        if inv is None or inv.nodes is None:
+            return []
+        out = []
+        for t in self._wf_templates()[:1]:
+            for node in t.values():
+                cls = node.get("class_type", "") if isinstance(node, dict) else ""
+                pack = manifest.node_pack(cls) if cls and cls not in inv.nodes else None
+                if pack and pack[0].startswith("ComfyUI itself"):
+                    pack = None          # a core node of a newer ComfyUI (SeedVR2): its switch greys itself out (_enforce_switch_files)
+                if pack and cls not in {c for c, _p, _u in out}:
+                    out.append((cls, pack[0], pack[1]))
+        return out
+
+    def _pack_lines(self, inv) -> list[str]:
+        return [f"missing node {c}: install {p} ({u})" for c, p, u in self._pack_missing(inv)]
+
     def _preflight(self) -> list[str]:
         m = self._model()
         if m is None or self.inv is None:
             return []
         mode = self.v_mode.get()
-        lines = inventory.preflight(self.inv, m.key, mode)
+        lines = inventory.preflight(self.inv, m.key, mode) + self._pack_lines(self.inv)
         if lines:       # the cached reading may be old (a file was copied and ComfyUI restarted since): look again first
             fresh = self._reread_inventory()
             if fresh is not None:
                 self._set_inventory(fresh)
-                lines = inventory.preflight(fresh, m.key, mode)
+                lines = inventory.preflight(fresh, m.key, mode) + self._pack_lines(fresh)
         return lines
+
+    def _ready_text(self) -> str:
+        """The idle line at the bottom: "Ready" only when the chosen model and function can run; else what to get (user 3.11.)."""
+        m = self._model()
+        if m is None or self.inv is None:
+            return "Ready"
+        st = self.inv.mode_status(m.key, self.v_mode.get())
+        names = [f.name for f in st.missing]
+        packs = list(dict.fromkeys([p for _c, p, _u in self._pack_missing(self.inv)] +
+                                   [p[0] for c in st.nodes if (p := manifest.node_pack(c))]))
+        if not names and not packs and not st.nodes:
+            return "Ready"
+        parts = []
+        if names:
+            parts.append(f"download {', '.join(names[:2])}{f' (+{len(names) - 2} more)' if len(names) > 2 else ''} in the settings")
+        if packs:
+            parts.append(f"install {', '.join(packs)} in ComfyUI")
+        return "You need to " + " and ".join(parts or ["download the missing files in the settings"]) + " to run with these options"
+
+    def _update_ready(self):
+        """Keep the idle status line right: it is replaced only while it shows an earlier idle text, never a message or an error."""
+        cur = self.v_status.get()
+        if cur not in ("", "Ready", getattr(self, "_idle_text", "")):
+            return
+        new = "" if self.start_state() else self._ready_text()
+        self._idle_text = new
+        if new != cur:
+            self.v_status.set(new)
 
     def generate(self):
         if self.start_state():
@@ -337,7 +450,7 @@ class SettingsMixin(DownloadMixin):
             rows += [("enable", m.key, m.label, True) for m in models.MODELS]
         else:
             for row in self.inv.rows():
-                miss = [f for f, found, lv in row["files"] if found is None and f.url and lv == "required" and not self._dl_done(f)]
+                miss = [f for f, found, lv in row["files"] if found is None and f.url and not self._dl_done(f)]      # every file of the package (user 3.11.)
                 direct = [f for f in miss if not browser_only(f)]
                 rows.append(("model", row["key"], row["label"], row["status"].state, row["key"] == self._settings_focus,
                              {"count": len(direct), "site": len(miss) - len(direct), "size": size_text(sum(f.size for f in direct))}
@@ -504,7 +617,7 @@ class SettingsMixin(DownloadMixin):
         nb = ttk.Notebook(win)              # tab 1: the models; tab 2: credits
         nb.pack(fill="both", expand=True, padx=10, pady=(0, 8))
         tab_models, tab_other, tab_credits = ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb)
-        nb.add(tab_models, text="All supported models")
+        nb.add(tab_models, text="All models")
         nb.add(tab_other, text="Other settings")      # general switches (user 1.11.): for now the tip popup
         nb.add(tab_credits, text="Credits")
         self._other_settings(tab_other)
@@ -520,9 +633,9 @@ class SettingsMixin(DownloadMixin):
         self.f_set_top.pack(fill="x", side="top")
         self.f_set_top.bind("<Configure>", lambda e: self._settings_wrap("top", e.width), add="+")
         ttk.Frame(tab_models, style="SepWhite.TFrame", height=1).pack(fill="x", pady=(6, 0))      # white line above the model tabs (user 1.11.)
-        self.nb_models = ttk.Notebook(tab_models, style="Inner.TNotebook")
+        self.nb_models = ButtonTabs(tab_models)
         self.nb_models.pack(fill="both", expand=True, pady=(0, 0))
-        self._set_pages = {m.key: self._scroll_page(m.key, models.SHORT[m.key]) for m in models.MODELS}
+        self._set_pages = {m.key: self._scroll_page(m.key, m.label) for m in models.MODELS}
         self._set_pages["additional"] = self._scroll_page("additional", "Additional")
         win.bind("<MouseWheel>", self._settings_wheel, add="+")      # only this window: the plugin's body has its own
         self._set_widgets = []
@@ -575,6 +688,7 @@ class SettingsMixin(DownloadMixin):
 
     def _other_settings(self, parent):
         """The tab "Other settings" (user 1.11.): the tip tick, and two buttons that undo things done elsewhere in the plugin."""
+        self._comfy_address_row(parent)
         self._tips_setting_row(parent)
         for text, tip, command in (
                 ("Show all hidden models", "Brings back every model chip that was hidden (right-click menu of a chip or the tick in the model tab).",
@@ -586,6 +700,81 @@ class SettingsMixin(DownloadMixin):
             b = ttk.Button(parent, text=text, style="SetSmall.TButton", command=command)
             b.pack(side="top", anchor="w", padx=14, pady=(8, 0))
             Tooltip(b, tip)
+
+    # ---- the ComfyUI address (user 3.11.) ----
+
+    def _comfy_address_row(self, parent):
+        """"ComfyUI address": the field, Refresh and, beside them, what the check found (green tick, red cross, or a yellow hint)."""
+        box = ttk.Frame(parent)
+        box.pack(side="top", fill="x", padx=14, pady=(10, 0))
+        ttk.Label(box, text="ComfyUI address", style=SET_STYLES["head"]).pack(anchor="w")
+        row = ttk.Frame(box)
+        row.pack(fill="x", pady=(4, 0))
+        self.v_comfy_url = tk.StringVar(value=self.comfy.url)
+        ent = ttk.Entry(row, textvariable=self.v_comfy_url, width=30)
+        ent.pack(side="left")
+        ent.bind("<Return>", lambda e: self._comfy_address_check())
+        b = ttk.Button(row, text="Refresh", image=self._icon("refresh", px=SET_ICON_PX), compound="left", style="SetSmall.TButton",
+                       command=self._comfy_address_check)
+        b.pack(side="left", padx=(8, 0))
+        Tooltip(b, "Checks the address and, if it is ComfyUI, uses it from now on: the plugin reads its models and nodes again.")
+        self.lbl_comfy_mark = ttk.Label(row, text="", style=SET_STYLES["green"])
+        self.lbl_comfy_mark.pack(side="left", padx=(8, 0))
+        self.lbl_comfy_msg = ttk.Label(row, text="", style=SET_STYLES["muted"])
+        self.lbl_comfy_msg.pack(side="left", padx=(4, 0))
+        reset = ttk.Button(row, text="Reset to default", style="Link.TButton", command=self._comfy_address_reset)
+        reset.pack(side="right")
+        self.lbl_comfy_note = ttk.Label(box, text="", style=SET_STYLES["muted"], justify="left", wraplength=self._px(520))
+        self.lbl_comfy_note.pack(anchor="w", pady=(4, 0))
+        self._comfy_seq = 0
+        self._comfy_address_check(apply=False)          # shows at once whether the address in use answers
+
+    def _comfy_address_show(self, mark: str, msg: str, style: str, note: str = ""):
+        try:
+            self.lbl_comfy_mark.configure(text=mark, style=SET_STYLES["green" if mark == "✓" else "red"])
+            self.lbl_comfy_msg.configure(text=msg, style=SET_STYLES[style])
+            self.lbl_comfy_note.configure(text=note, style=SET_STYLES["warn" if note.startswith("Unencrypted") else "muted"])
+        except (tk.TclError, AttributeError):
+            pass
+
+    def _comfy_address_check(self, apply: bool = True):
+        """Refresh: check what is typed, ask the server in the background, and use the address when it is ComfyUI."""
+        url, err, warn = comfyaddr.check_format(self.v_comfy_url.get())
+        if url is None:
+            self._comfy_address_show("✗", err, "bad")
+            return
+        self._comfy_seq += 1
+        seq = self._comfy_seq
+        self._comfy_address_show("", "Checking…", "muted")
+        import threading
+
+        def work():
+            ok, msg = comfyaddr.probe(url)
+            self.events.put(("comfyaddr", (seq, url, ok, msg, warn, apply)))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _comfy_address_done(self, data):
+        seq, url, ok, msg, warn, apply = data
+        if seq != self._comfy_seq:
+            return              # a newer check is on its way
+        note = (f"Unencrypted: {warn.split(': ', 1)[1]}. " if warn else "") + (comfyaddr.REMOTE_NOTE if not comfyaddr.is_local(url) else "")
+        if not ok:
+            self._comfy_address_show("✗", msg, "bad", note)
+            return
+        self._comfy_address_show("✓", msg, "muted", note)
+        if apply and url != self.comfy.url:
+            cfgmod.set_setting("comfyui_url", None if url == comfyaddr.DEFAULT_URL else url)
+            self.comfy.set_url(url)
+            self._comfy_root = None
+            self.v_comfy_url.set(url)
+            self.refresh()
+            self._status(f"Using ComfyUI at {url}.")
+        elif apply:
+            self.refresh()
+
+    def _comfy_address_reset(self):
+        self.v_comfy_url.set(comfyaddr.DEFAULT_URL)
+        self._comfy_address_check()
 
     def _show_hidden_models(self):
         hidden = cfgmod.hidden_tabs()
@@ -752,7 +941,7 @@ class SettingsMixin(DownloadMixin):
         cache = self.__dict__.setdefault("_icon_cache", {})
         if ("dot", state) not in cache:
             from PIL import Image, ImageDraw
-            sc, d, pad = 4, self._px(9), self._px(DOT_PAD)
+            sc, d, pad = 4, max(3, round(self._px(9) * 0.7)), self._px(DOT_PAD)      # 70 % of the first size (user 3.11.)
             im = Image.new("RGBA", ((d + pad) * sc, d * sc), (0, 0, 0, 0))
             ImageDraw.Draw(im).ellipse([pad * sc, 0, (pad + d) * sc - 1, d * sc - 1], fill=DOT_RED)
             cache[("dot", state)] = icons.photo(self.root, None, DOT_RED, d, image=im.resize((d + pad, d), Image.LANCZOS))
@@ -765,7 +954,7 @@ class SettingsMixin(DownloadMixin):
                 continue
             st = self.inv.tab_status(key).state if self.inv is not None else ""
             try:
-                self.nb_models.tab(page["page"], text=models.SHORT[key], image=self.state_dot(st), compound="left")
+                self.nb_models.tab(page["page"], text=models.BY_KEY[key].label, image=self.state_dot(st), compound="left")
             except (tk.TclError, AttributeError):
                 pass
 
@@ -812,8 +1001,8 @@ class SettingsMixin(DownloadMixin):
                 _k, key, name, state, focus, allm = row
                 box = line()
                 if allm:
-                    b = ttk.Button(box, text="Download all needed models", image=self._icon("save", px=SET_ICON_PX), compound="left",
-                                   style="SetSmall.TButton", command=lambda k=key: self.download_missing(k, required_only=True))
+                    b = ttk.Button(box, text=ALL_FILES_BUTTON, image=self._icon("save", px=SET_ICON_PX), compound="left",
+                                   style="SetSmall.TButton", command=lambda k=key: self.download_missing(k))
                     b.pack(side="right", padx=(4, 0), pady=(6, 2))
                     Tooltip(b, f"Download the missing files this model needs ({allm['count']}, {allm['size']})"
                                + (f"; {allm['site']} open their page in the browser." if allm["site"] else "."))

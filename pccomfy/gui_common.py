@@ -671,6 +671,7 @@ CLIP_DEFAULT = "(workflow default)"
 
 
 PAGE_NOT_SAVED = ("mode", "workflow", "clip", "checkpoint", "seed", "prompt", "negative", "variants")   # what "Set as my settings" leaves out: the page itself, the text, the seed and the number of variants
+ON_ACCENT = "#ffffff"       # text and icons on the blue fill (chosen function, Generate): white, bold (user 3.11.)
 BG, PANEL, FG, MUTED, ACCENT = "#535353", "#282828", "#eeeeee", "#cfcfcf", "#378ef0"   # PhotoCraft grey and blue (both measured from a screenshot); PANEL = inactive tab, fields, buttons, slots
 HINT_TEXT = "#82b8f7"       # the tip under the prompt: a little brighter than ACCENT_TEXT, for reading (user 3.11.)
 ACCENT_TEXT = "#6aaaf5"     # the blue for text and thin lines on the grey (the exact blue is too dark there: 2.3 : 1 on BG, this 3.2 : 1 like the old orange)
@@ -823,6 +824,7 @@ __all__ = [
     "FG",
     "MUTED",
     "ACCENT",
+    "ON_ACCENT",
     "ACCENT_TEXT",
     "DISABLED",
     "SCALE_MODES",

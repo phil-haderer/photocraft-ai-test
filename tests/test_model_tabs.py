@@ -317,6 +317,31 @@ def main():
     import json
     assert json.loads((Path(t.TMP) / "state.json").read_text(encoding="utf-8"))["model"] == "qwen"
     assert json.loads((Path(t.TMP) / "state.json").read_text(encoding="utf-8"))["loras"] == [["qwen\\style_a.safetensors", 0.6]]
+    from pccomfy import ui_settings
+    assert ui_settings.ALL_FILES_BUTTON == "Download all model files" and not hasattr(ui_settings, "tab_title")
+    # the model buttons of the settings window wrap into rows when the full names do not fit (user 3.11.)
+    class B:
+        def __init__(self, w):
+            self.w, self.pos = w, None
+
+        def winfo_reqwidth(self):
+            return self.w
+
+        def grid_forget(self):
+            self.pos = None
+
+        def grid(self, row, column, **kw):
+            self.pos = (row, column)
+
+    class Bar:
+        def columnconfigure(self, *a, **k):
+            pass
+    bt = ui_settings.ButtonTabs.__new__(ui_settings.ButtonTabs)
+    bt.bar, bt.buttons = Bar(), [B(w) for w in (170, 160, 140, 190, 130, 130, 110)]
+    bt._layout(1100)
+    assert {b.pos[0] for b in bt.buttons} == {0}                                   # wide enough: one row
+    bt._layout(800)
+    assert [b.pos for b in bt.buttons] == [(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2)], [b.pos for b in bt.buttons]
     shutil.rmtree(t.TMP, ignore_errors=True)
     print("ALL OK (model tabs)")
 

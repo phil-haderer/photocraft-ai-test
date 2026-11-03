@@ -28,7 +28,7 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.18 · ComfyUI version: 0.42.0
    once (the button opens its page). Restart ComfyUI afterwards.
 5. **Custom node**: the plugin needs one ComfyUI custom node pack, [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
    (Flux 3 Upscale uses its *Color Match* node). Install it from the ComfyUI Manager or the link, then restart ComfyUI. If you already have it,
-   nothing changes. Without it only Flux 3 Upscale is locked (the settings window names the missing pack); everything else uses ComfyUI's own nodes.
+   nothing changes. Without it only Flux 3 Upscale cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes.
 6. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
 
 Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested

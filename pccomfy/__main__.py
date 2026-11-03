@@ -17,7 +17,7 @@ from .workflows import GenParams
 def make(cfg: dict) -> Bridge:
     pcc, cc = cfg["photocraft"], cfg["comfyui"]
     pc = PhotoCraft(pcc["host"], int(pcc["port"]), token_file=pcc["token_file"], headless=bool(pcc["headless"]))
-    return Bridge(pc, ComfyUI(cc["url"]), pcc["exchange_dir"])
+    return Bridge(pc, ComfyUI(cfgmod.get_setting("comfyui_url") or cc["url"]), pcc["exchange_dir"])
 
 
 def cmd_check(cfg: dict) -> int:

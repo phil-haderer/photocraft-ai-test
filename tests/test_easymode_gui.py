@@ -139,7 +139,7 @@ def main():
     app.root.update()
     assert app.nb_settings.select() == str(app._easy_tab)        # the window opens on the Easy Mode tab (user 2.11.)
     tabs = [app.nb_settings.tab(i, "text") for i in range(app.nb_settings.index("end"))]
-    assert tabs == [em.TAB_TITLE, "All supported models", "Other settings", "Credits"], tabs
+    assert tabs == [em.TAB_TITLE, "All models", "Other settings", "Credits"], tabs
 
     def texts(w):
         out = []

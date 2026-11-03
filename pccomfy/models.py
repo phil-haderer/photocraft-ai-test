@@ -161,7 +161,7 @@ FLUX3 = Model(
         "qwen3vl_4b_int8_convrot.safetensors",
         "flux2-vae.safetensors",
     ),   # the model files this tab needs (details per mode: manifest.py)
-    max_refs=3, tag_style="<ref_image_{i}>", seam="off", bbox=True)
+    max_refs=3, tag_style="<ref_image_{i}>", seam="off", bbox=True)   # with BBOX ticked only one (refslots.BBOX_MAX_REFS)
 
 # MOSS: the DMD2 speed LoRA (8 steps, CFG 1.5) is the model's own LoRA; the Lenovo UltraReal LoRA and the skip-layer
 # guidance (SLG) are switches that start on (best result in the live tests); the LLM prompt enhancer starts off.

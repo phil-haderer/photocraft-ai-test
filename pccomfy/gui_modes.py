@@ -306,6 +306,24 @@ class ModeMixin:
         self.v_adv_open.set(not self.v_adv_open.get())
         self._show_advanced()
         self._fit_height()
+        if self.v_adv_open.get():
+            self._scroll_into_view(self.f_adv)
+
+    def _scroll_into_view(self, w):
+        """When the body scrolls (screen too small for the whole window), brings `w` into view: all of it, or its top
+        when it is taller than the view (user 3.11.: Advanced settings opened under the status line, out of sight)."""
+        cv = self.cv_body
+        try:
+            self.root.update_idletasks()
+            body, view = self.f_body.winfo_height(), cv.winfo_height()
+            y0 = w.winfo_rooty() - self.f_body.winfo_rooty()
+            y1 = y0 + w.winfo_height()
+            first = cv.yview()[0] * body
+            if body <= view or (y0 >= first and y1 <= first + view):
+                return
+            cv.yview_moveto(max(0, y0 if y1 - y0 > view else y1 - view) / body)
+        except (TypeError, ValueError, ZeroDivisionError, tk.TclError):
+            pass
 
     def _reset_detail(self):
         """"Mix source image/new image" starts at 100 % (only the new image) whenever a function or tab is chosen."""

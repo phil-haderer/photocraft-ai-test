@@ -65,11 +65,10 @@ def preview_image(data: bytes, prompt_id: str | None = None) -> Image.Image | No
 
 class ComfyUI:
     def __init__(self, url: str = "http://127.0.0.1:8188", timeout: float = 30.0):
-        self.url = url.rstrip("/")
         self.timeout = timeout
-        parts = urllib.parse.urlsplit(self.url)
-        self._host, self._port = parts.hostname or "127.0.0.1", parts.port or 80
         self._local = threading.local()
+        self._gen = 0                  # grows with every new address: an open connection of an older one is dropped
+        self._set_target(url)
         self._cache: dict = {}
         self._cache_lock = threading.RLock()
         self.client_id = uuid.uuid4().hex
@@ -83,17 +82,38 @@ class ComfyUI:
     CACHE_SECONDS = 10.0
     _CACHED = ("/system_stats", "/object_info", "/models/")
 
+    def _set_target(self, url: str) -> None:
+        self.url = url.rstrip("/")
+        parts = urllib.parse.urlsplit(self.url)
+        self._https = parts.scheme == "https"
+        self._host, self._port = parts.hostname or "127.0.0.1", parts.port or (443 if self._https else 80)
+
+    def set_url(self, url: str) -> None:
+        """Talk to another server from now on (Other settings > ComfyUI address): the lists of the old one are forgotten."""
+        with self._cache_lock:
+            self._gen += 1
+            self._set_target(url)
+            self._cache.clear()
+
     def invalidate(self) -> None:
         """Forget the cached lists (a file was just added)."""
         with self._cache_lock:
             self._cache.clear()
 
+    def _new_connection(self) -> http.client.HTTPConnection:
+        cls = http.client.HTTPSConnection if self._https else http.client.HTTPConnection
+        return cls(self._host, self._port, timeout=self.timeout)
+
     def _connection(self, fresh: bool) -> http.client.HTTPConnection:
         if fresh:
-            return http.client.HTTPConnection(self._host, self._port, timeout=self.timeout)
+            return self._new_connection()
         conn = getattr(self._local, "conn", None)
+        if conn is not None and getattr(self._local, "gen", None) != self._gen:
+            conn.close()
+            conn = None
         if conn is None:
-            conn = self._local.conn = http.client.HTTPConnection(self._host, self._port, timeout=self.timeout)
+            conn = self._local.conn = self._new_connection()
+            self._local.gen = self._gen
         return conn
 
     def _request(self, path: str, data: bytes | None = None, headers: dict | None = None, method: str | None = None):

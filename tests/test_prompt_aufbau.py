@@ -27,7 +27,7 @@ def example(key: str) -> dict:
     for i, d in enumerate(DESCRIPTIONS[:m.max_refs]):
         rs.add(Image.new("RGB", (64, 64), "red"), f"r{i}.png")
         rs.items[-1].description = d
-    typed = f"Put the hat from {rs.tag(1)} on the dog from {rs.tag(0)}."
+    typed = f"Put the hat from {rs.tag(1)} on the dog from {rs.tag(0)}." if m.max_refs > 1 else f"Put the dog from {rs.tag(0)} on the picture."
     window_prompt = rs.prompt_with_descriptions(typed)          # the prompt field after Describe on both images (sent as it is)
     pc, _, b = T.make(tempfile.mkdtemp(), with_sel=False)
     b.comfy = T.FakeComfy()
@@ -44,7 +44,7 @@ def example(key: str) -> dict:
 def main():
     out = [example(k) for k in WF]
     for e in out:
-        assert e["sent"] and DESCRIPTIONS[0] in e["sent"] and DESCRIPTIONS[1] in e["sent"] and e["typed"] in e["sent"], e
+        assert e["sent"] and DESCRIPTIONS[0] in e["sent"] and (DESCRIPTIONS[1] in e["sent"] or models.BY_KEY[e["key"]].max_refs == 1) and e["typed"] in e["sent"], e
         print(f"--- {e['model']}  (tags: picture {e['tags'][0]}, references {', '.join(e['tags'][1:])})\n{e['sent']}\n")
     if "--write" in sys.argv:
         parts = ["# Der gesendete Prompt bei „Multi Image Edit“\n",

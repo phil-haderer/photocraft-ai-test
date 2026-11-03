@@ -395,6 +395,7 @@ class Bridge:
         self.pipeline = ""
         self.last_vgl = ""
         self._cancel = threading.Event()
+        self._cancel_all = threading.Event()    # "Cancel all": stops the variants and comparison runs that would follow too
         self.on_preview = None                  # the window's callback for live preview frames (PIL images), see Request.preview
         self._tmp: list[Path] = []
         self._snap: dict | None = None          # history snapshot taken before the last generation (for "Undo AI edit")
@@ -404,7 +405,20 @@ class Bridge:
         self._preview: dict | None = None       # the feather preview while it is shown: document, saved selection, mask
 
     def cancel(self) -> None:
+        """Cancel the run that is on now; variants / comparison runs that follow one after the other still go on."""
         self._cancel.set()
+
+    def cancel_all(self) -> None:
+        """Cancel the run that is on now and every one that follows it."""
+        self._cancel_all.set()
+        self._cancel.set()
+
+    def cancel_all_requested(self) -> bool:
+        return self._cancel_all.is_set()
+
+    def reset_cancel_all(self) -> None:
+        """A new Generate starts: an earlier "Cancel all" no longer counts."""
+        self._cancel_all.clear()
 
     # ---------- main operation ----------
 
@@ -463,9 +477,11 @@ class Bridge:
         results: list[dict] = []
         layers: list = []          # newest first (the top of the stack)
         try:
+            skipped = 0
             for v in range(n):
-                if self._cancel.is_set():
+                if self._cancel_all.is_set():
                     raise Cancelled()
+                self._cancel.clear()      # "Cancel" only ends the variant that was on: the next one starts normally
 
                 def sub(f, msg="", v=v, **kw):
                     progress((v + min(max(float(f), 0.0), 1.0)) / n, f"Variant {v + 1}/{n}: {msg}" if msg else msg, **kw)
@@ -473,7 +489,13 @@ class Bridge:
                 if v and orig_name:      # Upscale opened a new document: the next variant starts from the original one again
                     self._activate_doc(orig_name)
                 pv = dataclasses.replace(p, seed=(first_seed + 7919 * v) % (2**31), batch=1)
-                res = self._run(dataclasses.replace(req, variants=1), pv, f"{tag}{v}", sub, seq=(v, n))
+                try:
+                    res = self._run(dataclasses.replace(req, variants=1), pv, f"{tag}{v}", sub, seq=(v, n))
+                except Cancelled:
+                    if self._cancel_all.is_set() or v == n - 1 and not results:
+                        raise
+                    skipped += 1          # this variant is dropped, the others go on
+                    continue
                 results.append(res)
                 if v and layers and res["layers"]:
                     self._try("layer.hideLayers", {"layer": layers[0]})    # the new result is the visible one on top
@@ -487,7 +509,7 @@ class Bridge:
         out = dict(last, seed=first_seed, layers=layers, group=group)
         if req.mode == "upscale":
             out["documents"] = sum(r.get("documents", 0) for r in results)
-        progress(1.0, f"Done: {n} variants (seed {first_seed})", phase="place")
+        progress(1.0, f"Done: {n - skipped} variants (seed {first_seed})" if skipped else f"Done: {n} variants (seed {first_seed})", phase="place")
         return out
 
     @staticmethod

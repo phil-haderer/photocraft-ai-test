@@ -46,7 +46,7 @@ def main():
     try:
         app._icon_cache = {}
         normal, _sel, selected, _dis, disabled = app._function_icon("inpaint")
-        assert asked == ["fn-inpaint"] * 3 and (normal, selected, disabled) == (gui.FG, "#1b1b1b", gui.DISABLED)
+        assert asked == ["fn-inpaint"] * 3 and (normal, selected, disabled) == (gui.FG, gui.ON_ACCENT, gui.DISABLED)
         px = app._px(gui_theme.ICON_PX)
         assert shown[0].size == (px + app._px(gui_theme.FN_GAP), px) and gui_theme.FN_GAP == 8
         assert shown[0].crop((px, 0, shown[0].width, px)).getbbox() is None          # the gap is empty

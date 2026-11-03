@@ -19,6 +19,8 @@ MAX_SIDE = 1024                      # the longest side of a reference image sen
 # the model gets a flat picture, and white behind a cut-out subject disturbed it.
 DEFAULT_BACKGROUND = (128, 128, 128)
 
+BBOX_MAX_REFS = 1       # with BBOX ticked the one reference image is the object for the box (user 3.11.)
+BBOX_LABEL = "Place ref. image in selection (BBOX)"
 BBOX_CHECK_TIP = "Your selection becomes a box named <obj_1> in the prompt. Without a selection the run is a normal Multi Image Edit."
 BBOX_TIP = ("Draw a rectangular selection on the canvas and simply name the object from the reference image in the prompt, "
             "e.g. “wine glass”. It will be placed exactly where you want it.")   # under the prompt while BBOX is ticked (user 3.11.)
@@ -361,10 +363,9 @@ class RefSlotsMixin:
         self.f_refs = ttk.Frame(self.f_body)      # inside the body frame (gui.py _build): it is packed before f_neg, which lives there
         head = ttk.Frame(self.f_refs)
         head.pack(fill="x")
-        self.lbl_refs = ttk.Label(head, text="Reference images", style="Muted.TLabel")
-        self.lbl_refs.pack(side="left")
-        self.lbl_refmax = ttk.Label(head, text="", style="Muted.TLabel")      # always shown, on the line above the slots:
-        self.lbl_refmax.pack(side="left", padx=(self._px(12), 0))           # "Reference images (1/3)   Max. images: 3"
+        self.lbl_refs = ttk.Label(head, text="Reference images", style="Muted.TLabel")     # not shown (user 3.11.): only "Max. images: n"
+        self.lbl_refmax = ttk.Label(head, text="", style="Muted.TLabel")      # always shown, on the line above the slots
+        self.lbl_refmax.pack(side="left")
         self.f_refgrid = ttk.Frame(self.f_refs)
         self.f_refgrid.pack(fill="x", pady=(4, 0))
         self.lbl_refnames = ttk.Label(self.f_refs, text="", style="Muted.TLabel", wraplength=self._px(380 - 24), justify="left")
@@ -385,7 +386,7 @@ class RefSlotsMixin:
         # BBOX next to "Prompt" (user 30.10.): the selection is the box <obj_1>; while it is ticked its tip is the one under the
         # prompt (user 3.11.: no tip under the slots)
         self.v_bbox = tk.BooleanVar(value=False)       # off at every start, like the other start values
-        self.cb_bbox = ttk.Checkbutton(self.f_ptop, text="BBOX", variable=self.v_bbox, command=self._refs_bbox_changed)
+        self.cb_bbox = ttk.Checkbutton(head, text=BBOX_LABEL, variable=self.v_bbox, command=self._refs_bbox_changed)
         Tooltip(self.cb_bbox, BBOX_CHECK_TIP)
         self._refs_dnd = self._refs_setup_dnd()
         try:
@@ -394,9 +395,19 @@ class RefSlotsMixin:
         except tk.TclError:
             pass
 
+    def _refs_max(self, m) -> int:
+        """How many reference images the model takes now: Flux 3 with BBOX ticked takes one, else its usual number."""
+        v = getattr(self, "v_bbox", None)
+        return BBOX_MAX_REFS if (m.bbox and v is not None and v.get()) else m.max_refs
+
     def _refs_bbox_changed(self):
-        """BBOX ticked or not: the tip under the prompt changes with it."""
+        """BBOX ticked or not: the tip under the prompt changes with it, and the number of slots (the extra images stay)."""
         self._update_prompt_hint()
+        m = self._refs_model()
+        rs = getattr(self, "refslots", None)
+        if m is not None and rs is not None and rs.max_refs != self._refs_max(m) and self._refs_wanted():
+            rs.set_model(self._refs_max(m), m.tag_style)
+            self._refs_redraw()
 
     def _refs_setup_dnd(self) -> bool:
         """Drag and drop needs the optional package tkinterdnd2; without it everything else still works."""
@@ -440,11 +451,11 @@ class RefSlotsMixin:
             return
         m = self._refs_model()
         if m.bbox:
-            self.cb_bbox.pack(side="left", padx=(self._px(10), 0))
+            self.cb_bbox.pack(side="left", padx=(self._px(12), 0))
         else:
             self.cb_bbox.pack_forget()
         self._refs_bbox_changed()
-        self.refslots.set_model(m.max_refs, m.tag_style)
+        self.refslots.set_model(self._refs_max(m), m.tag_style)
         self.f_refs.pack(fill="x", padx=10, pady=(6, 0), before=self.f_neg)
         self._refs_redraw()
 

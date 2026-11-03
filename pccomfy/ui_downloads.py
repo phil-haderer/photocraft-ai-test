@@ -13,7 +13,7 @@ import urllib.parse
 import webbrowser
 from pathlib import Path
 
-from . import comfydir, downloads, manifest
+from . import comfyaddr, comfydir, downloads, manifest
 from .gui_common import *  # noqa: F401,F403
 
 DIRECT_HOSTS = ("huggingface.co", "githubusercontent.com")      # the plugin loads from these itself (Civitai: its page opens)
@@ -64,14 +64,20 @@ class DownloadMixin:
             p = Path(env)
             p.mkdir(parents=True, exist_ok=True)
             return p
-        saved = cfgmod.get_setting("comfy_models_dir")      # noqa: F405
+        remote = not comfyaddr.is_local(self.comfy.url)      # ComfyUI on another computer: its folder is the one you choose for it
+        saved = cfgmod.get_setting("comfy_models_dir_remote" if remote else "comfy_models_dir")      # noqa: F405
         if saved and Path(saved).is_dir():
             return Path(saved)
+        if remote:
+            return self._ask_models_dir(ask, True)
         if self._comfy_root is None:
             self._comfy_root = comfydir.find_root(self.comfy.url) or Path("")
         found = comfydir.models_dir_of(self._comfy_root) if str(self._comfy_root) not in ("", ".") else None
         if found is not None:
             return found
+        return self._ask_models_dir(ask, False)
+
+    def _ask_models_dir(self, ask: bool, remote: bool) -> Path | None:
         if not ask:
             return None
         from tkinter import filedialog
@@ -81,7 +87,7 @@ class DownloadMixin:
         if chosen and p is None:
             self._status("There is no models folder in that folder.", error=True)
         if p is not None:
-            cfgmod.set_setting("comfy_models_dir", str(p))      # noqa: F405
+            cfgmod.set_setting("comfy_models_dir_remote" if remote else "comfy_models_dir", str(p))      # noqa: F405
         return p
 
     # ---------- the buttons ----------

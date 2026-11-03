@@ -137,6 +137,7 @@ class RunMixin:
         self.b_undo.configure(state="disabled")
         self.b_redo.configure(state="disabled")
         self.b_stop.configure(state="normal")
+        self.bridge.reset_cancel_all()
         self._reset_progress()
 
         def progress(f, msg, phase="", phase_fraction=-1.0, elapsed=0.0):
@@ -148,15 +149,29 @@ class RunMixin:
             if req.params.seed is None or req.params.seed < 0:
                 req.params.seed = random.randint(0, 10**8 - 1)   # one seed for the whole series: only the value differs
 
+        # runs that follow one another (variants of Upscale / Refine, a comparison): "Cancel all" is offered besides "Cancel"
+        if len(runs) > 1 or (req.mode in SCALE_MODES and int(req.variants) > 1):
+            self._show_stop_all(True)
+
         def work():
             try:
                 total = 0
+                res = None
                 t_start = time.monotonic()
                 for k, rq in enumerate(runs):
+                    if self.bridge.cancel_all_requested():
+                        raise Cancelled()
                     if len(runs) > 1:
                         self.events.put(("progress", (0.0, f"Comparison {k + 1}/{len(runs)}: {rq.label}", "prepare", -1.0, 0.0)))
-                    res = self.bridge.run(rq, progress)
+                    try:
+                        res = self.bridge.run(rq, progress)
+                    except Cancelled:
+                        if len(runs) == 1 or self.bridge.cancel_all_requested():
+                            raise
+                        continue          # "Cancel" ends this comparison run only
                     total += len(res["layers"])
+                if res is None:
+                    raise Cancelled()
                 self.events.put(("vgl", res.get("vgl", "")))
                 self.events.put(("seed", res.get("seed")))
                 seam = res.get("seam")     # the seam correction's A/B: the tone jump of #1 in levels, before → after
@@ -321,6 +336,20 @@ class RunMixin:
             self.bridge.cancel()
             self._status("Cancelling…")
 
+    def _show_stop_all(self, on: bool):
+        """"Cancel all" beside "Cancel": Cancel gets narrower while it is shown, so the row (with Undo and Redo) still fits the window."""
+        self.b_stop.configure(width=6 if on else 9)
+        if on:
+            self.b_stop_all.pack(side="left", fill="y", padx=(6, 0), after=self.b_stop)
+        else:
+            self.b_stop_all.pack_forget()
+
+    def stop_all(self):
+        """Cancel all: the run that is on and every variant / comparison run still to come."""
+        if self.worker and self.worker.is_alive():
+            self.bridge.cancel_all()
+            self._status("Cancelling…")
+
     def _poll(self):
         frame = None                # the newest live preview frame of this round (older ones are skipped)
         try:
@@ -352,6 +381,7 @@ class RunMixin:
                     self.b_undo.configure(state="normal")
                     self.b_redo.configure(state="normal")
                     self.b_stop.configure(state="disabled")
+                    self._show_stop_all(False)
                     self._history_end(ok)
                 elif kind == "seed":
                     self._set_last_seed(data)
@@ -362,6 +392,8 @@ class RunMixin:
                         self._hist_run["llm"] = self._last_vgl.strip()
                 elif kind == "refresh":
                     self._apply_refresh(data)
+                elif kind == "comfyaddr":
+                    self._comfy_address_done(data)
                 elif kind == "download":
                     self._download_event(data)
                 elif kind == "feather":

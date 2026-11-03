@@ -377,8 +377,11 @@ def main():
     pick("flux3", "multi_edit")
     assert seen[0:1] == ["box on"] and app._request().bbox is False and app._hint_text.startswith("Example:")
     assert not hasattr(app, "lbl_refbbox")          # no tip under the slots any more (user 3.11.)
+    assert app.refslots.max_refs == 3 and app.lbl_refmax["text"] == "Max. images: 3"      # Flux 3 with BBOX off: its usual three
+    assert not app.lbl_refs.winfo_manager()                                              # no "Reference images (n/n)" header
     app.v_bbox.set(True)
     app._refs_bbox_changed()
+    assert app.refslots.max_refs == 1 and app.lbl_refmax["text"] == "Max. images: 1"      # BBOX ticked: one reference image
     assert app._request().bbox is True and app._hint_text == refslots.BBOX_TIP     # BBOX ticked: its tip under the prompt instead
     assert "name the object from the reference image in the prompt" in refslots.BBOX_TIP
     assert app._request().layer_mask == "soft"      # BBOX: the margin mask, whatever the mode's start value (live finding 30.10.: "none" gave a whole new picture)
@@ -388,6 +391,8 @@ def main():
     pick("qwen", "multi_edit")               # ticked, but not a Flux 3 function
     assert app._request().bbox is False and not app._bbox_on()
     app.v_bbox.set(False)
+    app._refs_bbox_changed()
+    assert app._refs_max(gui.models.BY_KEY["flux3"]) == 3 and refslots.BBOX_LABEL == "Place ref. image in selection (BBOX)"     # unticked: three again
 
     assert not hasattr(refslots, "apply_strokes") and not hasattr(app, "_refs_pen")      # the pen is gone
     assert refslots.thumbnail_png(Image.new("RGBA", (300, 100), (0, 0, 0, 0)), 64)[:4] == b"\x89PNG"

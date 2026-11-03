@@ -26,7 +26,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         d = cfg["defaults"]
         pcc, cc = cfg["photocraft"], cfg["comfyui"]
         self.pc = PhotoCraft(pcc["host"], int(pcc["port"]), token_file=pcc["token_file"], headless=bool(pcc["headless"]))
-        self.comfy = ComfyUI(cc["url"])
+        self.comfy = ComfyUI(cfgmod.get_setting("comfyui_url") or cc["url"])      # the address from Other settings wins over config.toml
         self.bridge = Bridge(self.pc, self.comfy, pcc["exchange_dir"])
         self.workflows_dir = Path(cc["workflows_dir"]).expanduser()
         self.events: queue.Queue = queue.Queue()
@@ -565,7 +565,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
 
         bf = self.f_go = ttk.Frame(r)   # Generate, Cancel, Undo, Redo: above the line over "Prompt", under the functions
         bf.pack(fill="x", padx=10, pady=(6, 2), before=self.sep_prompt)
-        self.b_go = ttk.Button(bf, text="Generate", width=11, style="Accent.TButton", command=self.generate)
+        self.b_go = ttk.Button(bf, text="Generate", width=9, style="Accent.TButton", command=self.generate)
         self.b_go.pack(side="left", fill="y")
         Tooltip(self.b_go, "Generate (Ctrl+Enter)")
         # Variants are part of Generate (user 29.10.): a narrow orange piece on its right, like a split button; a click
@@ -579,9 +579,12 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
             self.m_variants.add_radiobutton(label=str(n), value=n, variable=self.v_variants)
         self.v_variants.trace_add("write", lambda *a: self._show_variants())
         self._show_variants()
-        self.b_stop = ttk.Button(bf, text="Cancel", command=self.stop, state="disabled")
+        self.b_stop = ttk.Button(bf, text="Cancel", width=9, command=self.stop, state="disabled")
         self.b_stop.pack(side="left", fill="y", padx=(6, 0))
-        Tooltip(self.b_stop, "Cancel the run (Esc or Ctrl+Alt+Enter)")
+        Tooltip(self.b_stop, "Cancel the run (Esc or Ctrl+Alt+Enter). With several variants it ends only the one that is running.")
+        # "Cancel all" shows up only while several runs follow one another (variants of Upscale / Refine, a comparison)
+        self.b_stop_all = ttk.Button(bf, text="Cancel all", style="Fit.TButton", command=self.stop_all)
+        Tooltip(self.b_stop_all, "Cancel this run and all the variants that are still to come.")
         self._icons.update({"undo": self._icon("undo"), "redo": self._icon("redo")})
         self.b_undo = ttk.Button(bf, image=self._icons["undo"], style="Icon.TButton", command=self.undo_edit)
         self.b_redo = ttk.Button(bf, image=self._icons["redo"], style="Icon.TButton", command=self.redo_edit)
@@ -756,6 +759,9 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         if m:
             x, y = int(m.group(1).replace("+", "")), int(m.group(2).replace("+", ""))
             if x > -10000 and y > -10000:       # a minimized window reports -32000
+                fit_y, home = getattr(self, "_fit_y", None), getattr(self, "_home_y", None)
+                if fit_y is not None and home is not None and fit_y == self.root.winfo_rooty():
+                    y += home - fit_y       # moved up only to fit the screen (_fit_top): the next start uses the user's place
                 self._win_pos = (x, y)
 
     def _yield_popups(self):

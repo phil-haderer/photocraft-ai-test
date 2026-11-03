@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
@@ -76,7 +77,10 @@ class ThemeMixin:
         s.configure("Tab.Toolbutton", background=PANEL, foreground=FG, padding=(8, 5), anchor="w", relief="flat",
                     borderwidth=0, font=font(10))
         s.map("Tab.Toolbutton", background=[("selected", ACCENT), ("active", "#5f5f5f")],
-              foreground=[("selected", "#1b1b1b")])
+              foreground=[("selected", ON_ACCENT)], font=[("selected", font(10, bold=True))])
+        # the model buttons of the settings window: the look of the function buttons, a size smaller, centred
+        s.configure("Set.Tab.Toolbutton", padding=(8, 3), anchor="center", font=font(9))
+        s.map("Set.Tab.Toolbutton", font=[("selected", font(9, bold=True))])
         s.configure("Link.TButton", background=BG, foreground=MUTED, padding=(0, 2), borderwidth=0, relief="flat",
                     width=0)   # as wide as its text: clam's minimum width would centre "Advanced" and push it right
         s.map("Link.TButton", foreground=[("active", FG)], background=[("active", BG)])
@@ -86,7 +90,7 @@ class ThemeMixin:
         s.configure("Small.Toolbutton", background=PANEL, foreground=FG, padding=(8, 2), font=font(9), anchor="center",
                     relief="flat", borderwidth=0)
         s.map("Small.Toolbutton", background=[("selected", ACCENT), ("active", "#5f5f5f")],
-              foreground=[("selected", "#1b1b1b")])
+              foreground=[("selected", ON_ACCENT)], font=[("selected", font(9, bold=True))])
         # the Easy Mode switch in the header (user 31.10.): no fill, never orange; only its icon turns from grey to orange
         s.configure("Switch.Toolbutton", background=BG, foreground=FG, padding=(4, 2), font=font(9), relief="flat", borderwidth=0)
         s.map("Switch.Toolbutton", background=[("selected", BG), ("active", BG)], foreground=[("selected", FG), ("active", FG)])
@@ -97,8 +101,9 @@ class ThemeMixin:
         s.map("Chip.Toolbutton", foreground=[("disabled", DISABLED), ("selected", ACCENT_TEXT)],
               bordercolor=[("disabled", "#4a4a4a"), ("selected", ACCENT)], background=[("active", "#5f5f5f")])
         s.configure("Missing.Chip.Toolbutton", foreground=NA_RED)
-        s.configure("Accent.TButton", background=ACCENT, foreground="#1b1b1b", font=font(10, bold=True))
+        s.configure("Accent.TButton", background=ACCENT, foreground=ON_ACCENT, font=font(10, bold=True))
         s.map("Accent.TButton", background=[("active", "#5ba3f5"), ("disabled", "#5a6678")])
+        s.configure("Fit.TButton", padding=(5, 6), width=0)     # "Cancel all": as wide as its text (a fixed width cut the last letter)
         s.configure("Split.Accent.TButton", padding=(6, 6))     # the narrow "×2 ▾" piece on the right of Generate
         s.configure("TCombobox", fieldbackground=PANEL, background=PANEL, foreground=FG, arrowcolor=FG)
         s.map("TCombobox", fieldbackground=[("readonly", PANEL)], foreground=[("readonly", FG)],
@@ -112,6 +117,7 @@ class ThemeMixin:
         s.configure("Sep.TFrame", background="#9a9a9a")
         s.configure("SepWhite.TFrame", background="#ffffff")       # the line above the model tabs of the settings window (user 1.11.)
         s.configure("SetGreen.TLabel", foreground=DONE_GREEN, font=font(10, bold=True))      # the tick behind a ready model
+        s.configure("SetWarn.TLabel", foreground="#f5c542", font=font(9))      # a hint that is no error (unencrypted connection)
         s.configure("SetRed.TLabel", foreground=ERROR_TEXT, font=font(10, bold=True))        # the X behind a model that is not yet available
         s.configure("SetHead9.TLabel", foreground="#ffffff", font=font(9, bold=True))        # "Covers these modes:", the same line height as the list
         s.configure("Done.TLabel", foreground=DONE_GREEN, font=font(10, bold=True))      # the word "Done"
@@ -258,7 +264,7 @@ class ThemeMixin:
                 wide.paste(pic, (0, 0))
                 cache[k] = icons.photo(self.root, None, c, px, image=wide)
             return cache[k]
-        return (img(FG), "selected", img("#1b1b1b"), "disabled", img(DISABLED))
+        return (img(FG), "selected", img(ON_ACCENT), "disabled", img(DISABLED))
 
     def _slider_row(self, frame):
         """Sharpen, Match colours, Edge feather and Mix source/new share one layout: the label takes the room on the left,
@@ -329,17 +335,62 @@ class ThemeMixin:
                 pass
         self._on_content_size()
 
+    def _screen_span(self) -> tuple[int, int]:
+        """(top, bottom) the window's content may use on the monitor it is on: bottom leaves room for the taskbar."""
+        try:
+            x = int(self.root.winfo_rootx()) + int(self.root.winfo_width()) // 2
+            y = max(0, int(self.root.winfo_rooty()))
+            _, top, _, bottom = self._monitor_at(x, y)
+            return int(top), int(bottom) - self._px(56)      # 56: taskbar and frame
+        except (AttributeError, TypeError, ValueError, tk.TclError):
+            return 0, 10 ** 6
+
     def _max_height(self) -> int:
         """The tallest the window may be: down to the bottom of the screen's work area from where the window starts."""
         try:
-            top = max(0, int(self.root.winfo_rooty()))
-            return max(self._px(320), int(self.root.winfo_screenheight()) - top - self._px(56))   # 56: taskbar and frame
+            return max(self._px(320), self._screen_span()[1] - max(0, int(self.root.winfo_rooty())))
         except (TypeError, ValueError, tk.TclError):
             return 10 ** 6
 
+    def _fit_top(self, needed: int) -> int | None:
+        """Where the top of the window's content should be so that `needed` pixels fit on the screen (user 3.11.: no scroll
+        bar while the whole plugin fits on the screen). The place the user chose (dragged, placed, saved) is home: the
+        window stays there while it fits, moves up only as far as it must, and goes back home when it is smaller again.
+        None: it does not fit even from the top of the screen (the body scrolls) or the position is unknown."""
+        try:
+            cur = int(self.root.winfo_rooty())
+        except (TypeError, ValueError, tk.TclError):
+            return None
+        if cur not in getattr(self, "_fit_ys", ()):        # moved by someone else (drag, placement): that is home now
+            self._home_y = cur
+            self._fit_ys = (cur,)
+        top, bottom = self._screen_span()
+        home = getattr(self, "_home_y", cur)
+        if needed > bottom - top:
+            return top
+        return max(top, min(home, bottom - needed))
+
+    def _move_top(self, y: int) -> int:
+        """Moves the window so its content starts at screen y (x stays) and returns where it really starts: a title bar
+        (Linux, PCCOMFY_TITLEBAR) is kept in the sum, and a window manager may hold the window lower (GNOME's top bar)."""
+        try:
+            cur = int(self.root.winfo_rooty())
+            if cur != y:
+                m = re.match(r"\d+x\d+([+-]-?\d+)([+-]-?\d+)", self.root.geometry())
+                fx, fy = int(m.group(1).replace("+", "")), int(m.group(2).replace("+", ""))
+                self.root.geometry(f"+{fx}+{y - (cur - fy)}")         # cur - fy: the height of a title bar, 0 without
+                self.root.update_idletasks()
+                cur = int(self.root.winfo_rooty())
+        except (AttributeError, TypeError, ValueError, tk.TclError):
+            return y
+        self._fit_y = cur
+        self._fit_ys = tuple({*getattr(self, "_fit_ys", ()), y, cur})     # positions this window chose, not the user
+        return cur
+
     def _fit_height(self, width: int | None = None):
-        """The window is MIN_W wide (fixed) and exactly as high as its content needs. When that is taller than the screen
-        allows, the body under the tabs gets the room that is left and scrolls (thin bar on the right)."""
+        """The window is MIN_W wide (fixed) and exactly as high as its content needs. When it would reach below the screen,
+        it moves up first (_fit_top); only when it is taller than the whole screen, the body under the tabs gets the room
+        that is left and scrolls (thin bar on the right)."""
         self.root.update_idletasks()
         if getattr(self, "_minimized", False):          # only the header: exactly its height
             w, h = self._px(MIN_W), self.root.winfo_reqheight()
@@ -358,7 +409,11 @@ class ThemeMixin:
                 except (TypeError, ValueError, tk.TclError):
                     cur = body
                 others = self.root.winfo_reqheight() - cur          # everything but the scrolled body
-                room = self._max_height() - others if isinstance(others, int) else body
+                y = self._fit_top(others + body) if isinstance(others, int) else None
+                if y is not None:
+                    room = self._screen_span()[1] - self._move_top(y) - others
+                else:
+                    room = self._max_height() - others if isinstance(others, int) else body
                 target = body if body <= room else max(self._px(120), room)
                 if target != cur:
                     cv.configure(height=target)
