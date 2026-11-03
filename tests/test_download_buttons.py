@@ -58,7 +58,7 @@ def main():
         del os.environ["PCCOMFY_SIMULATE_NO_MODELS"]
 
     # ---- the buttons
-    mdir = Path(tempfile.mkdtemp())
+    mdir = Path(tempfile.mkdtemp()).resolve()        # the long form: a temp path can hold a short name like FDK-DE~1, the download target is resolved
     os.environ["PCCOMFY_MODELS_DIR"] = str(mdir)
     app = ts.make_app()
     lists = td.full_lists()

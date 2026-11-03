@@ -68,19 +68,20 @@ FLUX3_REFINE_PROMPTS = (
 )
 # Qwen 2.1 Upscale and Refine (workflow qwen212KUpscale_v10): the generic prompt of the workflow is the standard setting (user 2.11.: perfect)
 QWEN_UPSCALE_DEFAULT = "Enhance this image to high resolution while preserving the original composition, lighting, and atmosphere. Image can be illustration or real photo, keep the original input style."
-QWEN_UPSCALE_TIP = "The prompt matters most. Too much grain, noise or artifacts? Try rewording it."
 FIBO_REFINE = "relight the scene to natural lighting"   # Fibo Refine's old prompt (now FLUX2_DEFAULT, user 28.10.); kept as a stock text
-FILL_TIP = "Draw a selection and prompt e.g. “a red flower”. Hide layers from previous results before running again."   # wording from the user (28.10.)
+FILL_TIP = "Draw a selection and prompt e.g. “add a red flower”. Always hide the layers of previous results before running again."   # wording from the user (3.11.)
 QWEN_SMALL = "Small selections don't work well with Qwen."   # user 30.10.: small fills came out shifted (helikopter.psd)
-REMOVE_NAME_TIP = "Optional: name what to remove (\"the dog\")."
-REMOVE_AGAIN = "If the first try didn't work, try removing it a second time."   # Fibo Remove, idea of the user (28.10.)
-MULTI_TIP = "Place reference images on an image or on an empty white canvas. Example: \"Place the tent from {tag} in the meadow.\""   # {tag}: the model's name for reference image 1 (user 1.11.)
-EDIT_TIP = "Describe the result: \u201cReplace the dog with a vase of flowers.\u201d"
+REMOVE_NAME_TIP = "Name what to remove (e.g. “car”)."
+REMOVE_AGAIN = "If the first try doesn't work, try removing it a second time."   # idea of the user (28.10.), for all models since 3.11.
+REMOVE_TIP = REMOVE_NAME_TIP + " " + REMOVE_AGAIN
+MULTI_TIP = "Example: “Place the bag from {tag} on the table.” Cut out the object in the reference image before using it."   # {tag}: the model's name for reference image 1 (user 3.11.)
+EDIT_TIP = "Describe the result: “Replace the laptop with a book.” or “Remove the sitting person.”"   # user 3.11., the same for every model
 # Krea 2 / MOSS Expand (wording chosen by the user 29.10.; A/B test docs/tests/krea-moss-expand-ab.md)
 EXPAND_DESCRIBE_TIP = ("This model needs a prompt: describe the surroundings only (place, light, style), not the main subject. "
                        "Describe writes one for you.")
-DESCRIBE_TIP = "Add a short description of your image in front of this text."   # Refine and Upscale, wording chosen by the user (28.10.)
-T2I_TIP = "Text to image: a completely new image is added to the canvas as a new layer."
+DESCRIBE_TIP = "Add a short description of your image in front of the default prompt for better results."   # Upscale, every model (user 3.11.)
+REFINE_TIP = "Refine keeps the size and redraws fine detail. " + DESCRIBE_TIP   # Refine, every model (user 3.11.)
+T2I_TIP = "A new image is added to the canvas."   # user 3.11.
 FLUX3_DEFAULT_OLD = "Restore the photo: remove blur, noise and compression artifacts and recover sharp, natural detail, keeping the same composition, people and colors."
 STOCK_PROMPTS = {FLUX2_DEFAULT_PREV, FLUX2_DEFAULT_OLD, FLUX3_DEFAULT_OLD, PLACEHOLDER, FLUX2_DEFAULT, FLUX3_DEFAULT, FLUX3_RESTORE, QWEN_UPSCALE_DEFAULT, RELIGHT_NEUTRAL, RELIGHT_STUDIO, FIBO_REFINE}   # texts the window may replace when the mode changes
 
@@ -99,7 +100,6 @@ FUNCTION_TIPS = {
     "refine": "Cleans up the whole picture at the same size, as a new layer. A selection is ignored.",
     "txt2img": "New picture from text only, as a new layer. A selection is ignored.",
 }
-EDIT_AGAIN = "Nothing happens? Generate again or word it more fully."     # Flux 2 and 3 Edit (was in their tooltip)
 
 QWEN = Model(
     "qwen", "Qwen 2.1 Edit",
@@ -111,11 +111,11 @@ QWEN = Model(
         # soft: opaque over the selection, fading out to the crop's side (Bridge: soft_layer_mask; Fill mask test round 30.10.)
         "inpaint": Mode("qwen-image-21-edit.json", dict(_SOFT, base_res=1024, context=0.4, turbo=False, feather_pct=4.0), prompt_tip=FILL_TIP + " " + QWEN_SMALL),
         "outpaint": Mode("qwen-image-21-edit.json", dict(base_res=1024, turbo=False, layer_mask="none")),   # = the old "auto"
-        "remove": Mode("qwen-image-21-edit.json", dict(_SOFT, base_res=1024, context=0.4, turbo=False, feather_pct=10.0), prompt_tip=REMOVE_NAME_TIP, remove_text=True),
+        "remove": Mode("qwen-image-21-edit.json", dict(_SOFT, base_res=1024, context=0.4, turbo=False, feather_pct=10.0), prompt_tip=REMOVE_TIP, remove_text=True),
         # native 2K upscale: no upscaler node and no LoRA, 25 steps; the result is about the scale factor times the picture, up to 24 MP
-        "upscale": Mode("qwen-image-21-upscale.json", dict(scale=1.5, turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=QWEN_UPSCALE_TIP),
+        "upscale": Mode("qwen-image-21-upscale.json", dict(scale=1.5, turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=DESCRIBE_TIP),
         # the same graph at the size of the canvas (factor 1); not ranked yet, waits for the user's test (2.11.)
-        "refine": Mode("qwen-image-21-upscale.json", dict(turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=QWEN_UPSCALE_TIP),
+        "refine": Mode("qwen-image-21-upscale.json", dict(turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=REFINE_TIP),
     },
     requires=(
         "qwen_image_2.1_int8_convrot.safetensors",
@@ -128,12 +128,12 @@ FLUX2 = Model(
     "FLUX.2 Klein 9B: text to image, whole-image edits, Remove Selection, Expand, Upscale, Refine.",
     {
         "txt2img": Mode("flux2-klein-t2i.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
-        "edit": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="none"), prompt_tip=EDIT_TIP + " " + EDIT_AGAIN),
+        "edit": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="none"), prompt_tip=EDIT_TIP),
         "multi_edit": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="none"), prompt_tip=MULTI_TIP, run_as="edit"),
-        "remove": Mode("flux2-klein-edit.json", dict(_SOFT, base_res=1024, context=0.4, feather_pct=10.0), prompt_tip=REMOVE_NAME_TIP + " " + REMOVE_AGAIN, remove_text=True),
+        "remove": Mode("flux2-klein-edit.json", dict(_SOFT, base_res=1024, context=0.4, feather_pct=10.0), prompt_tip=REMOVE_TIP, remove_text=True),
         "outpaint": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="none")),
         "upscale": Mode("flux2-klein-upscale.json", dict(scale=1.5, turbo=True, context=0.0), FLUX2_DEFAULT, prompt_tip=DESCRIBE_TIP),
-        "refine": Mode("flux2-klein-upscale.json", dict(turbo=True, context=0.0), FLUX2_DEFAULT, FLUX2_REFINE_PROMPTS, DESCRIBE_TIP),
+        "refine": Mode("flux2-klein-upscale.json", dict(turbo=True, context=0.0), FLUX2_DEFAULT, FLUX2_REFINE_PROMPTS, REFINE_TIP),
     },
     requires=(
         "flux-2-klein-9b_int8_convrot.safetensors",
@@ -147,14 +147,14 @@ FLUX3 = Model(
     "FLUX.3 Klein: text to image, whole-image edits, Remove Selection, Expand, Upscale, Refine.",
     {
         "txt2img": Mode("flux3-klein-t2i.json", dict(base_res=1536, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
-        "edit": Mode("flux3-klein-edit.json", dict(base_res=1536, layer_mask="none"), prompt_tip=EDIT_TIP + " " + EDIT_AGAIN),
+        "edit": Mode("flux3-klein-edit.json", dict(base_res=1536, layer_mask="none"), prompt_tip=EDIT_TIP),
         "multi_edit": Mode("flux3-klein-edit.json", dict(base_res=1536, layer_mask="none"), prompt_tip=MULTI_TIP, run_as="edit"),
-        "remove": Mode("flux3-klein-edit.json", dict(_SOFT, base_res=1536, context=0.4, feather_pct=10.0), prompt_tip=REMOVE_NAME_TIP, remove_text=True),
+        "remove": Mode("flux3-klein-edit.json", dict(_SOFT, base_res=1536, context=0.4, feather_pct=10.0), prompt_tip=REMOVE_TIP, remove_text=True),
         # Expand: its own graph with ausboss' outpaint LoRA (29.10., after Pixaroma's "14. Flux 3 Klein - Outpaint"; without
         # it Flux 3 slid or zoomed the picture instead of filling the margin): grey margin, ~1 megapixel, Context 1.0
         "outpaint": Mode("flux3-klein-outpaint.json", dict(base_res=1024, context=1.0, layer_mask="none")),
         "upscale": Mode("flux3-klein-upscale.json", dict(scale=1.5, turbo=True, stage_on=False, stage2_on=True, context=0.0, detail=0.7), FLUX3_DEFAULT, prompt_tip=DESCRIBE_TIP),
-        "refine": Mode("flux3-klein-refine.json", dict(turbo=False, context=0.0), FLUX3_DEFAULT, FLUX3_REFINE_PROMPTS, DESCRIBE_TIP),
+        "refine": Mode("flux3-klein-refine.json", dict(turbo=False, context=0.0), FLUX3_DEFAULT, FLUX3_REFINE_PROMPTS, REFINE_TIP),
     },
     requires=(
         "flux3-image-klein-int8-convrot.safetensors",
@@ -222,10 +222,10 @@ FIBO = Model(
         "edit": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=EDIT_TIP),
         "multi_edit": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=MULTI_TIP, run_as="edit"),
         "refine": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False, sharpen=0.1), FLUX2_DEFAULT, run_as="edit",
-                       prompt_tip=DESCRIBE_TIP + " Change the prompt for other edits."),   # Sharpen 10 % (final, user 31.10.)
+                       prompt_tip=REFINE_TIP),   # Sharpen 10 % (final, user 31.10.)
         "inpaint": Mode("fibo2-edit.json", dict(base_res=1024, context=0.1, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=FILL_TIP),   # Context 0.1 chosen by the user 1.11. (was 0.4 from the test round 28.10.); Edge feather 10 % stays
         "outpaint": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False)),
-        "remove": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=REMOVE_NAME_TIP + " " + REMOVE_AGAIN, remove_text=True),
+        "remove": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=REMOVE_TIP, remove_text=True),
     },
     requires=(
         "fibo2_edit_turbo_int8_convrot.safetensors",

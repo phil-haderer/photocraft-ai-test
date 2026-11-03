@@ -293,19 +293,18 @@ def main():
     assert all(back.values())
     # Flux 3 restore prompt without "people" (an older copy in the field is replaced); a tip under the prompt in Edit Canvas
     assert "people" not in models.FLUX3_DEFAULT and models.FLUX3_DEFAULT_OLD in models.STOCK_PROMPTS
-    for key in ("qwen", "fibo"):
+    for key in ("qwen", "fibo", "flux2", "flux3"):     # the same tip for every model (user 3.11.)
         assert models.BY_KEY[key].modes["edit"].prompt_tip == models.EDIT_TIP, key
-    for key in ("flux2", "flux3"):        # the Flux note moved from the tooltip under the prompt (user 28.10.)
-        assert models.BY_KEY[key].modes["edit"].prompt_tip == models.EDIT_TIP + " " + models.EDIT_AGAIN, key
 
     # run time next to "Done"; Flux 2 refine default without "people, faces"; the tip is a wrapped label
     assert gui.duration_text(23.4) == "23 s" and gui.duration_text(65) == "1 min 05 s" and gui.duration_text(0.2) == "0 s"
     assert "people" not in models.FLUX2_DEFAULT and models.FLUX2_DEFAULT_OLD in models.STOCK_PROMPTS and models.FLUX2_DEFAULT.endswith("Keep the composition and colors exactly as they are.") and models.FLUX2_DEFAULT_PREV in models.STOCK_PROMPTS
-    assert models.EDIT_TIP == "Describe the result: \u201cReplace the dog with a vase of flowers.\u201d"
+    assert models.EDIT_TIP == "Describe the result: “Replace the laptop with a book.” or “Remove the sitting person.”"
     assert app.lbl_hint["wrap"] == "word"      # selectable text
-    # an orange info icon in front of the tip, both in one row (user 29.10.)
+    # an info icon in front of the tip, both in one row (user 29.10.), in the brighter tip blue (user 3.11.)
     from pccomfy import gui_theme
-    assert app.lbl_hint_icon["image"] == app._icon("info", gui.ACCENT_TEXT, px=gui_theme.HINT_ICON_PX)
+    assert app.lbl_hint_icon["image"] == app._icon("info", gui.HINT_TEXT, px=gui_theme.HINT_ICON_PX)
+    assert app.lbl_hint["fg"] == gui.HINT_TEXT and gui.HINT_TEXT != gui.ACCENT_TEXT
 
     # the Upscale factor sits under the LLM row (the negative prompt when that row is hidden), above the LoRA box
     scale_pack = rec(app.f_scale, "pack")

@@ -20,7 +20,8 @@ MAX_SIDE = 1024                      # the longest side of a reference image sen
 DEFAULT_BACKGROUND = (128, 128, 128)
 
 BBOX_CHECK_TIP = "Your selection becomes a box named <obj_1> in the prompt. Without a selection the run is a normal Multi Image Edit."
-BBOX_TIP = "Place a rectangle on the canvas and simply name the object in the prompt. E.g.: \"car\""
+BBOX_TIP = ("Draw a rectangular selection on the canvas and simply name the object from the reference image in the prompt, "
+            "e.g. “wine glass”. It will be placed exactly where you want it.")   # under the prompt while BBOX is ticked (user 3.11.)
 
 
 # ---- rewriting the image names in the prompt when the model changes ----
@@ -381,11 +382,11 @@ class RefSlotsMixin:
         self.lbl_refdesc.pack(side="left", fill="x", expand=True)
         self._ref_shown = None          # the slot item whose description spot XY shows
         self.lbl_refmsg = ttk.Label(self.f_refs, text="", style="Hint.TLabel", wraplength=self._px(380 - 24), justify="left")   # only packed while it has text
-        # BBOX next to "Prompt" (user 30.10.): the selection is the box <obj_1>; the tip is under the slots while it is ticked
+        # BBOX next to "Prompt" (user 30.10.): the selection is the box <obj_1>; while it is ticked its tip is the one under the
+        # prompt (user 3.11.: no tip under the slots)
         self.v_bbox = tk.BooleanVar(value=False)       # off at every start, like the other start values
         self.cb_bbox = ttk.Checkbutton(self.f_ptop, text="BBOX", variable=self.v_bbox, command=self._refs_bbox_changed)
         Tooltip(self.cb_bbox, BBOX_CHECK_TIP)
-        self.lbl_refbbox = ttk.Label(self.f_refs, text=BBOX_TIP, style="Hint.TLabel", wraplength=self._px(380 - 24), justify="left")
         self._refs_dnd = self._refs_setup_dnd()
         try:
             self.root.bind("<Control-v>", self._refs_ctrl_v, add="+")
@@ -394,11 +395,8 @@ class RefSlotsMixin:
             pass
 
     def _refs_bbox_changed(self):
-        """The BBOX tip under the slots shows while BBOX is ticked."""
-        if self._bbox_on():
-            self.lbl_refbbox.pack(fill="x", pady=(4, 0), side="bottom")
-        else:
-            self.lbl_refbbox.pack_forget()
+        """BBOX ticked or not: the tip under the prompt changes with it."""
+        self._update_prompt_hint()
 
     def _refs_setup_dnd(self) -> bool:
         """Drag and drop needs the optional package tkinterdnd2; without it everything else still works."""

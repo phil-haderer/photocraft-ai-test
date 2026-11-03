@@ -69,7 +69,7 @@ def config_checks():
     if sys.platform == "win32":
         assert "pythonw.exe" in cmd.lower(), cmd     # no console window at login
     # the same values as the starter .bat passes on its command line
-    bat_file = ROOT / "photocraft-ai neuer-nutzer.bat"      # only in the private working repo, not in a release
+    bat_file = ROOT / "test new user.bat"      # only in the private working repo, not in a release
     if bat_file.exists():
         bat = bat_file.read_text(encoding="utf-8", errors="replace")
         for flag in ("--control ", "--control-token-file", "--automation-read-root", "--automation-write-root"):

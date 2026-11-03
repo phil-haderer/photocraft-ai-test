@@ -582,7 +582,7 @@ class SettingsMixin(DownloadMixin):
                 ("Reset all modes to default settings", "Forgets every page you saved with “Set as my settings” (right-click on a model chip): "
                  "all models and functions start with their standard settings again. Asks first.", self._reset_all_modes),
                 ("Reset favourite models", "Forgets every favourite you set with the right-click menu of a model chip: "
-                 "Easy Mode and the functions use the ranking again. Asks first.", self._reset_favourites)):
+                 "Easy Mode and the functions use the default ranking again. Asks first.", self._reset_favourites)):
             b = ttk.Button(parent, text=text, style="SetSmall.TButton", command=command)
             b.pack(side="top", anchor="w", padx=14, pady=(8, 0))
             Tooltip(b, tip)
@@ -617,17 +617,17 @@ class SettingsMixin(DownloadMixin):
     def _reset_favourites(self):
         favs = cfgmod.favorites()
         if not favs:
-            self._status("No favourite model is set, the ranking is used everywhere.")
+            self._status("No favourite model is set, the default ranking is used everywhere.")
             return
         n = len(favs)
         if not messagebox.askyesno("Reset favourite models", f"Forget the favourite model of {n} function{'s' if n != 1 else ''}?\n\n"      # noqa: F405
-                                   "Easy Mode and the functions will use the ranking again.",
+                                   "Easy Mode and the functions will use the default ranking again.",
                                    parent=self._settings_win or self.root):
             return
         cfgmod.set_setting("favorites", None)
         if getattr(self, "_easy", False):
             self._easy_refresh()          # Easy Mode picks its models by the ranking again
-        self._status("All favourite models are forgotten: the ranking is used again.")
+        self._status("All favourite models are forgotten: the default ranking is used again.")
 
     def _scroll_page(self, key: str, title: str) -> dict:
         """One tab of the model notebook: a canvas that scrolls, its rows in a frame (the rows: one per file, in a frame each)."""

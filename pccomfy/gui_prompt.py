@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from . import hostos, manifest, styles
+from .refslots import BBOX_TIP
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
@@ -122,6 +123,8 @@ class PromptMixin:
         m = self._model()
         spec = m.modes.get(mode) if m else None
         text = (spec.prompt_tip if spec and spec.prompt_tip else "") or (EXPAND_HINT if mode == "outpaint" else "")
+        if mode == "multi_edit" and getattr(self, "v_bbox", None) is not None and self._bbox_on():
+            text = BBOX_TIP              # BBOX ticked: its tip instead of the Multi Image Edit one, only here (user 3.11.)
         if "{tag}" in text:      # Multi Image Edit: the example names the first reference the way this model does
             text = text.replace("{tag}", m.tag_style.format(n=2, i=1) if m and m.tag_style else "the reference image")
         on = bool(text)

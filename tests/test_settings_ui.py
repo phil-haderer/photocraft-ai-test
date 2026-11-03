@@ -60,6 +60,7 @@ def file_rows(app) -> list[dict]:
 
 def make_app():
     app = gui.App(cfgmod.load())
+    app._comfy_root = Path("")        # never look up a ComfyUI running on this PC: its real models folder would change the results
     wfdir = Path(app.workflows_dir)
     wfdir.mkdir(parents=True, exist_ok=True)
     names = sorted({w for m in models.MODELS for w in m.workflows()})

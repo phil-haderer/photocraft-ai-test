@@ -108,7 +108,8 @@ def main():
     app.root.update()
     px, py = app.root.winfo_pointerx(), app.root.winfo_pointery()
     gx, gy = app._style_tip_pos
-    assert abs(gy - (py - 12)) < 80 and gx > 0, (gx, gy, px, py)
+    vx0, vy0, vx1, _vy1 = app._monitor_at(px, py)           # the mouse's screen: left of the main one its x is negative
+    assert abs(gy - (py - 12)) < 80 and vx0 <= gx < vx1 and (gx, gy) != (vx0, vy0), (gx, gy, px, py, vx0, vy0, vx1)
     app._style_tip_hide()
 
     # Easy Mode keeps the Styles button (user 1.11.) beside the bin, hides LLM, and LLM comes back between them

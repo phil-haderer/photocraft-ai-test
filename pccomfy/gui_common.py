@@ -38,7 +38,7 @@ MODE_LABELS = [
 SHORT_MODES = {"txt2img": "Text", "edit": "Edit", "inpaint": "Fill Selection", "outpaint": "Expand", "multi_edit": "Multi Edit",
                "remove": "Remove Selection", "upscale": "Upscale", "refine": "Refine", "img2img": "Img2img"}   # layer names
 MODE_TIPS = models.FUNCTION_TIPS    # the tooltips of the function buttons, the same for every model (user 28.10.)
-EXPAND_HINT = "Try removing the prompt for expanding"
+EXPAND_HINT = "Don't use a prompt for expanding."   # user 3.11.
 BUILTIN = "Built-in (checkpoint)"
 PROMPT_LINES = 5     # height of the prompt field in lines (it can be dragged taller or smaller)
 LAYER_MASKS = {"soft": "soft", "selection": "hard (from selection)", "none": "none"}
@@ -672,6 +672,7 @@ CLIP_DEFAULT = "(workflow default)"
 
 PAGE_NOT_SAVED = ("mode", "workflow", "clip", "checkpoint", "seed", "prompt", "negative", "variants")   # what "Set as my settings" leaves out: the page itself, the text, the seed and the number of variants
 BG, PANEL, FG, MUTED, ACCENT = "#535353", "#282828", "#eeeeee", "#cfcfcf", "#378ef0"   # PhotoCraft grey and blue (both measured from a screenshot); PANEL = inactive tab, fields, buttons, slots
+HINT_TEXT = "#82b8f7"       # the tip under the prompt: a little brighter than ACCENT_TEXT, for reading (user 3.11.)
 ACCENT_TEXT = "#6aaaf5"     # the blue for text and thin lines on the grey (the exact blue is too dark there: 2.3 : 1 on BG, this 3.2 : 1 like the old orange)
 NA_RED = "#ff6b6b"      # text of a tab that is not available (model files missing); 5.3 : 1 on PANEL
 DISABLED = "#8e8e8e"   # text of a greyed-out control: clearly darker than MUTED, so it reads as "not available here"
@@ -800,6 +801,7 @@ __all__ = [
     "SHORT_MODES",
     "MODE_TIPS",
     "EXPAND_HINT",
+    "HINT_TEXT",
     "BUILTIN",
     "PROMPT_LINES",
     "LAYER_MASKS",

@@ -16,7 +16,7 @@ from .refslots import RefSlotsMixin
 from . import clipboard
 from . import easymode
 from . import hostos
-from .appname import WINDOW_TITLE
+from .appname import HEADER_TITLE, WINDOW_TITLE
 
 
 class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, ModeMixin, StateMixin, RunMixin, TipsMixin):
@@ -150,11 +150,15 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.f_logo = ttk.Frame(self.f_header, height=self._px(ICON_PX + 12))
         self.f_logo.pack(side="left", fill="x", expand=True)
         self.f_logo.pack_propagate(False)       # the title never makes the header higher
-        # a makeshift title until the user's picture comes: "PhotoCraft" in white, "AI" in blue, large (user 1.11.)
-        self.lbl_title = [ttk.Label(self.f_logo, text="PhotoCraft", foreground="#ffffff", font=font(16, bold=True)),
-                          ttk.Label(self.f_logo, text="AI", foreground=ACCENT, font=font(16, bold=True))]
+        # a makeshift title until the user's picture comes (user 3.11., variant B): the two names white and thin, the sign
+        # between them blue and bold, 12 pt; the texts come from appname.py
+        left, sign, right = HEADER_TITLE
+        self.lbl_title = [ttk.Label(self.f_logo, text=left, foreground="#ffffff", font=font(12)),
+                          ttk.Label(self.f_logo, text=sign, foreground=ACCENT, font=font(12, bold=True)),
+                          ttk.Label(self.f_logo, text=right, foreground="#ffffff", font=font(12))]
         self.lbl_title[0].pack(side="left", padx=(2, 5))
-        self.lbl_title[1].pack(side="left")
+        self.lbl_title[1].pack(side="left", padx=(0, 5))
+        self.lbl_title[2].pack(side="left")
         self._minimized = False
         if self._frameless:         # far right: closes the plugin (what the title bar's cross did)
             self.b_close = ttk.Button(self.f_header, image=self._icon("close", px=SMALL_ICON_PX), style="Link.TButton", command=self._quit)
@@ -370,11 +374,11 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         Tooltip(self.grip, "Drag to resize the prompt field.")
         # the tip under the prompt: orange text with an orange info icon in front, level with its first line (user 29.10.)
         self.f_hint = ttk.Frame(r)
-        self.lbl_hint_icon = ttk.Label(self.f_hint, image=self._icon("info", ACCENT_TEXT, px=HINT_ICON_PX))
-        self.lbl_hint_icon.pack(side="left", anchor="n", padx=(0, 6), pady=(2, 0))
+        self.lbl_hint_icon = ttk.Label(self.f_hint, image=self._icon("info", HINT_TEXT, px=HINT_ICON_PX))
+        self.lbl_hint_icon.pack(side="left", anchor="n", padx=(0, 6), pady=(self._px(4), 0))
         # selectable text (user 1.11.), not the icon; the wrap width is the row's width
-        self.lbl_hint = SelectableLabel(self.f_hint, text=EXPAND_HINT, fg=ACCENT_TEXT, bg=BG, fnt=font(10))   # Expand image, Upscale, Refine (see _update_prompt_hint)
-        self.lbl_hint.pack(side="left", anchor="n", fill="x", expand=True)
+        self.lbl_hint = SelectableLabel(self.f_hint, text=EXPAND_HINT, fg=HINT_TEXT, bg=BG, fnt=font(10))   # every mode's tip (see _update_prompt_hint)
+        self.lbl_hint.pack(side="left", anchor="n", fill="x", expand=True, pady=(self._px(4), 0))   # the first line a little lower, level with the icon (user 3.11.)
         # Krea 2 / MOSS Expand: writes a description of the surroundings into the field (under the tip, user 29.10.)
         self.b_describe = ttk.Button(r, text="Describe", style="Small.TButton", command=self.describe_scene)
         Tooltip(self.b_describe, "Qwen 3.5 9B describes the surroundings of your picture (not the main subject) and writes "

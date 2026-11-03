@@ -374,16 +374,16 @@ def main():
     seen = []
     app.cb_bbox.pack = lambda *a, **k: seen.append("box on")
     app.cb_bbox.pack_forget = lambda: seen.append("box off")
-    app.lbl_refbbox.pack = lambda *a, **k: seen.append("tip on")
-    app.lbl_refbbox.pack_forget = lambda: seen.append("tip off")
     pick("flux3", "multi_edit")
-    assert seen[0:1] == ["box on"] and seen[-1] == "tip off" and app._request().bbox is False
+    assert seen[0:1] == ["box on"] and app._request().bbox is False and app._hint_text.startswith("Example:")
+    assert not hasattr(app, "lbl_refbbox")          # no tip under the slots any more (user 3.11.)
     app.v_bbox.set(True)
     app._refs_bbox_changed()
-    assert seen[-1] == "tip on" and app._request().bbox is True and "name the object in the prompt" in refslots.BBOX_TIP
+    assert app._request().bbox is True and app._hint_text == refslots.BBOX_TIP     # BBOX ticked: its tip under the prompt instead
+    assert "name the object from the reference image in the prompt" in refslots.BBOX_TIP
     assert app._request().layer_mask == "soft"      # BBOX: the margin mask, whatever the mode's start value (live finding 30.10.: "none" gave a whole new picture)
     pick("flux3", "edit")
-    assert seen[-2:] == ["box off", "tip off"] or seen[-1] == "box off"
+    assert seen[-1] == "box off" and app._hint_text == gui.models.EDIT_TIP
     assert app._request().bbox is False
     pick("qwen", "multi_edit")               # ticked, but not a Flux 3 function
     assert app._request().bbox is False and not app._bbox_on()

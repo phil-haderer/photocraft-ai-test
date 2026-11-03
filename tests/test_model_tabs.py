@@ -102,7 +102,7 @@ def main():
     assert app._hint_text == models.DESCRIBE_TIP
     app.v_mode.set("edit")
     app._on_mode()
-    assert app._hint_text == models.EDIT_TIP + " " + models.EDIT_AGAIN    # the tip under the prompt in Edit Canvas (Flux 3)
+    assert app._hint_text == models.EDIT_TIP    # the tip under the prompt in Edit Canvas, the same for every model (user 3.11.)
     assert app.v_workflow.get() == "flux3-klein-edit.json" and app.t_prompt.get("1.0", "end").strip() == ""
     app.t_prompt.insert("1.0", "make it night")
     app.v_mode.set("upscale")
@@ -220,7 +220,7 @@ def main():
             assert spec.settings["layer_mask"] == effective_layer_mask("auto", "outpaint", ed, True), m.key
     assert mm["fibo"].modes["inpaint"].prompt_tip == models.FILL_TIP   # the user's wording
     assert mm["qwen"].modes["inpaint"].prompt_tip == models.FILL_TIP + " Small selections don't work well with Qwen."   # user 30.10.
-    assert models.FILL_TIP == "Draw a selection and prompt e.g. “a red flower”. Hide layers from previous results before running again."
+    assert models.FILL_TIP == "Draw a selection and prompt e.g. “add a red flower”. Always hide the layers of previous results before running again."   # user 3.11.
     assert [p[0] for p in mm["flux2"].modes["refine"].prompts] == ["Default", "Neutral", "Studio portrait"]
     assert mm["flux3"].modes["upscale"].prompts == () and mm["flux2"].modes["upscale"].prompts == ()   # Flux 3: the workflow's own prompt only
     # the prompt a refine starts with is the one the workflow sends by default
@@ -230,8 +230,10 @@ def main():
     assert wf2["206"]["_meta"]["pc_default_prompt"] == models.FLUX2_DEFAULT == mm["flux2"].modes["refine"].prompt_hint
     assert wf3["159"]["_meta"]["pc_default_prompt"] == models.FLUX3_DEFAULT == mm["flux3"].modes["upscale"].prompt_hint
     assert wf3["159"]["inputs"]["text"] == ""          # the pc:prompt node itself (no AusBoss text node since 2.11.)
-    assert mm["flux2"].modes["refine"].prompt_tip == mm["flux3"].modes["upscale"].prompt_tip == models.DESCRIBE_TIP
-    assert models.DESCRIBE_TIP == "Add a short description of your image in front of this text."   # user 28.10.
+    assert {m.modes["upscale"].prompt_tip for m in models.MODELS if "upscale" in m.modes} == {models.DESCRIBE_TIP}     # every model (user 3.11.)
+    assert {m.modes["refine"].prompt_tip for m in models.MODELS if "refine" in m.modes} == {models.REFINE_TIP}
+    assert models.DESCRIBE_TIP == "Add a short description of your image in front of the default prompt for better results."
+    assert models.REFINE_TIP == "Refine keeps the size and redraws fine detail. " + models.DESCRIBE_TIP
     # Remove (a test) for Flux 2 and 3: the Qwen way, soft mask with 10 % feather
     for k in ("flux2", "flux3"):
         assert mm[k].modes["remove"].settings["feather_pct"] == 10.0 and mm[k].modes["remove"].settings["layer_mask"] == "soft"
@@ -246,8 +248,8 @@ def main():
         app._on_model()
         tips[key] = app.tt_modes["remove"].text
     assert tips["qwen"] == tips["fibo"] == tips["flux2"] == models.function_tip("remove", models.FUNCTION_TIPS["remove"])
-    assert mm["flux2"].modes["remove"].prompt_tip.endswith(models.REMOVE_AGAIN)
-    assert mm["fibo"].modes["refine"].prompt_tip == models.DESCRIBE_TIP + " Change the prompt for other edits."
+    assert {m.modes["remove"].prompt_tip for m in models.MODELS if "remove" in m.modes} == {models.REMOVE_TIP}        # every model (user 3.11.)
+    assert models.REMOVE_TIP == "Name what to remove (e.g. “car”). If the first try doesn't work, try removing it a second time."
     # every function's tooltip starts with the ranking (user 28.10.); a function without one says so
     assert models.ranking_text("inpaint") == "Ranking: 1. Fibo, 2. Qwen."
     assert models.ranking_text("remove") == "Ranking: 1. Fibo, 2. Qwen (not ranked: Flux 3, Flux 2)."

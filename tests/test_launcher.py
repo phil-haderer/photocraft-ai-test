@@ -30,7 +30,7 @@ def args_checks():
     assert args == [EXE, "--control", "7878", "--control-token-file", str(tmp / "photocraft.token"),
                     "--automation-read-root", str(tmp / "exchange"), "--automation-write-root", str(tmp / "exchange")]
     # the same flags as the starter .bat (that file is only in the private working repo, not in a release)
-    bat_file = ROOT / "photocraft-ai neuer-nutzer.bat"
+    bat_file = ROOT / "test new user.bat"
     if bat_file.exists():
         bat = bat_file.read_text(encoding="utf-8", errors="replace")
         for flag in args[1::2]:
