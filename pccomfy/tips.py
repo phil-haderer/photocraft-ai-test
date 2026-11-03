@@ -1,5 +1,5 @@
 """Tips of the day: the texts of the start-up popup (gui_tips.py). English, one tip per entry; edit the words between the quotes.
-The order is the numbering of docs/tooltips-entwurf.md. Check them against the code when functions change (PLAN.md point 16)."""
+The order is the numbering of docs/tooltips-entwurf.md; the popup remembers the tips it showed by their text (gui_tips.tip_id), so tips may be removed or reordered. Check them against the code when functions change (PLAN.md point 16)."""
 
 TIPS = (
     "Fill Selection: select an area and describe only what should appear there, e.g. \"add a red flower\". Always hide the layers of previous results before the next run.",
@@ -8,27 +8,21 @@ TIPS = (
     "Expand image: crop outward with the Crop tool (Enter), fill the new area white, and try an empty prompt first. Expand big areas in small steps.",
     "In Multi Image Edit your PhotoCraft picture is image 1 and slot 1 is image 2. Click the tag under a slot to add it to your prompt. Cut out the object in the reference image before using it.",
     "Drag a slot picture into the prompt box: its tag lands where you let go, and the text cursor shows the spot.",
-    "\"Describe\" on a slot writes \"<name>: description\" as its own line into your prompt. Edit or delete it freely.",
+    "The Describe icon on a slot picture writes a short description of it into your prompt, as its own line starting with the slot's tag (e.g. \"image 2: a red leather bag\"). Edit or delete it freely.",
     "Flux 3 Multi Image Edit with BBOX: draw a rectangular selection, put a reference in slot 1 and name the object from the reference image in the prompt, e.g. \"wine glass\". It is placed exactly in your rectangle.",
-    "With BBOX and no <obj_1> in your text, the plugin adds \"Place the result in <obj_1>.\" Your selection stays after the run.",
     "Edge feather softens the seam, in % of the selection's shorter side. It shows up with the soft layer mask (Fill, Remove); 0 = hard edge.",
-    "Mask density: 100 % shows only the selection with its soft edge, 0 % the whole redrawn area. You can change it later in PhotoCraft.",
     "\"Show feather\" paints the blend area red in PhotoCraft (Quick Mask). Click it again, or Generate, to get your selection back.",
     "Match colours (Fill Selection only) pulls the new area's saturation back toward its surroundings. 0 = off.",
     "Qwen fills small selections badly. Use a larger selection, or try Fibo 2.0 Edit Turbo.",
-    "Right-click a model chip: \"Set as my settings\" keeps the current sliders, sampler, steps and LoRAs for this function and model; \"Reset page\" brings them back.",
+    "Right-click the chosen model chip and pick \"Set as my settings…\": the current sliders, sampler, steps and LoRAs become your start for this function and model, and \"Reset page\" returns to them. Shift-click \"Reset page\" for the standard settings.",
     "Right-click a model chip and tick \"Favourite for ...\": Easy Mode then uses this model first for that function. \"Reset favourite models\" (gear window, Other settings) forgets all favourites: Easy Mode and the functions use the default ranking again.",
-    "Hover a function button: the tooltip starts with the model ranking for it, e.g. Fill Selection: 1. Fibo, 2. Qwen.",
     "MOSS does text to image only; Krea 2 is the fast text to image model.",
     "The gear window lists the files each model needs. The chain icon links a file ComfyUI already has under another name.",
-    "The disk icon in the gear window downloads a file; right-click it to copy the download link.",
-    "Click the small \"x1\" piece on the right of Generate to make 1 to 8 variants in one run. They land together in one group in PhotoCraft.",
     "\"Live preview\" shows the picture while it is made. It is greyed out until the model's preview decoder file is downloaded.",
     "MOSS text to image is best without the DMD2 speed LoRA: 25 steps at CFG 3.0. The LoRA (8 steps) is faster but looks more artificial.",
     "Ctrl+Enter generates. Esc or Ctrl+Alt+Enter cancels the run.",
     "The clock in the header lists your last 20 runs. Click one to load its settings with a new seed; nothing starts by itself.",
-    "Click a value box next to a slider and type a number. Double-click selects just the number; Up and Down step the value.",
-    "The LLM button describes the picture in PhotoCraft and adds the text to the end of your prompt on a new line. Ctrl+Z in the field undoes it.",
+    "Describe Canvas (above the prompt) adds a short description of the picture in PhotoCraft to the end of your prompt. Ctrl+Z in the field undoes it.",
     "Upscale and Refine: the \"Mix source/new image\" slider blends the plain scaled original into the result; below 100 % it tames over-sharp results.",
     "Right-click a model chip and choose \"Hide this model\" to take it out of the window. It comes back with the tick in its tab of the gear window, or all at once with \"Show all hidden models\" (Other settings).",
     "Upscale and Refine: add a short description of your image in front of the default prompt for better results. Refine keeps the size and redraws fine detail.",

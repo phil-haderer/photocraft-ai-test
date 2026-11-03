@@ -25,6 +25,9 @@ echo Creating the desktop shortcut "PhotoCraft AI" ...
 "%PYRUN%" -m pccomfy shortcut
 echo.
 echo Setup done. Start PhotoCraft with the desktop shortcut "PhotoCraft AI".
+echo.
+echo One ComfyUI custom node pack is needed: ComfyUI-KJNodes (Flux 3 Upscale uses its Color Match node).
+echo Install it from the ComfyUI Manager or from https://github.com/kijai/ComfyUI-KJNodes . If you have it already, do nothing.
 pause
 exit /b 0
 

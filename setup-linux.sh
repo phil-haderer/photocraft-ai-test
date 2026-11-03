@@ -104,6 +104,9 @@ main() {
         fi
     fi
     echo
+    echo "One ComfyUI custom node pack is needed: ComfyUI-KJNodes (Flux 3 Upscale uses its Color Match node)."
+    echo "Install it from the ComfyUI Manager or from https://github.com/kijai/ComfyUI-KJNodes . If you have it already, do nothing."
+    echo
     if [ "$menu" = 1 ]; then
         echo "Setup done. Start PhotoCraft from the application menu (\"PhotoCraft AI\") or with ./photocraft-ai.sh"
     else

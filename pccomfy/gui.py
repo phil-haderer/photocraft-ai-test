@@ -193,7 +193,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
             rb = ttk.Radiobutton(f_fn, text=label, value=key, variable=self.v_mode, style="Tab.Toolbutton",
                                  image=self._function_icon(key), compound="left", command=self._on_mode)
             self.rb_modes[key] = rb
-            self.tt_modes[key] = Tooltip(rb, models.function_tip(key, MODE_TIPS[key]))
+            self.tt_modes[key] = Tooltip(rb, MODE_TIPS[key])
         f_md = self.f_models = ttk.Frame(self.f_tabs)
         f_md.pack(fill="x", pady=(6, 0))
         cols = 3
@@ -336,8 +336,9 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.b_clear = ttk.Button(self.f_ptop, image=self._icons["clear"], style="Link.TButton", command=self._clear_prompt)   # flat: the row keeps its height
         self.b_clear.pack(side="right")
         Tooltip(self.b_clear, "Delete the prompt (Ctrl+Z in the field brings it back).")
-        # "LLM" left of the bin (user 30.10.): the model's own text model describes the picture, the text is added to the prompt
-        self.b_llm = ttk.Button(self.f_ptop, text="LLM", style="Llm.TButton", command=self.describe_canvas)
+        # "Describe Canvas" left of the bin (user 30.10., named "LLM" until 3.11.): the model's own text model describes the
+        # picture, the text is added to the prompt
+        self.b_llm = ttk.Button(self.f_ptop, text="Describe Canvas", style="Llm.TButton", command=self.describe_canvas)
         self.b_llm.pack(side="right", padx=(0, 6))
         self.tt_llm = Tooltip(self.b_llm, LLM_TIP)
         # "Styles" left of "LLM" (user 1.11.): style prompts (styles.json) for the modes that have them, now Text to image; shown by

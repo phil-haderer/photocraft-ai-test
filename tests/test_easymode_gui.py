@@ -109,6 +109,7 @@ def main():
     assert str(app.rb_modes["edit"].cget("state")) == "normal"
     assert app.v_model.get() == "fibo" and app.v_mode.get() == "txt2img", (app.v_model.get(), app.v_mode.get())
     assert app.tt_modes["upscale"].text == em.MODE_GREYED_TIP
+    assert app.tt_modes["edit"].text == "Currently used for this mode: Fibo 2.0 Edit Turbo."     # only the model (user 3.11.)
     del app._model_usable
 
     # back to the normal window: the same stacking order, the same model, function, settings

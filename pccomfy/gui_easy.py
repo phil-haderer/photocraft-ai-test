@@ -149,7 +149,8 @@ class EasyMixin:
             rb = self.rb_modes[key]
             rb.grid(row=i // 2, column=i % 2, sticky="ew", padx=2, pady=2)
             rb.configure(state="normal" if picks[key] else "disabled")
-            self.tt_modes[key].text = MODE_TIPS[key] if picks[key] else em.MODE_GREYED_TIP     # no "Ranking:" line in Easy Mode
+            # only the model Easy Mode uses for it (user 3.11.)
+            self.tt_modes[key].text = em.MODE_MODEL_TIP.format(model=models.BY_KEY[picks[key]].label) if picks[key] else em.MODE_GREYED_TIP
 
     def _show_enhance_box(self, on: bool):
         if not getattr(self, "_easy", False):

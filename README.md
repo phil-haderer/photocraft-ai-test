@@ -26,7 +26,10 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.18 · ComfyUI version: 0.42.0
 4. **Get the models**: open the plugin's settings window (gear symbol). Under **Easy Mode** one button downloads the two starter models
    (Flux 3 Klein Image and Fibo 2.0 Edit Turbo, about 20 GB), which cover all six Easy Mode functions. Flux 3 needs a free Hugging Face login
    once (the button opens its page). Restart ComfyUI afterwards.
-5. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
+5. **Custom node**: the plugin needs one ComfyUI custom node pack, [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
+   (Flux 3 Upscale uses its *Color Match* node). Install it from the ComfyUI Manager or the link, then restart ComfyUI. If you already have it,
+   nothing changes. Without it only Flux 3 Upscale is locked (the settings window names the missing pack); everything else uses ComfyUI's own nodes.
+6. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
 
 Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested
 settings. Refine and Multi Image Edit are not part of Easy Mode: switch it off to use them and to get all settings. 
@@ -48,7 +51,7 @@ attached to the PhotoCraft window.
 3. **Start it**: start ComfyUI, close PhotoCraft, then start **PhotoCraft AI** from the menu (or run `./photocraft-ai.sh`). PhotoCraft opens and the
    plugin window appears. If the `photocraft` program is not found (it is searched in `PATH`, `/opt`, `~/Applications` and
    a few more places), set `PHOTOCRAFT=/path/to/photocraft` or run `.venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft`.
-4. **Models and use**: as in steps 4 and 5 above. Settings and the PhotoCraft token live in `~/.config/pccomfy/`; a different ComfyUI address or port
+4. **Models and use**: as in steps 4 to 6 above (the custom node pack ComfyUI-KJNodes is needed on Linux too). Settings and the PhotoCraft token live in `~/.config/pccomfy/`; a different ComfyUI address or port
    goes into `~/.config/pccomfy/config.toml` (see `config.example.toml`).
 
 ## What it does

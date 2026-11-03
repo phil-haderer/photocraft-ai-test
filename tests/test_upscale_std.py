@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_reference_mode as T  # noqa: E402
-from pccomfy import workflows  # noqa: E402
+from pccomfy import manifest, workflows  # noqa: E402
 from pccomfy.bridge import Request  # noqa: E402
 
 WF = ROOT / "workflows" / "flux3-klein-upscale.json"
@@ -29,6 +29,8 @@ def main():
     assert workflows.has_upscale_slot(g) and workflows.lora_strength(g) == 0.5
     assert [l for _, l in workflows.stage_switches(g)] == ["SeedVR2 pre-cleaning", "4x UltraSharp"]
     assert g["16"]["inputs"]["images"] == ["173", 0] and g["173"]["class_type"] == "ColorMatch"      # colours back to the picture (AusBoss: keep_colors)
+    # Color Match comes from ComfyUI-KJNodes: a missing node names that pack and its link
+    assert (manifest.node_pack("ColorMatch") or ("",))[0] == "ComfyUI-KJNodes"
     assert g["154"]["inputs"]["tile_width"] == ["170", 1] and "ceil" in g["170"]["inputs"]["expression"]    # equal tiles
     off = workflows.bypass_stage(g)
     assert links_ok(off) and not any("SeedVR2" in n["class_type"] for n in off.values())   # 166 (size) survives the switch

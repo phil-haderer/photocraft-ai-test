@@ -20,7 +20,24 @@ from pccomfy.tips import TIPS  # noqa: E402
 
 
 def logic():
-    assert len(TIPS) == 31 and all(isinstance(t, str) and t.strip() for t in TIPS) and len(set(TIPS)) == 31
+    assert len(TIPS) == 25 and all(isinstance(t, str) and t.strip() for t in TIPS) and len(set(TIPS)) == 25
+    # tips removed on 3.11. (user): the shown list keeps the tips' ids, an old list of numbers still counts
+    for gone in ("disk icon", "Mask density", "value box", "no <obj_1>", "\"x1\"", "Hover a function button", "LLM button"):
+        assert not [t for t in TIPS if gone in t], gone
+    ids = [gui_tips.tip_id(t) for t in TIPS]
+    assert len(set(ids)) == len(ids) and len(gui_tips.LEGACY_IDS) == 31
+    fill = TIPS.index(next(t for t in TIPS if t.startswith("Fill Selection")))
+    assert gui_tips.shown_indices([0, 10, 99, True, "x"]) == [fill]          # old 0 = Fill; old 10 = Mask density, removed
+    assert gui_tips.shown_indices([ids[3], ids[3], 0]) == [3, fill]
+    assert gui_tips.shown_indices(None) == [] and gui_tips.shown_indices({}) == []
+    cfgmod.set_setting(gui_tips.SHOWN_KEY, [0])
+    i = gui_tips.next_tip(rng=random.Random(2))
+    assert i != fill and cfgmod.get_setting(gui_tips.SHOWN_KEY) == [ids[fill], ids[i]]
+    # the very first start shows no tip; it leaves an empty list, so the next start does
+    cfgmod.set_setting(gui_tips.SHOWN_KEY, None)
+    assert gui_tips.first_start() and cfgmod.get_setting(gui_tips.SHOWN_KEY) == []
+    assert not gui_tips.first_start()
+    cfgmod.set_setting(gui_tips.SHOWN_KEY, None)
     rng = random.Random(1)
     shown, seen = [], []
     for _ in range(30):                                     # a whole round: every tip exactly once
@@ -63,6 +80,8 @@ def window():
     cfgmod.set_setting(gui_tips.SHOWN_KEY, None)
     app.root.deiconify()
     app.root.update()
+    app._show_tip_popup()                                    # the very first start: no popup (user 3.11.)
+    assert getattr(app, "_tip_win", None) is None and cfgmod.get_setting(gui_tips.SHOWN_KEY) == []
     app._show_tip_popup()
     app.root.update()
     win = app._tip_win

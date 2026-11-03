@@ -2,6 +2,7 @@
 The tips are in tips.py. The shown ones and the tick are kept in settings.json (state.json is rewritten completely on every save)."""
 from __future__ import annotations
 
+import hashlib
 import os
 import random
 
@@ -14,6 +15,12 @@ from .tips import TIPS
 HIDE_KEY, SHOWN_KEY = "hide_tips", "shown_tips"
 HIDE_TEXT = "Don’t show tips at startup"
 POPUP_W, POPUP_WRAP = 380, 340           # popup width and text width in px at 100 %
+# Until 3.11. the shown tips were kept as their numbers in tips.py; these are the ids of those 31 tips in that order, so an old
+# list still counts after tips were removed (user 3.11.)
+LEGACY_IDS = ("d8e18eec", "fd9fa9f1", "b2381b70", "4651d1b0", "7c7d08e0", "82093726", "8b0a92d5", "7d64edd8", "45558978",
+              "e8e70a86", "e01328eb", "17db5250", "a43280ab", "f231a72e", "8c759488", "4448235d", "1f1daa2c", "1a3e9165",
+              "c655512f", "8af57d8b", "4aa60104", "bbbecccb", "0f28f04f", "72447ec8", "3a23a8d5", "ed81616d", "435219da",
+              "c887a3c2", "fc1131d9", "5ecc44e8", "1f6275ae")
 
 
 def tip_log(text: str, fresh: bool = False) -> None:
@@ -31,6 +38,43 @@ def tip_log(text: str, fresh: bool = False) -> None:
 
 def tips_hidden() -> bool:
     return bool(cfgmod.get_setting(HIDE_KEY, False))
+
+
+def tip_id(text: str) -> str:
+    """A short id of a tip's text: the shown list keeps these, so removing or reordering tips does not mix it up; a tip
+    whose wording changed counts as new."""
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
+
+
+def shown_indices(stored, tips=TIPS) -> list[int]:
+    """The saved shown list as numbers in `tips`: ids, and the numbers of the old lists (LEGACY_IDS). Unknown ones are dropped."""
+    if not isinstance(stored, list):
+        return []
+    where = {tip_id(t): i for i, t in enumerate(tips)}
+    out = []
+    for s in stored:
+        if isinstance(s, int) and not isinstance(s, bool):
+            s = LEGACY_IDS[s] if 0 <= s < len(LEGACY_IDS) else None
+        i = where.get(s) if isinstance(s, str) else None
+        if i is not None and i not in out:
+            out.append(i)
+    return out
+
+
+def next_tip(tips=TIPS, rng=random) -> int:
+    """Picks the next tip (pick_tip) and saves the shown list as ids."""
+    i, shown = pick_tip(len(tips), shown_indices(cfgmod.get_setting(SHOWN_KEY, []), tips), rng)
+    cfgmod.set_setting(SHOWN_KEY, [tip_id(tips[k]) for k in shown])
+    return i
+
+
+def first_start() -> bool:
+    """No tip at the very first start (user 3.11.): it is the start without a shown list yet. It leaves an empty one, so the
+    next start shows a tip."""
+    if cfgmod.get_setting(SHOWN_KEY, None) is not None:
+        return False
+    cfgmod.set_setting(SHOWN_KEY, [])
+    return True
 
 
 def pick_tip(count: int, shown, rng=random) -> tuple[int, list[int]]:
@@ -83,8 +127,10 @@ class TipsMixin:
                 return
         except tk.TclError:
             return
-        i, shown = pick_tip(len(TIPS), cfgmod.get_setting(SHOWN_KEY, []))
-        cfgmod.set_setting(SHOWN_KEY, shown)
+        if first_start():
+            tip_log("not shown: first start")
+            return
+        i = next_tip()
         self._tip_hist, self._tip_pos = [i], 0
         self._build_tip_popup(TIPS[i])
 
@@ -95,9 +141,7 @@ class TipsMixin:
         if pos < 0 or not getattr(self, "_tip_win", None):
             return
         if pos >= len(self._tip_hist):
-            i, shown = pick_tip(len(TIPS), cfgmod.get_setting(SHOWN_KEY, []))
-            cfgmod.set_setting(SHOWN_KEY, shown)
-            self._tip_hist.append(i)
+            self._tip_hist.append(next_tip())
         self._tip_pos = pos
         self._tip_label.configure(text=TIPS[self._tip_hist[pos]])
         self._tip_back.configure(state="normal" if pos > 0 else "disabled")

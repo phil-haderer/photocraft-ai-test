@@ -86,7 +86,7 @@ FLUX3_DEFAULT_OLD = "Restore the photo: remove blur, noise and compression artif
 STOCK_PROMPTS = {FLUX2_DEFAULT_PREV, FLUX2_DEFAULT_OLD, FLUX3_DEFAULT_OLD, PLACEHOLDER, FLUX2_DEFAULT, FLUX3_DEFAULT, FLUX3_RESTORE, QWEN_UPSCALE_DEFAULT, RELIGHT_NEUTRAL, RELIGHT_STUDIO, FIBO_REFINE}   # texts the window may replace when the mode changes
 
 # The tooltips of the function buttons: one general text per function, the same for every model (user 28.10.); what
-# holds for one model only goes into its tip under the prompt (Mode.prompt_tip). The ranking goes in front (function_tip).
+# holds for one model only goes into its tip under the prompt (Mode.prompt_tip). No ranking in it (user 3.11.).
 FUNCTION_TIPS = {
     "inpaint": "Select an area, type what should appear there, then Generate.",
     "remove": "Select the object (whole object inside), then Generate. Text is optional: name what to remove (\"the dog\").",
@@ -255,7 +255,8 @@ SHORT = {"flux3": "Flux 3", "flux2": "Flux 2", "qwen": "Qwen", "fibo": "Fibo", "
 
 
 def ranking_text(mode: str) -> str:
-    """'Ranking: 1. Fibo, 2. Qwen (not ranked: Flux 3, Flux 2).' for a function's tooltip; '' when no model offers it."""
+    """'Ranking: 1. Fibo, 2. Qwen (not ranked: Flux 3, Flux 2).' for development; '' when no model offers it. Not in the
+    window since 3.11. (user: the ranking in the function tooltips was for development only)."""
     offered = [m.key for m in MODELS if mode in m.modes]
     if not offered:
         return ""
@@ -265,12 +266,6 @@ def ranking_text(mode: str) -> str:
         return "Ranking: not set yet."
     text = "Ranking: " + ", ".join(f"{i}. {SHORT[k]}" for i, k in enumerate(ranked, 1))
     return text + (f" (not ranked: {', '.join(rest)})." if rest else ".")
-
-
-def function_tip(mode: str, text: str) -> str:
-    """A function's tooltip with the ranking in front."""
-    r = ranking_text(mode)
-    return f"{r}\n{text}" if r else text
 
 
 def model_for_workflow(name: str) -> Model | None:

@@ -95,7 +95,7 @@ class ModeMixin:
             # greyed out when every model that can do it is hidden (right-click menu, gear window)
             offered = self._custom_workflow() or any(key in x.modes and x.key not in hidden for x in models.MODELS)
             rb.configure(state="normal" if offered else "disabled")
-            self.tt_modes[key].text = models.function_tip(key, MODE_TIPS[key])
+            self.tt_modes[key].text = MODE_TIPS[key]        # no ranking in the tooltip (user 3.11.: it was for development)
             shown.append(key)
         for i, key in enumerate(shown):
             self.rb_modes[key].grid(row=i // 2, column=i % 2, sticky="ew", padx=2, pady=2)

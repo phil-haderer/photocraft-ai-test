@@ -340,6 +340,7 @@ def describe_line(model_key: str, has) -> str:
 # node class prefix -> (pack, where to get it). Only what the shipped workflows use.
 NODE_PACKS = (
     ("SeedVR2", "ComfyUI itself (SeedVR2 nodes): update ComfyUI", "https://github.com/comfyanonymous/ComfyUI"),
+    ("ColorMatch", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),      # Flux 3 Upscale: colours back to your picture
     ("GrowMaskWithBlur", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),
     ("MaskBoundingBox+", "ComfyUI_essentials", "https://github.com/cubiq/ComfyUI_essentials"),
 )

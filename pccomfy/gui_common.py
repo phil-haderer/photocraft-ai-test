@@ -678,8 +678,7 @@ NA_RED = "#ff6b6b"      # text of a tab that is not available (model files missi
 DISABLED = "#8e8e8e"   # text of a greyed-out control: clearly darker than MUTED, so it reads as "not available here"
 SCALE_MODES = ("upscale", "refine")   # these run only with an upscale workflow (a node titled pc:upscale)
 NO_LLM_MODES = ("outpaint", "remove") + SCALE_MODES   # no "LLM prompt enhancement" row: fixed or ready-made prompts (user 30.10.)
-LLM_TIP = ("Describes the picture in PhotoCraft (all visible layers) in one or two sentences, using the text model of the chosen "
-           "model, and adds the description to the end of the prompt. Ctrl+Z in the prompt takes it away again.")
+LLM_TIP = "Describes the picture in PhotoCraft and adds the text to the end of your prompt. Ctrl+Z undoes it."   # the Describe Canvas button (user 3.11.)
 STYLES_TIP = "Style prompts"
 V10_WORKFLOW = "moss-image-inpaint-v10.json"      # MOSS Fill as published (MOSS Inpainting v10), test switch next to Prompt
 V10_TIP = ("Test: runs MOSS Inpainting v10 as published instead of the edit LoRA. Its graph crops around the selection "

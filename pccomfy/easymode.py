@@ -44,6 +44,7 @@ SWITCH_TIP = ("Easy mode: only the basics. The plugin picks the best installed m
 MODEL_LINE = "{name}"                         # in the footer, right of "Live preview"
 MODEL_TIP = "The model Easy Mode picked for this function."
 MODE_GREYED_TIP = "No model installed for this function. Get the starter models in the settings (gear) under Easy Mode."
+MODE_MODEL_TIP = "Currently used for this mode: {model}."     # the tooltip of a function button in Easy Mode (user 3.11.)
 NO_MODELS = "No models yet. Open the settings (gear) and get the starter models."
 STATUS_ON = "Easy mode on: the plugin picks the model and settings."
 TAB_TITLE = "Easy mode models"

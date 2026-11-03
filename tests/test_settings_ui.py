@@ -326,7 +326,7 @@ def main():
     assert app.rb_tabs["flux3"]["style"] == "Missing.Chip.Toolbutton" and app.rb_tabs["qwen"]["state"] == "normal"      # Qwen can upscale too (2.11.)
     app.v_mode.set("edit"); app._update_mode_radios()
     assert "Missing for Upscale (new file): Flux 3\\flux-3-image-klein-restore.safetensors. Set in settings" in app.tt_modes["upscale"].text
-    assert app.tt_modes["upscale"].text.startswith(models.function_tip("upscale", models.FUNCTION_TIPS["upscale"]))
+    assert app.tt_modes["upscale"].text.startswith(models.FUNCTION_TIPS["upscale"])
     assert "Missing for Upscale" in app.tt_tabs["flux3"].text and app.tt_tabs["flux3"].text.startswith(models.FLUX3.tip)
     app._update_mode_radios()          # called again (a tab switch does that): the tooltip does not grow
     assert app.tt_modes["upscale"].text.count("Missing for") == 1
