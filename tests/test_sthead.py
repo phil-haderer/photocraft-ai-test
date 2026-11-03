@@ -61,15 +61,33 @@ def main():
     make(base / "vae" / "samesize-junk.safetensors", {"w": ("F16", [2], 4)}, pad=3)      # another size: no hint
     st = Stub(base)
     hints = st._link_hints(real.name, ["renamed.safetensors", "samesize-junk.safetensors", "ghost.safetensors"])
-    assert hints == {"renamed.safetensors": "looks like " + real.name}, hints
+    assert hints == {"renamed.safetensors": ui_settings.HINT_SAME + real.name}, hints
     assert "ghost.safetensors" not in hints                     # a file that is not in the models folder: no hint
 
     # a half-finished copy says so
     make(base / "vae" / "half.safetensors", {"w": ("F16", [2], 4)}, cut=2)
-    assert st._link_hints(real.name, ["half.safetensors"]) == {"half.safetensors": "incomplete?"}
+    assert st._link_hints(real.name, ["half.safetensors"]) == {"half.safetensors": ui_settings.HINT_INCOMPLETE}
     # no models folder known (ask=False): no hints, no crash
     assert Stub(None)._link_hints(real.name, ["renamed.safetensors"]) == {}
     assert st._link_hints("no-such-file", ["x"]) == {}
+    # under the missing file: the renamed copy (same size, complete header) is named; a cut copy or another size is not
+    st.inv = type("Inv", (), {"lists": {"vae": ["renamed.safetensors", "samesize-junk.safetensors", "half.safetensors"]}})()
+    assert st._probable_file(real) == "renamed.safetensors"
+    assert Stub(None)._probable_file(real) == ""
+    # a file kept in an extra folder of extra_model_paths.yaml (a block of paths, a relative one under base_path) is found too
+    ext = tmp / "ext"
+    lora = manifest.File("Sub/test-lora.safetensors", "lora", size=make(ext / "Lora" / "Sub" / "1test-lora.safetensors", tensors).stat().st_size)
+    manifest.FILES[lora.name] = lora
+    yaml = "comfyui:\n    base_path: %s\n    vae: |\n        %s\n    loras: Lora\nother:\n    loras: |\n        %s\n" % (ext, tmp / "nope", tmp / "x:y")
+    (base.parent / "extra_model_paths.yaml").write_text(yaml, encoding="utf-8")
+    from pccomfy import comfydir
+    assert comfydir.extra_model_dirs(base, "loras") == [ext / "Lora", tmp / "x:y"], comfydir.extra_model_dirs(base, "loras")
+    assert comfydir.extra_model_dirs(base, "vae") == [tmp / "nope"] and comfydir.extra_model_dirs(base / "none", "vae") == []
+    renamed = "Sub/1test-lora.safetensors"
+    st.inv = type("Inv", (), {"lists": {"lora": [renamed]}})()
+    got = st._link_hints(lora.name, [renamed]); assert got == {renamed: ui_settings.HINT_SAME + lora.name}, got
+    assert st._probable_file(lora) == renamed
+    del manifest.FILES[lora.name]
     del manifest.FILES[real.name]
     print("ok")
 

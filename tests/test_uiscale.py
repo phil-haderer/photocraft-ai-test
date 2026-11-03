@@ -62,6 +62,33 @@ def main():
     uiscale._read_xrdb = lambda: ""
     assert uiscale.detect({}, {}, down, 96) is None
 
+    # the window's own setting (Other settings > Interface scale) comes after the environment and before config.toml / PhotoCraft
+    uiscale._read_xrdb = lambda: "Xft.dpi:\t192\n"
+    uiscale._read_gsettings = lambda: ""
+    assert uiscale.detect({}, {"window": {"scale": 1.25}}, pc, 96, setting=2.0) == 2.0
+    assert uiscale.detect({"PCCOMFY_SCALE": "1.75"}, {}, pc, 96, setting=2.0) == 1.75
+    assert uiscale.detect({}, {}, pc, 96, setting=None) == 1.5
+    assert uiscale.detect({}, {}, down, 96, setting="junk") == 2.0               # an unusable value counts as not set
+
+    # the desktop: GDK_SCALE / QT_SCALE_FACTOR, then GNOME's text scaling; PhotoCraft and the settings still win; 1 is none
+    assert uiscale.gnome_text_scale("1.25\n") == 1.25 and uiscale.gnome_text_scale("double 1.5") == 1.5
+    assert uiscale.gnome_text_scale("1.0") is None and uiscale.gnome_text_scale("") is None and uiscale.gnome_text_scale("No such schema") is None
+    uiscale._read_gsettings = lambda: "1.25\n"
+    assert uiscale.desktop_scale({"GDK_SCALE": "2"}) == (2.0, "GDK_SCALE")
+    assert uiscale.desktop_scale({"QT_SCALE_FACTOR": "1.5", "GDK_SCALE": "1"}) == (1.5, "QT_SCALE_FACTOR")
+    assert uiscale.desktop_scale({}) == (1.25, "GNOME text scaling")
+    assert uiscale.detect({}, {}, down, 96) == 1.25                               # before Xft.dpi (192)
+    assert uiscale.detect({}, {}, pc, 96) == 1.5                                  # PhotoCraft first
+    uiscale._read_gsettings = lambda: ""
+    assert uiscale.desktop_scale({}) == (None, "")
+
+    # python -m pccomfy scale: every source in order, and the one that is used
+    text = uiscale.report({"PCCOMFY_SCALE": "2"}, {"window": {"scale": 1.25}}, pc, 96, setting=1.75)
+    assert "Tk reports 96 dpi." in text and "Used: 2" in text and text.index("PCCOMFY_SCALE") < text.index("Interface scale") < text.index("config.toml") < text.index("PhotoCraft") < text.index("Xft.dpi")
+    assert "Used: none" in uiscale.report({}, {}, down, 96) or "Used: 2" in uiscale.report({}, {}, down, 96)      # Xft.dpi is 192 here
+    uiscale._read_xrdb = lambda: ""
+    assert "Used: none" in uiscale.report({}, {}, down, 96)
+
     assert abs(uiscale.tk_scaling(1.5) - 2.0) < 1e-9 and abs(uiscale.tk_scaling(1.0) - 96 / 72) < 1e-9
     print("uiscale ok")
 

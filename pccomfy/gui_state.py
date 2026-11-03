@@ -1,12 +1,44 @@
 """Settings state: collect, apply, refresh from PhotoCraft, saved state. (moved out of gui.py unchanged; see PLAN.md, phase 0)."""
 from __future__ import annotations
 
+import os
+
+from . import comfyaddr
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
 
+WATCH_MS = 5000       # how often the ComfyUI dot asks the server whether it is still there
+
+
 class StateMixin:
     # ---------- connections ----------
+
+    def _watch_comfy(self):
+        """The dot at the bottom left follows ComfyUI while the window is open: every WATCH_MS a short question on a fresh
+        connection (in a thread), so a ComfyUI that was closed turns it red and a started one turns it green (user 4.11.)."""
+        if os.environ.get("PCCOMFY_NO_WATCH"):
+            return
+        if not getattr(self, "_watching", False):
+            self._watching, url = True, self.comfy.url
+
+            def work():
+                ok = comfyaddr.probe(url, 2.0)[0]
+                self._watching = False
+                self.events.put(("alive", (url, ok)))
+            threading.Thread(target=work, daemon=True).start()
+        self.root.after(WATCH_MS, self._watch_comfy)
+
+    def _comfy_alive(self, url: str, ok: bool):
+        """The answer of _watch_comfy. A ComfyUI that comes back is read again (lists, files); an old address is ignored."""
+        if url != self.comfy.url:
+            return
+        was = getattr(self, "_comfy_up", None)
+        self._comfy_up = ok
+        self.v_conn.set("ComfyUI connected" if ok else "ComfyUI not connected")
+        set_dot(self.lbl_dot, ok)
+        if ok and was is False:
+            self.refresh()
 
     def refresh(self):
         def work():
@@ -30,6 +62,8 @@ class StateMixin:
         threading.Thread(target=work, daemon=True).start()
 
     def _apply_refresh(self, info):
+        if "comfy" in info:
+            self._comfy_up = bool(info["comfy"])
         self.v_conn.set("ComfyUI connected" if info.get("comfy") else "ComfyUI not connected")
         set_dot(self.lbl_dot, bool(info.get("comfy")))
         if info.get("ckpts") and self.v_ckpt.get() not in info["ckpts"]:

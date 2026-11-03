@@ -7,6 +7,16 @@ from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
 
+def put_in_front(t, text: str) -> None:
+    """A generated text (Describe, the LLM button) goes in front of the prompt, followed by a line break; an empty prompt
+    gets just the text (user 3.11.). One undo step: Ctrl+Z in the field takes it away."""
+    t.edit_separator()
+    rest = t.get("1.0", "end").strip()
+    t.delete("1.0", "end")
+    t.insert("1.0", text + ("\n" + rest if rest else ""))
+    t.edit_separator()
+
+
 class PromptMixin:
     def _editor_keys(self, t):
         """Text-editor keys in a prompt field: Ctrl+Left/Right jump by word (Shift selects), Ctrl+Backspace/Delete delete a
@@ -67,7 +77,7 @@ class PromptMixin:
             t.bind(seq, fn)
 
     def _show_enhance_box(self, on: bool):
-        """The "LLM prompt enhancement" row (with the copy button): not in Expand, Remove, Refine and Upscale (NO_LLM_MODES). It sits directly under the negative
+        """The "Enhance prompt with LLM" row (with the copy button): not in Expand, Remove, Refine and Upscale (NO_LLM_MODES). It sits directly under the negative
         prompt, above the Upscale factor and the LoRA switches (user 30.10.)."""
         shown = bool(self.f_enh.winfo_manager())
         if on and not shown:
@@ -183,11 +193,7 @@ class PromptMixin:
             if "error" in box:
                 self._status(box["error"] if box["error"] == "Cancelled." else "Describe failed: " + box["error"], error=box["error"] != "Cancelled.")
                 return
-            t = self.t_prompt
-            t.edit_separator()
-            t.delete("1.0", "end")
-            t.insert("1.0", box["text"])
-            t.edit_separator()
+            put_in_front(self.t_prompt, box["text"])
             self._status("Described. Edit the text as you like, then Generate.")
         self.root.after(200, check)
 
@@ -253,14 +259,8 @@ class PromptMixin:
             if "error" in box:
                 self._status(box["error"] if box["error"] == "Cancelled." else "Describe failed: " + box["error"], error=box["error"] != "Cancelled.")
                 return
-            t = self.t_prompt
-            t.edit_separator()
-            if t.get("1.0", "end").strip():
-                t.insert("end-1c", "\n" + box["text"])
-            else:
-                t.insert("1.0", box["text"])
-            t.edit_separator()
-            self._status("Described. The text is at the end of the prompt.")
+            put_in_front(self.t_prompt, box["text"])
+            self._status("Described. The text is at the start of the prompt.")
         self.root.after(200, check)
 
     def _copy_enhanced(self):

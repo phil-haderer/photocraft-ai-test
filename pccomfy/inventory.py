@@ -60,7 +60,8 @@ class Status:
 class Inventory:
     def __init__(self, lists: dict, nodes=None, mapping: dict | None = None):
         self.lists = {k: list(lists.get(k) or []) for k in LIST_KINDS}
-        self.nodes = None if nodes is None else set(nodes)      # None = node classes not read
+        # None = node classes not read; a comfy.NodeProbe asks ComfyUI one class at a time (no 5 MB /object_info)
+        self.nodes = None if nodes is None else (nodes if hasattr(nodes, "_known") else set(nodes))
         self.mapping = dict(mapping or {})
 
     # ---------- single files ----------
@@ -192,9 +193,28 @@ class Inventory:
 
 # ---------- reading ComfyUI ----------
 
+_BUNDLED_CLASSES: list = []
+
+
+def bundled_classes() -> list:
+    """The node classes the shipped workflows use (asked from ComfyUI up front, in the background thread of the reading)."""
+    if not _BUNDLED_CLASSES:
+        seen: dict = {}
+        for p in sorted(BUNDLED_WORKFLOWS_DIR.glob("*.json")):
+            try:
+                graph = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for node in graph.values() if isinstance(graph, dict) else ():
+                if isinstance(node, dict) and node.get("class_type"):
+                    seen[node["class_type"]] = None
+        _BUNDLED_CLASSES.extend(seen)
+    return _BUNDLED_CLASSES
+
+
 def fetch(comfy, mapping: dict | None = None) -> Inventory:
     """Read the lists from a ``comfy.ComfyUI``. Raises ComfyError when the server cannot be reached."""
-    raw = comfy.inventory_raw()
+    raw = comfy.inventory_raw(bundled_classes())
     if os.environ.get("PCCOMFY_SIMULATE_NO_MODELS"):    # test start of a new user ("test new user.bat"):
         raw = {**raw, **{k: [] for k in LIST_KINDS}}     # ComfyUI answers, but its model folders look empty
     return Inventory({k: raw.get(k) for k in LIST_KINDS}, raw.get("nodes"), mapping)

@@ -73,7 +73,7 @@ def gui_checks():
         assert app._hint_text == ra.gui.EXPAND_HINT and packed["b"] is False, key
     ra.go(app, "krea2", "txt2img")
     assert packed["b"] is False
-    # the button writes the description into the field (one undo step)
+    # the button writes the description in front of the text in the field (one undo step)
     ra.go(app, "moss", "outpaint")
     app.t_prompt.delete("1.0", "end")
     app.t_prompt.insert("1.0", "old text")
@@ -86,7 +86,7 @@ def gui_checks():
             break
         time.sleep(0.02)
         pending.pop(0)()
-    assert app.t_prompt.get("1.0", "end").strip() == "a dim rustic room with wooden walls"
+    assert app.t_prompt.get("1.0", "end").strip() == "a dim rustic room with wooden walls\nold text"   # in front of the old text (user 3.11.)
     assert "Described" in app.v_status.get()
     # a failure is shown, the field stays
     app.bridge.describe_scene = lambda: (_ for _ in ()).throw(RuntimeError("ComfyUI is not running"))

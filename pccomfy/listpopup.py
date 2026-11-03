@@ -9,14 +9,14 @@ import tkinter as tk
 from collections.abc import Callable
 
 from . import hostos
-from .gui_common import ACCENT, FG, MUTED, PANEL, ThinScrollbar, font
+from .gui_common import ACCENT, FG, MUTED, PANEL, ThinScrollbar, bind_wheel, font, wheel_up
 
 MAX_ROWS = 10       # rows shown before the list scrolls
 HOT_FG = "#1b1b1b"
 
 
 class ListPopup:
-    def __init__(self, root, anchor, rows: list[tuple[str, Callable | None, str]], scale: float = 1.0, max_rows: int = MAX_ROWS):
+    def __init__(self, root, anchor, rows: list[tuple[str, Callable | None, str]], scale: float = 1.0, max_rows: int = MAX_ROWS, above: bool = False):
         self.root, self.top, self.closed = root, None, False
         px = lambda n: round(n * scale)  # noqa: E731
         top = self.top = tk.Toplevel(root, **hostos.TOP_KW)
@@ -40,13 +40,15 @@ class ListPopup:
             if kind == "action":
                 tk.Frame(inner, bg="#454545", height=1).pack(fill="x", pady=(1, 1))
         for w in (cv, inner, *self.rows):
-            w.bind("<MouseWheel>", lambda e: (cv.yview_scroll(-1 if e.delta > 0 else 1, "units"), "break")[1])
+            bind_wheel(w, lambda e: (cv.yview_scroll(-1 if wheel_up(e) else 1, "units"), "break")[1])
         top.update_idletasks()
         w, h = inner.winfo_reqwidth(), inner.winfo_reqheight()
         row_h = max(1, self.rows[0].winfo_reqheight()) if self.rows else 1
         view_h = min(h, row_h * max_rows + (1 if rows and rows[0][2] == "action" else 0) + 3)
         cv.configure(width=w, height=view_h, scrollregion=(0, 0, w, h))
         x, y = anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height()
+        if above:                             # the anchor is at the bottom of its window: the list opens upwards
+            y = max(0, anchor.winfo_rooty() - view_h - 2)
         try:                                  # inside the screen: a list at the right edge opens to the left of its button
             right = root.winfo_vrootx() + root.winfo_vrootwidth()
             x = max(root.winfo_vrootx(), min(x, right - w - px(14)))

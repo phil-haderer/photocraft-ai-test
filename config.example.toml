@@ -28,5 +28,7 @@ variants = 1
 
 [window]
 # Linux only: the display scale of the plugin window (1.5 or 150 = 150 %). Without it the plugin takes PhotoCraft's own scale
-# (window.pixelsPerPoint), then Xft.dpi, else what Tk reports. The environment variable PCCOMFY_SCALE wins over this line.
+# (window.pixelsPerPoint), then GDK_SCALE / QT_SCALE_FACTOR / GNOME's text scaling, then Xft.dpi, else what Tk reports. The environment
+# variable PCCOMFY_SCALE wins over this line; "Interface scale" in the plugin's Other settings wins over it.
+# `python -m pccomfy scale` shows what each source says.
 # scale = 1.5

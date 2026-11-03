@@ -8,9 +8,10 @@ from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 from PIL import Image
 
-from . import icons, uiscale
+from . import config as cfgmod, hostos, icons, spacing, uiscale
 
 ICON_PX = 20       # the window's button icons (vector, icons.py) before the display scaling; the slot icons have their own (19, refslots.py)
+FOOT_BTN_PX = round(ICON_PX * 0.85 * 0.9)   # the clock and Copy canvas in the footer: 90 % of the small header icon (user 4.11.)
 SMALL_ICON_PX = round(ICON_PX * 0.85)   # flat header icons, the bin and the Styles button: 85 % of the usual icon (user 1.11.)
 HINT_ICON_PX = 14  # the info icon in front of the tip under the prompt: about one text line high
 FN_GAP = 8         # room between a function symbol and its text (ttk has no gap option: the symbol gets it on its right)
@@ -40,6 +41,8 @@ class ThemeMixin:
         # a clicked button keeps no orange focus outline (user 30.10.): after the click the focus goes back to the window
         for cls in ("TButton", "TRadiobutton", "TCheckbutton"):
             self.root.bind_class(cls, "<ButtonRelease-1>", self._drop_focus, add="+")
+        self.root.bind_class("TLabel", "<Button-3>", self._copy_menu, add="+")        # every text and link: right-click copies it (user 3.11.)
+        self.root.bind_class("TButton", "<Button-3>", self._copy_menu, add="+")       # a link symbol copies its address
         s.configure("Muted.TLabel", foreground=MUTED, font=font(9))
         # the rows of the settings window (ui_settings.py): a bold model line, green / red / orange marks, grey details
         # only the headings are bold; everything else in the window is one size smaller (user 31.10.)
@@ -94,12 +97,13 @@ class ThemeMixin:
         # the Easy Mode switch in the header (user 31.10.): no fill, never orange; only its icon turns from grey to orange
         s.configure("Switch.Toolbutton", background=BG, foreground=FG, padding=(4, 2), font=font(9), relief="flat", borderwidth=0)
         s.map("Switch.Toolbutton", background=[("selected", BG), ("active", BG)], foreground=[("selected", FG), ("active", FG)])
-        # the model chips under the functions: outlined, no fill; chosen = orange outline and text (Tab.Toolbutton is the
-        # filled look of the functions above them)
+        # the model chips under the functions: outlined, no fill; chosen = filled blue with white text (user 3.11.; Tab.Toolbutton is the
+        # look of the functions above them)
         s.configure("Chip.Toolbutton", background=BG, foreground=FG, padding=(2, 3), anchor="center", relief="solid",
                     borderwidth=1, bordercolor="#686868", lightcolor=BG, darkcolor=BG, font=font(9))
-        s.map("Chip.Toolbutton", foreground=[("disabled", DISABLED), ("selected", ACCENT_TEXT)],
-              bordercolor=[("disabled", "#4a4a4a"), ("selected", ACCENT)], background=[("active", "#5f5f5f")])
+        s.map("Chip.Toolbutton", foreground=[("disabled", DISABLED), ("selected", ON_ACCENT)],
+              bordercolor=[("disabled", "#4a4a4a"), ("selected", ACCENT)], background=[("selected", ACCENT), ("active", "#5f5f5f")],
+              font=[("selected", font(9, bold=True))])
         s.configure("Missing.Chip.Toolbutton", foreground=NA_RED)
         s.configure("Accent.TButton", background=ACCENT, foreground=ON_ACCENT, font=font(10, bold=True))
         s.map("Accent.TButton", background=[("active", "#5ba3f5"), ("disabled", "#5a6678")])
@@ -284,6 +288,33 @@ class ThemeMixin:
             return "break"
         cb.bind("<Button-1>", post)
 
+    def _copy_menu(self, event):
+        """Right-click on a label (error messages, hints) or on a link symbol: a menu with "Copy" / "Copy link". Text of its own
+        wins (`copy_text`, set on link symbols); an empty or one-character label (dot, badge) shows nothing."""
+        w = event.widget
+        text = getattr(w, "copy_text", "")
+        link = bool(text)
+        if not text:
+            try:
+                var = str(w.cget("textvariable"))
+                text = str(w.getvar(var)) if var else str(w.cget("text"))
+            except tk.TclError:
+                return None
+        text = text.strip()
+        if len(text) < 2:
+            return None
+        menu = tk.Menu(self.root, tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground="#1b1b1b", bd=0, font=font(10))
+
+        def copy():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+        menu.add_command(label="Copy link" if link else "Copy", command=copy)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+        return "break"
+
     def _text(self, parent, height):
         t = tk.Text(parent, height=height, width=10, wrap="word", bg=PANEL, fg=FG, insertbackground=FG,
                     relief="flat", highlightthickness=1, highlightbackground="#454545", highlightcolor=ACCENT,
@@ -301,14 +332,29 @@ class ThemeMixin:
     def _px(self, n: int) -> int:
         return round(n * getattr(self, "ui", 1.0))
 
+    def _keep(self, n: int):
+        """``_px`` for a gap of pack or grid: marked as final, so spacing.py does not scale it again."""
+        return spacing.Keep(self._px(n))
+
     def _apply_linux_scale(self) -> None:
-        """Linux only (uiscale.py): Tk often reports 96 dpi on a scaled display. Sets Tk's scaling from the first source that
-        names a scale; fonts (in points) and ``self.ui`` follow. Nothing found: Tk's own value stays."""
+        """Sets Tk's scaling; fonts (in points) and ``self.ui`` follow. Linux (uiscale.py): Tk often reports 96 dpi on a scaled
+        display, so the first source that names a scale is used. Windows follows its display by itself: only the user's own
+        choice (PCCOMFY_SCALE, Other settings > Interface scale) is applied, relative to the display's scale (100 % = as
+        Windows says, 120 % = a fifth bigger), "Auto" changes nothing. Nothing found: Tk's own
+        value stays. ``self._own_scale`` is that choice (it may be below 100 %)."""
+        own = uiscale.pick_scale(os.environ.get("PCCOMFY_SCALE"), cfgmod.get_setting("ui_scale"))
+        self._own_scale = own
         try:
             dpi = float(self.root.winfo_fpixels("1i"))
-            scale = uiscale.detect(os.environ, self.cfg, self.pc, dpi)
+            if hostos.IS_LINUX:
+                scale = uiscale.detect(os.environ, self.cfg, self.pc, dpi, cfgmod.get_setting("ui_scale"))
+            else:
+                scale = own * dpi / 96 if own else None      # relative to Windows' own display scale: 120 % = 20 % bigger than Auto
             if scale:
+                start = float(self.root.tk.call("tk", "scaling"))
                 self.root.tk.call("tk", "scaling", uiscale.tk_scaling(scale))
+                now = float(self.root.tk.call("tk", "scaling"))
+                set_font_scaling(now if hostos.IS_LINUX and abs(now / start - 1.0) > 0.01 else 0.0)      # Linux: the fonts follow the scale (gui_common.set_font_scaling)
         except Exception:
             pass
 
@@ -345,52 +391,10 @@ class ThemeMixin:
         except (AttributeError, TypeError, ValueError, tk.TclError):
             return 0, 10 ** 6
 
-    def _max_height(self) -> int:
-        """The tallest the window may be: down to the bottom of the screen's work area from where the window starts."""
-        try:
-            return max(self._px(320), self._screen_span()[1] - max(0, int(self.root.winfo_rooty())))
-        except (TypeError, ValueError, tk.TclError):
-            return 10 ** 6
-
-    def _fit_top(self, needed: int) -> int | None:
-        """Where the top of the window's content should be so that `needed` pixels fit on the screen (user 3.11.: no scroll
-        bar while the whole plugin fits on the screen). The place the user chose (dragged, placed, saved) is home: the
-        window stays there while it fits, moves up only as far as it must, and goes back home when it is smaller again.
-        None: it does not fit even from the top of the screen (the body scrolls) or the position is unknown."""
-        try:
-            cur = int(self.root.winfo_rooty())
-        except (TypeError, ValueError, tk.TclError):
-            return None
-        if cur not in getattr(self, "_fit_ys", ()):        # moved by someone else (drag, placement): that is home now
-            self._home_y = cur
-            self._fit_ys = (cur,)
-        top, bottom = self._screen_span()
-        home = getattr(self, "_home_y", cur)
-        if needed > bottom - top:
-            return top
-        return max(top, min(home, bottom - needed))
-
-    def _move_top(self, y: int) -> int:
-        """Moves the window so its content starts at screen y (x stays) and returns where it really starts: a title bar
-        (Linux, PCCOMFY_TITLEBAR) is kept in the sum, and a window manager may hold the window lower (GNOME's top bar)."""
-        try:
-            cur = int(self.root.winfo_rooty())
-            if cur != y:
-                m = re.match(r"\d+x\d+([+-]-?\d+)([+-]-?\d+)", self.root.geometry())
-                fx, fy = int(m.group(1).replace("+", "")), int(m.group(2).replace("+", ""))
-                self.root.geometry(f"+{fx}+{y - (cur - fy)}")         # cur - fy: the height of a title bar, 0 without
-                self.root.update_idletasks()
-                cur = int(self.root.winfo_rooty())
-        except (AttributeError, TypeError, ValueError, tk.TclError):
-            return y
-        self._fit_y = cur
-        self._fit_ys = tuple({*getattr(self, "_fit_ys", ()), y, cur})     # positions this window chose, not the user
-        return cur
-
     def _fit_height(self, width: int | None = None):
-        """The window is MIN_W wide (fixed) and exactly as high as its content needs. When it would reach below the screen,
-        it moves up first (_fit_top); only when it is taller than the whole screen, the body under the tabs gets the room
-        that is left and scrolls (thin bar on the right)."""
+        """The window is MIN_W wide (fixed) and exactly as high as its content needs. It never moves by itself and may be pushed
+        down, even partly off the screen (user 4.11.: it used to jump up to fit). Only when the content is taller than the
+        screen's usable height, the body under the tabs gets the room that is left and scrolls (mouse wheel or the thin bar)."""
         self.root.update_idletasks()
         if getattr(self, "_minimized", False):          # only the header: exactly its height
             w, h = self._px(MIN_W), self.root.winfo_reqheight()
@@ -409,11 +413,8 @@ class ThemeMixin:
                 except (TypeError, ValueError, tk.TclError):
                     cur = body
                 others = self.root.winfo_reqheight() - cur          # everything but the scrolled body
-                y = self._fit_top(others + body) if isinstance(others, int) else None
-                if y is not None:
-                    room = self._screen_span()[1] - self._move_top(y) - others
-                else:
-                    room = self._max_height() - others if isinstance(others, int) else body
+                top, bottom = self._screen_span()
+                room = (bottom - top) - others if isinstance(others, int) else body    # the screen's height, not what is left below the window
                 target = body if body <= room else max(self._px(120), room)
                 if target != cur:
                     cv.configure(height=target)

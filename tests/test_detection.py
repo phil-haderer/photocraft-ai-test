@@ -237,6 +237,7 @@ class FakeComfy(comfy.ComfyUI):
     def __init__(self, lists, up=True, all_nodes=True):
         super().__init__()
         self.lists, self.up, self.all_nodes = lists, up, all_nodes
+        self.asked = []
 
     def _json(self, path, payload=None):
         if not self.up:
@@ -244,12 +245,15 @@ class FakeComfy(comfy.ComfyUI):
         if path == "/system_stats":
             return {"system": {}}
         if path == "/object_info":
-            if not self.all_nodes:
-                raise comfy.ComfyError("boom")
-            return {"UNETLoader": {}, "AUSBOSS_NODES_Seed": {}}
+            raise AssertionError("the full /object_info (5 MB) must not be read any more")
         if path == "/models/vae_approx":          # the live preview decoders: a plain folder list
             return list(self.lists.get("preview", []))
         node = path.rsplit("/", 1)[1]
+        if node not in ("UNETLoader", "CLIPLoader", "VAELoader", "LoraLoaderModelOnly"):      # a node-class probe
+            if not self.all_nodes:
+                raise comfy.ComfyError("boom")
+            self.asked.append(node)
+            return {node: {"input": {}}} if node in ("UNETLoader", "AUSBOSS_NODES_Seed") else {}
         field = {"UNETLoader": "unet_name", "CLIPLoader": "clip_name", "VAELoader": "vae_name", "LoraLoaderModelOnly": "lora_name"}[node]
         kind = {v[0]: k for k, v in manifest.KINDS.items()}[node]
         return {node: {"input": {"required": {field: [self.lists[kind], {}]}}}}
@@ -259,7 +263,7 @@ def test_comfy_reading():
     lists = full_lists()
     c = FakeComfy(lists)
     raw = c.inventory_raw()
-    assert raw["unet"] == lists["unet"] and raw["lora"] == lists["lora"] and raw["nodes"] == {"UNETLoader", "AUSBOSS_NODES_Seed"}
+    assert raw["unet"] == lists["unet"] and raw["lora"] == lists["lora"] and "UNETLoader" in raw["nodes"] and "AUSBOSS_NODES_Seed" in raw["nodes"] and "Nope" not in raw["nodes"]
     inv = inventory.fetch(c, {"x": "y"})
     assert inv.tab_status("flux3").state == "missing" and "upscale" in inv.tab_status("flux3").detail   # the fake lists two node classes only
     assert inv.mapping == {"x": "y"}
@@ -271,7 +275,10 @@ def test_comfy_reading():
     finally:
         del os.environ["PCCOMFY_SIMULATE_NO_MODELS"]
     assert inventory.fetch(c).lists["unet"] == lists["unet"]
-    assert FakeComfy(lists, all_nodes=False).inventory_raw()["nodes"] is None          # node list unreadable: not fatal
+    assert "Anything" in FakeComfy(lists, all_nodes=False).inventory_raw()["nodes"]      # a class that cannot be asked counts as installed: not fatal
+    asked = FakeComfy(lists)
+    asked.inventory_raw(["AUSBOSS_NODES_Seed", "B"])
+    assert asked.asked[-2:] == ["AUSBOSS_NODES_Seed", "B"] and "AUSBOSS_NODES_Seed" in asked.inventory_raw(["B"])["nodes"] and "B" not in asked.inventory_raw()["nodes"]       # the classes are asked up front, once each
     try:
         FakeComfy(lists, up=False).inventory_raw()
         raise AssertionError("an unreachable server must raise, not look like an empty install")

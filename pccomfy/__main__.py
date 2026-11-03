@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from . import config as cfgmod
@@ -195,6 +196,7 @@ def main(argv=None) -> int:
     w = sub.add_parser("windows", help="debug: list PhotoCraft's windows (what the bridge window is tied to)")
     w.add_argument("--watch", type=int, metavar="SECONDS", default=0,
                    help="for N seconds print every window that appears (open a PhotoCraft menu meanwhile)")
+    sub.add_parser("scale", help="debug (Linux): what each source says about the display scale and which one the window uses")
     c = sub.add_parser("commands", help="debug: list PhotoCraft commands matching a pattern")
     c.add_argument("pattern", nargs="?", default="history|undo|group|transaction|step")
     sc = sub.add_parser("shortcut", help="a desktop shortcut (Windows) or menu entry (Linux) that starts PhotoCraft and the bridge window (no console)")
@@ -240,6 +242,21 @@ def main(argv=None) -> int:
             winlink.watch(a.watch)
         else:
             print(winlink.describe())
+        return 0
+    if a.cmd == "scale":
+        from . import uiscale
+        try:
+            import tkinter
+            root = tkinter.Tk()
+            root.withdraw()
+            dpi = float(root.winfo_fpixels("1i"))
+            root.destroy()
+        except Exception as e:
+            print(f"(Tk is not available: {e})")
+            dpi = 96.0
+        pcc = cfg["photocraft"]
+        pc = PhotoCraft(pcc["host"], int(pcc["port"]), token_file=pcc["token_file"], headless=bool(pcc["headless"]))
+        print(uiscale.report(os.environ, cfg, pc, dpi, cfgmod.get_setting("ui_scale")))
         return 0
     if a.cmd == "shortcut":
         from . import launcher

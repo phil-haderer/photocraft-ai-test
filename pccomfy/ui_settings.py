@@ -15,7 +15,7 @@ from __future__ import annotations
 import difflib
 import webbrowser
 
-from . import comfyaddr, hostos, icons, inventory, manifest, sthead
+from . import comfyaddr, comfydir, hostos, icons, inventory, manifest, sthead
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 from .gui_theme import ICON_PX
@@ -24,6 +24,10 @@ from .ui_downloads import DownloadMixin, browser_only, site_hint, size_text
 _LABELS = dict(MODE_LABELS)      # noqa: F405
 EMPTY_TEXT = {"choose": "Choose a model", "none_linked": "Link your model in the settings"}
 STATE_TEXT = {"ready": "is ready.", "partial": "is not yet available", "missing": "is not yet available"}      # after the model name (user 1.11.)
+HINT_SAME = "same size and header as "          # behind a file in the chain list (user 3.11.)
+HINT_INCOMPLETE = "incomplete? shorter than its header says"
+PROBABLE_FILE = "This is probably the right file: "      # under a missing file, when a renamed copy of it is in the models folder (user 3.11.)
+HINT_EXPLAIN = "Marked files have the same size and safetensors header as a file this plugin expects."
 DOT_RED = "#e5484d"                   # the dot in front of a model that is not available (nothing in front of a ready one)
 DOT_PAD = 4                            # px of room to the left of the dot (user 1.11.)
 SETTINGS_W, SETTINGS_H = 640, 700      # the settings window at first (before the display scaling; 16 % narrower since 2.11.); then the size it was closed at
@@ -111,7 +115,8 @@ NOT_ALL_WEIGHTS = ("You don't have all the necessary weights to run the standard
 def file_path(f) -> str:
     """Where a file lies inside ComfyUI's models folder, as the window shows it: "/loras/Flux 3/flux-3-...safetensors"."""
     return "/" + f.folder + "/" + f.name.replace("\\", "/")
-GEAR_PX = round(ICON_PX * 0.6)     # the gear: about 60 % of the other button icons, flat without a button background (user 28.10.)
+GEAR_PX = round(ICON_PX * 0.6)     # the footer refresh arrow: about 60 % of the other button icons, flat without a button background (user 28.10.)
+GEAR_HEAD_PX = round(ICON_PX * 0.6 * 1.2)      # the gear, now in the header: 120 % of that size (user 4.11.)
 FOOT_REFRESH_PADX, FOOT_RESET_PADX = (4, 0), (12, 0)     # footer: the refresh arrow close to the ComfyUI dot, "Reset page" apart
 
 
@@ -129,7 +134,7 @@ class SettingsMixin(DownloadMixin):
     # ---------- build (one call at the end of App._build) ----------
 
     def _build_settings(self, foot):
-        """The gear button at the right end of the footer row (the one with the connection dot, the refresh arrow and "Reset page")."""
+        """The gear button in the header, left of the minimise button (user 4.11.; it used to end the footer row)."""
         self._last_model = self.v_model.get()
         self._dl_init()
         self._page_w = {}
@@ -137,8 +142,8 @@ class SettingsMixin(DownloadMixin):
         self._map_undo: list[dict] = []            # the links before each change ("Undo")
         style = ttk.Style()
         style.configure("Missing.Tab.Toolbutton", foreground=NA_RED)      # a tab that is not available: red text, the background of an inactive tab
-        self.b_gear = ttk.Button(foot, image=self._icon("gear", px=GEAR_PX), style="Link.TButton", command=self.toggle_settings)
-        self.b_gear.pack(side="right")
+        self.b_gear = ttk.Button(self.f_header, image=self._icon("gear", px=GEAR_HEAD_PX), style="Link.TButton", command=self.toggle_settings)
+        self.b_gear.pack(side="right", padx=(0, 6))
         Tooltip(self.b_gear, "Settings: which model files ComfyUI has, links to get the missing ones, credits.")
         style.configure("Empty.TLabel", foreground=MUTED, font=font(11))
         self.v_empty = tk.StringVar(value="")
@@ -509,7 +514,22 @@ class SettingsMixin(DownloadMixin):
                 "note": f.note if (found is None and not f.note.lower().startswith("licence")) else "", "dl": self._dl_info(f.name),
                 "restart": found is None and f.name in self._dl_restart, "browser": browser_only(f) if f.url else False,
                 "hint": site_hint(f) if (found is None and f.url and browser_only(f)) else "",
-                "other": found is not None and self._is_other_file(f, found)}
+                "other": found is not None and self._is_other_file(f, found),
+                "probable": self._probable_file(f) if found is None else ""}
+
+    def _probable_file(self, f) -> str:
+        """A file ComfyUI lists under another name that is the missing ``f`` (same size, complete safetensors header), or "".
+        Needs the models folder (not asked for here) and, for a file that was just renamed, a ComfyUI restart."""
+        base = self.models_dir(ask=False) if f.size else None
+        if base is None:
+            return ""
+        same = []
+        for n in self._link_candidates(f.name):
+            p = self._disk_file(f, n)
+            if p is not None and p.stat().st_size == f.size:
+                same.append(n)
+        hints = self._link_hints(f.name, same)
+        return next((n for n in same if hints.get(n) == HINT_SAME + f.name), "")
 
     @staticmethod
     def _is_other_file(f, found: str) -> bool:
@@ -543,10 +563,25 @@ class SettingsMixin(DownloadMixin):
         return sorted((n for n in avail if n != own),
                       key=lambda n: -difflib.SequenceMatcher(None, base(n), base(f.name)).ratio())
 
+    def _disk_file(self, f, name: str):
+        """The path on disk of ``name`` (as ComfyUI lists it) for the kind of ``f``: in ComfyUI's models folder or in one of the extra
+        folders of its extra_model_paths.yaml; None when it is in none of them."""
+        base = self.models_dir(ask=False)
+        if base is None:
+            return None
+        rel = name.replace("\\", "/")
+        for d in [Path(base) / f.folder, *comfydir.extra_model_dirs(base, f.folder)]:
+            try:
+                if (d / rel).is_file():
+                    return d / rel
+            except OSError:
+                continue
+        return None
+
     def _link_hints(self, expected: str, cands: list[str]) -> dict[str, str]:
-        """For the files of the chain list: "looks like <file>" when the file's size and its safetensors header match a file of
-        the manifest (a renamed copy; for the expected file itself it reads "looks like <expected>"), "incomplete?" when the header promises
-        more bytes than the file has. Only for files in ComfyUI's models folder (the ones in extra folders have no hint)."""
+        """For the files of the chain list: "same size and header as <file>" when the file's size and its safetensors header match a file of
+        the manifest (a renamed copy; for the expected file itself it names <expected>), "incomplete? ..." when the header promises
+        more bytes than the file has. Files in the extra folders of extra_model_paths.yaml count too."""
         f = manifest.FILES.get(expected)
         base = self.models_dir(ask=False) if f is not None else None
         if base is None:
@@ -554,18 +589,17 @@ class SettingsMixin(DownloadMixin):
         by_size = {g.size: g.name for g in manifest.FILES.values() if g.kind == f.kind and g.size}
         out: dict[str, str] = {}
         for n in cands:
-            p = base / f.folder / n.replace("\\", "/")
-            try:
-                size = p.stat().st_size
-            except OSError:
+            p = self._disk_file(f, n)
+            if p is None:
                 continue
+            size = p.stat().st_size
             head = sthead.read_header(p)
             if head is None:
                 continue
             if not sthead.is_complete(p):
-                out[n] = "incomplete?"
+                out[n] = HINT_INCOMPLETE
             elif size in by_size:
-                out[n] = "looks like " + by_size[size]
+                out[n] = HINT_SAME + by_size[size]
         return out
 
     # ---------- the overlay window ----------
@@ -637,7 +671,7 @@ class SettingsMixin(DownloadMixin):
         self.nb_models.pack(fill="both", expand=True, pady=(0, 0))
         self._set_pages = {m.key: self._scroll_page(m.key, m.label) for m in models.MODELS}
         self._set_pages["additional"] = self._scroll_page("additional", "Additional")
-        win.bind("<MouseWheel>", self._settings_wheel, add="+")      # only this window: the plugin's body has its own
+        bind_wheel(win, self._settings_wheel)      # only this window: the plugin's body has its own
         self._set_widgets = []
 
         self.t_credits = self._settings_text(tab_credits)
@@ -690,6 +724,7 @@ class SettingsMixin(DownloadMixin):
         """The tab "Other settings" (user 1.11.): the tip tick, and two buttons that undo things done elsewhere in the plugin."""
         self._comfy_address_row(parent)
         self._tips_setting_row(parent)
+        self._ui_scale_row(parent)
         for text, tip, command in (
                 ("Show all hidden models", "Brings back every model chip that was hidden (right-click menu of a chip or the tick in the model tab).",
                  self._show_hidden_models),
@@ -700,6 +735,38 @@ class SettingsMixin(DownloadMixin):
             b = ttk.Button(parent, text=text, style="SetSmall.TButton", command=command)
             b.pack(side="top", anchor="w", padx=14, pady=(8, 0))
             Tooltip(b, tip)
+
+    # ---- the interface scale (user 4.11.; Linux and Windows) ----
+
+    UI_SCALE_CHOICES = ("Auto", "50 %", "60 %", "70 %", "80 %", "90 %", "100 %", "110 %", "120 %", "125 %", "150 %", "175 %", "200 %", "250 %", "300 %")
+
+    def _ui_scale_row(self, parent):
+        """"Interface scale": Auto takes the scale from the system (Linux: the first source that names one, uiscale.py; Windows: the
+        display's own scale, as before). A value here sets the size of the whole window, also below 100 %, and wins over everything
+        but the environment variable PCCOMFY_SCALE. The window is built once, so the value counts from the next start."""
+        box = ttk.Frame(parent)
+        box.pack(side="top", fill="x", padx=14, pady=(10, 0))
+        row = ttk.Frame(box)
+        row.pack(fill="x")
+        ttk.Label(row, text="Interface scale", style="SetText.TLabel").pack(side="left", padx=(0, 8))
+        saved = cfgmod.get_setting("ui_scale")
+        shown = f"{round(float(saved) * 100) if float(saved) < 10 else int(float(saved))} %" if saved else "Auto"
+        self.v_ui_scale = tk.StringVar(value=shown if shown in self.UI_SCALE_CHOICES else "Auto")
+        cb = ttk.Combobox(row, textvariable=self.v_ui_scale, values=self.UI_SCALE_CHOICES, state="readonly", width=8)
+        cb.pack(side="left")
+        cb.bind("<<ComboboxSelected>>", lambda e: self._ui_scale_pick())
+        Tooltip(cb, "Size of the plugin window, from 50 % to 300 %. Auto follows your system. Pick a value if the window is too big or too small. 100 % is the size your system gives; 120 % is a fifth bigger, 80 % a fifth smaller (on Windows). Counts from the next start.")
+        self.lbl_ui_scale = ttk.Label(row, text="", style=SET_STYLES["muted"])
+        self.lbl_ui_scale.pack(side="left", padx=(8, 0))
+
+    def _ui_scale_pick(self):
+        """Saves the choice ("Auto" forgets it) and says that the plugin has to be started again."""
+        v = self.v_ui_scale.get()
+        cfgmod.set_setting("ui_scale", None if v == "Auto" else int(v.split()[0]) / 100)
+        try:
+            self.lbl_ui_scale.configure(text="Applies the next time you start the plugin.")
+        except (tk.TclError, AttributeError):
+            pass
 
     # ---- the ComfyUI address (user 3.11.) ----
 
@@ -981,10 +1048,12 @@ class SettingsMixin(DownloadMixin):
                 self._wrap_labels.append((lb, wrap, page))
             return lb
 
-        def icon(box, kind, tip, command, menu=None):
+        def icon(box, kind, tip, command, menu=None, copy=""):
             b = ttk.Button(box, image=self._icon(kind, px=SET_ICON_PX), style="Link.TButton", command=command)
             b.pack(side="right", padx=(4, 0))
             Tooltip(b, tip)
+            if copy:
+                b.copy_text = copy                      # right-click: Copy link (gui_theme._copy_menu)
             if menu is not None:
                 b.bind("<Button-3>", menu, add="+")
 
@@ -1001,14 +1070,14 @@ class SettingsMixin(DownloadMixin):
                 _k, key, name, state, focus, allm = row
                 box = line()
                 if allm:
-                    b = ttk.Button(box, text=ALL_FILES_BUTTON, image=self._icon("save", px=SET_ICON_PX), compound="left",
+                    b = ttk.Button(box, text=f"{ALL_FILES_BUTTON} ({allm['size']})", image=self._icon("save", px=SET_ICON_PX), compound="left",
                                    style="SetSmall.TButton", command=lambda k=key: self.download_missing(k))
                     b.pack(side="right", padx=(4, 0), pady=(6, 2))
                     Tooltip(b, f"Download the missing files this model needs ({allm['count']}, {allm['size']})"
                                + (f"; {allm['site']} open their page in the browser." if allm["site"] else "."))
-                # "<model> is ready." + a green tick, "<model> is not yet available" + a red X (user 1.11.)
+                # a green tick or a red X to the left of "<model> is ready." / "<model> is not yet available" (user 3.11.)
+                label(box, "\u2713" if state == "ready" else "\u2717", "green" if state == "ready" else "red", padx=(0, 6), pady=(6, 2))
                 label(box, name + " " + STATE_TEXT[state] + ("   \u25C0" if focus else ""), "head", pady=(6, 2))
-                label(box, "\u2713" if state == "ready" else "\u2717", "green" if state == "ready" else "red", padx=(6, 0), pady=(6, 2))
             elif kind == "enable":
                 key = row[1]
                 usable = row[3] if len(row) > 3 else True
@@ -1037,9 +1106,6 @@ class SettingsMixin(DownloadMixin):
                 t.pack(fill="x", pady=(6, 2))
                 t.bind("<Configure>", lambda e, t=t: self._fit_text(t), add="+")
                 made.append(t)
-                miss = [f"{tx}: {tip}" for _m, tx, st, tip in offered if st == "missing"]
-                if miss:
-                    Tooltip(t, "\n".join(miss))
             elif kind == "file":
                 f = row[1]
                 ok = f["found"] is not None
@@ -1075,6 +1141,8 @@ class SettingsMixin(DownloadMixin):
                     extra.append((f["hint"], "note"))               # orange: a website is needed
                 if ok and f["other"]:
                     extra.append((f"your file: {f['found']}", "muted"))
+                if f["probable"]:
+                    extra.append((PROBABLE_FILE + f["probable"], "note"))      # the chain symbol links it with one click
                 if f["restart"]:
                     extra.append(("loaded: restart ComfyUI and click the refresh arrow to list it", "note"))
                 if f["note"] and not (f["hint"] and f["note"].lower().startswith("gated")):
@@ -1085,7 +1153,7 @@ class SettingsMixin(DownloadMixin):
                 _k, cls, pack, url = row
                 box = line()
                 if url:
-                    icon(box, "link", f"Get {pack or 'the node pack'}: opens its page.", lambda u=url: webbrowser.open(u))
+                    icon(box, "link", f"Get {pack or 'the node pack'}: opens its page.", lambda u=url: webbrowser.open(u), copy=url)
                 label(box, "\u2717", "bad", padx=(8, 6))
                 label(box, f"node {cls}" + (f"   \u2192 {pack}" if pack else ""), "", wrap=self._px(120))
             elif kind == "head":
@@ -1201,8 +1269,11 @@ class SettingsMixin(DownloadMixin):
             self._status("ComfyUI lists no other file of this kind. Copy yours into its folder and restart ComfyUI.", error=True)
             return
         hints = self._link_hints(expected, cands)
-        cands = sorted(cands, key=lambda n: not hints.get(n, "").startswith("looks like " + expected))   # a match of the expected file first (sort is stable)
+        cands = sorted(cands, key=lambda n: not hints.get(n, "").startswith(HINT_SAME + expected))   # a match of the expected file first (sort is stable)
         menu = tk.Menu(self._settings_win or self.root, tearoff=0)
+        if any(h.startswith(HINT_SAME) for h in hints.values()):
+            menu.add_command(label=HINT_EXPLAIN, state="disabled")
+            menu.add_separator()
         for n in cands:
             tag = f"   ({hints[n]})" if n in hints else ""
             menu.add_command(label=("✓ " if n == mapped else "") + n + tag, command=lambda n=n: self._link_models(expected, n))

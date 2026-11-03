@@ -45,6 +45,10 @@ def main():
     assert log[-1] == "off"
     pick("qwen", "multi_edit")
     assert log[-1] == "on" and app.refslots.max_refs == 8 and app.refslots.tag_style == "<image{n}>"
+    # no reference image in a slot: no run (user 3.11.)
+    assert not app.refslots.active
+    app.generate()
+    assert "at least one reference image" in app.v_status.get() and not getattr(app, "_running", False), app.v_status.get()
     pick("qwen", "remove")
     assert log[-1] == "off"                                  # Remove Selection takes no references
     pick("qwen", "multi_edit")

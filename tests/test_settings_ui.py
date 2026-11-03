@@ -228,6 +228,23 @@ def test_other_settings():
         ui_settings.messagebox.askyesno = saved_ask
     assert cfgmod.favorites() == {} and "ranking is used again" in app.v_status.get()
 
+    # Interface scale (Linux; uiscale.py): the choice is saved as a factor, "Auto" forgets it, the row says when it counts
+    class _Var:
+        def __init__(self, v): self.v = v
+        def get(self): return self.v
+    class _Lbl:
+        text = ""
+        def configure(self, **k): self.text = k.get("text", self.text)
+    app.lbl_ui_scale = _Lbl()
+    cfgmod.set_setting("ui_scale", None)
+    app.v_ui_scale = _Var("150 %")
+    app._ui_scale_pick()
+    assert cfgmod.get_setting("ui_scale") == 1.5 and "next time" in app.lbl_ui_scale.text
+    app.v_ui_scale = _Var("Auto")
+    app._ui_scale_pick()
+    assert cfgmod.get_setting("ui_scale") is None
+    assert ui_settings.SettingsMixin.UI_SCALE_CHOICES[0] == "Auto" and "150 %" in ui_settings.SettingsMixin.UI_SCALE_CHOICES
+
 
 def test_page_layout_and_stop():
     """Each model page: the files the standard settings need first, a line, then the extra-feature files under their own heading
@@ -284,9 +301,13 @@ def main():
     t.ttk.Button = RecBtn
     probe = gui.App(cfgmod.load())
     t.ttk.Button = plain
-    assert probe.b_gear.master is not probe.f_tabs and probe.b_gear.image == probe._icon("gear", px=ui_settings.GEAR_PX) and probe.b_gear.master is not None
+    # the gear sits in the header at 120 % of its old size; the clock and Copy canvas moved to the footer at 90 % of the small icon (user 4.11.)
+    assert probe.b_gear.master is probe.f_header and probe.b_gear.image == probe._icon("gear", px=ui_settings.GEAR_HEAD_PX)
+    assert ui_settings.GEAR_HEAD_PX == 14 == round(1.2 * ui_settings.GEAR_PX) and gui_theme.FOOT_BTN_PX == 15 == round(0.9 * gui_theme.SMALL_ICON_PX)
     foot = [b.master for b in made if b.text == "Reset page" or b.image == probe._icon("refresh", px=ui_settings.GEAR_PX)]
-    assert len(foot) == 2 and foot[0] is foot[1] and probe.b_gear.master is foot[0]
+    assert len(foot) == 2 and foot[0] is foot[1]
+    assert probe.b_history.master is foot[0] and probe.b_copy_canvas.master is foot[0]
+    assert probe.b_history.image == probe._icon("clock", px=gui_theme.FOOT_BTN_PX) and probe.b_copy_canvas.image == probe._icon("copy", px=gui_theme.FOOT_BTN_PX)
     # flat like the trash button (no dark button background) and about 60 % of the other icons (user 28.10.)
     assert probe.b_gear["style"] == probe.b_clear["style"] == "Link.TButton" and ui_settings.GEAR_PX == 12 == round(0.6 * gui_theme.ICON_PX)
     # Refresh = a flat circle arrow in the gear's size, Reset = the small button "Reset page" (option A, user 29.10.)
@@ -504,6 +525,17 @@ def main():
     assert app.v_conn.get() == "ComfyUI connected" and app.lbl_dot.cget("style") == "ConnOk.TLabel"
     app._apply_refresh({"comfy": False})
     assert app.v_conn.get() == "ComfyUI not connected" and app.lbl_dot.cget("style") == "ConnBad.TLabel"
+    # the watcher (every 5 s): a ComfyUI that goes away turns the dot red, one that comes back green and is read again
+    reads = []
+    app.refresh = lambda: reads.append(1)
+    app._comfy_alive(app.comfy.url, True)
+    assert app.lbl_dot.cget("style") == "ConnOk.TLabel" and reads == [1]       # the refresh before it failed: ComfyUI is back, so everything is read again
+    app._comfy_alive(app.comfy.url, False)
+    assert app.v_conn.get() == "ComfyUI not connected" and app.lbl_dot.cget("style") == "ConnBad.TLabel"
+    app._comfy_alive(app.comfy.url, True)
+    assert app.v_conn.get() == "ComfyUI connected" and reads == [1, 1]
+    app._comfy_alive("http://other:1", False)                                   # an answer for an old address is ignored
+    assert app.lbl_dot.cget("style") == "ConnOk.TLabel"
     test_start_state()
     test_empty_view()
     test_other_settings()

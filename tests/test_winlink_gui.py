@@ -58,7 +58,7 @@ def main():
     app._on_destroy(E())                                                      # owner closed -> state saved once
     assert cfgmod.load_state().get("mode")
 
-    # start position: a first start is placed in PhotoCraft's top right corner at the first link and remembered
+    # start position: a first start is placed in PhotoCraft's top left corner at the first link and remembered
     geo = []
     app.root.geometry = lambda g=None: geo.append(g) if g else "380x700+1204+86"
     app.root.winfo_width = lambda: 380
@@ -66,7 +66,7 @@ def main():
     wl.owner_rect = lambda api=None: (0, 0, 1600, 900)
     app._placed, app._win_pos = False, None
     app._place_at_owner()
-    assert geo == [f"+{1600 - 380 - 16}+{wl.MENU_BAND + 16}"], geo
+    assert geo == [f"+16+{wl.MENU_BAND + 16}"], geo
     app._place_at_owner()
     assert len(geo) == 1                                                     # only once
     app._remember_pos()                                                      # the user moved it: the new place is kept

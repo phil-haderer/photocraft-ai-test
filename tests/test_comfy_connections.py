@@ -106,7 +106,7 @@ def main():
         comfy.ComfyUI(f"http://127.0.0.1:{srv.server_port}", timeout=2).system_stats()
         raise AssertionError("a dead server must raise")
     except comfy.ComfyError as e:
-        assert "No connection" in str(e)
+        assert "is not running" in str(e) or "does not answer" in str(e), str(e)
     print("ok")
 
 

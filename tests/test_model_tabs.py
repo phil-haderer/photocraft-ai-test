@@ -30,6 +30,13 @@ def main():
         shutil.copy(t.ROOT / "workflows" / f, wfdir / f)
     app.cb_workflow["values"] = [gui.BUILTIN] + names
 
+    # the tooltips of the function and model buttons are switched off for now (user 4.11.); the texts are kept
+    assert gui.CHIP_TIPS is False
+    for tt in list(app.tt_modes.values()) + list(app.tt_tabs.values()):
+        assert isinstance(tt, gui.ChipTooltip) and tt.text
+        tt._show()
+        assert tt.tip is None, "a chip tooltip must not open while CHIP_TIPS is off"
+
     # Qwen: fill, remove, reference, expand, edit, upscale (2.11.) - no refine
     app.v_model.set("qwen")
     app.v_mode.set("inpaint")
@@ -40,7 +47,11 @@ def main():
     app.v_mode.set("upscale"); app._on_mode()
     assert app.v_model.get() == "qwen" and app.v_workflow.get() == "qwen-image-21-upscale.json"      # Qwen can upscale: stays
     app.v_mode.set("refine"); app._on_mode()
-    assert app.v_model.get() == "qwen" and app.v_workflow.get() == "qwen-image-21-upscale.json"      # the same graph at the canvas size (2.11.)
+    assert app.v_model.get() == "qwen" and app.v_workflow.get() == "qwen-image-21-refine.json"      # the upscale graph at the canvas size, with the Turbo LoRA switch
+    assert app._has_lora_switch() and app.v_turbo.get() is False       # the switch shows, starts off (25 steps)
+    app.v_mode.set("upscale"); app._on_mode()
+    assert not app._has_lora_switch()                                    # Upscale keeps its graph without a LoRA
+    app.v_mode.set("refine"); app._on_mode()
     app.v_mode.set("inpaint"); app._on_mode()
     assert app.v_model.get() == "qwen"                                                                   # the last model of Fill
     app.v_mode.set("txt2img"); app._on_mode()
@@ -56,7 +67,7 @@ def main():
     app._on_model()
     assert app.v_mode.get() == "txt2img" and app.v_workflow.get() == "moss-image-t2i.json" and app.v_res.get() == 1280
     assert app.v_enhance.get() is False and "Qwen 3.5 9B" in app.tt_enhance.text      # which text model writes the prompt (starts off)
-    assert app.cb_enhance["text"] == "LLM prompt enhancement" and "Qwen 3.5 9B" in app.tt_enhance.text   # name only in the tooltip
+    assert app.cb_enhance["text"] == "Enhance prompt with LLM" and "Qwen 3.5 9B" in app.tt_enhance.text   # name only in the tooltip
     assert app.v_turbo.get() is False and app.cb_turbo["text"].startswith("DMD2") and app.v_lora_str.get() == 1.0   # DMD2 starts off (user 29.10.)
     assert list(models.MOSS.modes) == ["txt2img"]                                                       # Fill off (not good enough), Expand parked 29.10.
     assert [c["text"] for c in app.stage_cbs][:2] == ["UltraReal LoRA", "Skip-layer guidance (SLG)"]
@@ -107,7 +118,7 @@ def main():
     app.t_prompt.insert("1.0", "make it night")
     app.v_mode.set("upscale")
     app._on_mode()
-    assert app.v_workflow.get() == "flux3-klein-upscale.json" and app.t_prompt.get("1.0", "end").strip() == models.FLUX3_DEFAULT  # Upscale's own text replaces it (user 2.11.)
+    assert app.v_workflow.get() == "flux3-klein-upscale.json" and app.t_prompt.get("1.0", "end").strip() == "make it night"  # your own text stays (user 3.11.)
     assert "refine" in models.BY_KEY["flux3"].modes                                      # Flux 3 Refine (after Pixaroma, 1.11.)
 
     # a model without the current mode: the first one it has
@@ -121,7 +132,7 @@ def main():
     app.v_mode.set("inpaint")
     app._on_model()
     assert app.v_workflow.get() == "fibo2-edit.json" and app.v_enhance.get() is False
-    assert app.cb_enhance["text"] == "LLM prompt enhancement" and "Qwen 3.5 9B" in app.tt_enhance.text   # name only in the tooltip
+    assert app.cb_enhance["text"] == "Enhance prompt with LLM" and "Qwen 3.5 9B" in app.tt_enhance.text   # name only in the tooltip
     app.v_enhance.set(True)
     app.v_mode.set("edit")
     app._on_mode()

@@ -114,8 +114,9 @@ QWEN = Model(
         "remove": Mode("qwen-image-21-edit.json", dict(_SOFT, base_res=1024, context=0.4, turbo=False, feather_pct=10.0), prompt_tip=REMOVE_TIP, remove_text=True),
         # native 2K upscale: no upscaler node and no LoRA, 25 steps; the result is about the scale factor times the picture, up to 24 MP
         "upscale": Mode("qwen-image-21-upscale.json", dict(scale=1.5, turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=DESCRIBE_TIP),
-        # the same graph at the size of the canvas (factor 1); not ranked yet, waits for the user's test (2.11.)
-        "refine": Mode("qwen-image-21-upscale.json", dict(turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=REFINE_TIP),
+        # the upscale graph at the size of the canvas (factor 1), with the Turbo LoRA as a switch (own file so Upscale stays
+        # as it is); last in the ranking until more tests are done (user 4.11.)
+        "refine": Mode("qwen-image-21-refine.json", dict(turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=REFINE_TIP),
     },
     requires=(
         "qwen_image_2.1_int8_convrot.safetensors",
@@ -248,7 +249,7 @@ RANKING = {
     "txt2img": ("flux3", "moss", "flux2", "qwen", "fibo"),
     "edit": ("flux3", "qwen", "flux2", "fibo"),
     "upscale": ("qwen", "flux3", "flux2"),         # user 2.11.: Qwen 2.1 Upscale with the default prompt is perfect, the best one
-    "refine": ("fibo", "flux2", "flux3"),
+    "refine": ("fibo", "flux2", "flux3", "qwen"),     # Qwen last for now: ranked "good", more tests needed (user 4.11.)
     "multi_edit": ("flux3", "flux2", "qwen", "fibo"),
 }
 SHORT = {"flux3": "Flux 3", "flux2": "Flux 2", "qwen": "Qwen", "fibo": "Fibo", "krea2": "Krea 2", "moss": "MOSS"}

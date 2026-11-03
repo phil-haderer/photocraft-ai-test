@@ -4,7 +4,7 @@
 
 **Text to Image, Fill, Remove, Expand, Edit, Upscale and more — inside PhotoCraft, running locally in ComfyUI.**
 
-Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.18 · ComfyUI version: 0.42.0 
+Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.1 · ComfyUI version: 0.42.0 
 
 <sub>Replace Photoshop's generative AI features with locally running models. Supports: MOSS Image, Krea 2 Turbo, Flux 3 Image Klein, Flux 2 Image Klein, Qwen 2.1 Edit and Fibo 2.0 Edit Turbo  </sub>
 
@@ -15,16 +15,17 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.18 · ComfyUI version: 0.42.0
 > Unofficial community project, not affiliated with PhotoCraft, ArtCraft or Storyteller. PhotoCraft is in early alpha
 > and so is this plugin. "PhotoCraft AI" is a working title.
 
-## Quick start
+## Install on Windows
 
 1. **Get the parts**: Windows 10/11 with an NVIDIA card (16 GB VRAM), [Python 3.11+](https://www.python.org/downloads/windows/)
-   (tick "tcl/tk" and "Add python.exe to PATH"), PhotoCraft 0.18, and ComfyUI 0.42 or newer.
+   (tick "tcl/tk" and "Add python.exe to PATH"), PhotoCraft 0.20.1, and ComfyUI 0.42 or newer.
 2. **Install the plugin**: *Code › Download ZIP* and unpack it (or `git clone` the repository), then double-click **`setup-windows.bat`**. It also creates the
    desktop shortcut **PhotoCraft AI** (it looks for `photocraft.exe` itself and asks once if it can't find it).
 3. **Start it**: start ComfyUI, close PhotoCraft, then double-click **PhotoCraft AI** on your desktop. PhotoCraft opens,
    and a few seconds later the plugin window appears.
-4. **Get the models**: open the plugin's settings window (gear symbol). Under **Easy Mode** one button downloads the two starter models
-   (Flux 3 Klein Image and Fibo 2.0 Edit Turbo, about 20 GB), which cover all six Easy Mode functions. Flux 3 needs a free Hugging Face login
+4. **Get the models**: open the plugin's settings window (gear symbol). Under **Easy Mode** one button downloads the starter models
+   (Flux 3 Klein Image, Qwen 2.1 Edit and Fibo 2.0 Edit Turbo; the button shows the total size). Easy Mode needs **Flux 3 plus
+   Qwen or Fibo**: together they cover all seven Easy Mode functions, so you can also get just one of the two from its model tab in the gear window. Flux 3 needs a free Hugging Face login
    once (the button opens its page). Restart ComfyUI afterwards.
 5. **Custom node**: the plugin needs one ComfyUI custom node pack, [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
    (Flux 3 Upscale uses its *Color Match* node). Install it from the ComfyUI Manager or the link, then restart ComfyUI. If you already have it,
@@ -32,11 +33,11 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.18 · ComfyUI version: 0.42.0
 6. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
 
 Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested
-settings. Refine and Multi Image Edit are not part of Easy Mode: switch it off to use them and to get all settings. 
+settings. Multi Image Edit is not part of Easy Mode: switch it off to use it and to get all settings. 
 
 Download all models via the settings tabs to get the full experience!
 
-## Quick start on Linux
+## Install on Linux
 
 The plugin also runs on Linux (X11 and Wayland). It opens as a normal window next to PhotoCraft; unlike on Windows it is not
 attached to the PhotoCraft window.
@@ -53,6 +54,7 @@ attached to the PhotoCraft window.
    a few more places), set `PHOTOCRAFT=/path/to/photocraft` or run `.venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft`.
 4. **Models and use**: as in steps 4 to 6 above (the custom node pack ComfyUI-KJNodes is needed on Linux too). Settings and the PhotoCraft token live in `~/.config/pccomfy/`; a different ComfyUI address or port
    goes into `~/.config/pccomfy/config.toml` (see `config.example.toml`).
+5. **Window too small or too big?** The plugin takes PhotoCraft's scale, else your desktop's. If that is wrong, open the gear window › **Other settings** › **Interface scale** and pick a value; it counts from the next start. `.venv/bin/python -m pccomfy scale` shows what the plugin detected.
 
 ## What it does
 
@@ -60,7 +62,7 @@ You pick a **function** at the top, type a prompt and press **Generate**. The pl
 to ComfyUI and puts the result back into PhotoCraft as a new layer in a group, with a soft layer mask where that makes sense.
 
 More settings in the window: **variants** (generates several results as layers in one group), prompt history, prompt templates,
-LLM prompt enhancement, live preview. Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), add custom LoRAs, sharpen, match colours.**
+Enhance prompt with LLM, live preview. Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), add custom LoRAs, sharpen, match colours.**
 
 
 | Function | What it does |

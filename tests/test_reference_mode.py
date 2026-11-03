@@ -231,6 +231,12 @@ class FakePC:
 
 
 class FakeComfy:
+    def open_events(self):
+        return None
+
+    def close_events(self, ws):
+        pass
+
     def __init__(self):
         self.uploads, self.graphs, self.previews = {}, [], []
 

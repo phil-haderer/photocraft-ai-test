@@ -320,6 +320,14 @@ class RefSlotsMixin:
         super()._on_mode_ui()
         self._refs_update()
 
+    def generate(self):
+        slots = getattr(self, "refslots", None)
+        if self._refs_wanted() and (slots is None or not slots.active):
+            # without a reference image Multi Image Edit is a plain Edit: no run, say what to do (user 3.11.)
+            self._status("Multi Image Edit needs at least one reference image: drop, paste or add one in a slot.", error=True)
+            return
+        super().generate()
+
     def _request(self):
         req = super()._request()
         req.refs = self._refs_for(req.mode)     # the descriptions are already in the prompt field (Describe writes them there)
@@ -374,7 +382,7 @@ class RefSlotsMixin:
         # only packed while it shows one
         self.f_refxy = ttk.Frame(self.f_refs)
         self.b_refcopy = tk.Label(self.f_refxy, image=self._refs_icon("copy", FG), bg=BG, bd=0, cursor="hand2")
-        self.b_refcopy.pack(side="right", anchor="n", padx=(self._px(6), 0))
+        self.b_refcopy.pack(side="right", anchor="n", padx=(self._keep(6), 0))
         self.b_refcopy.bind("<Button-1>", lambda e: self._refs_copy_shown())
         self.b_refcopy.bind("<Enter>", lambda e: self.b_refcopy.configure(image=self._refs_icon("copy", ACCENT)), add="+")
         self.b_refcopy.bind("<Leave>", lambda e: self.b_refcopy.configure(image=self._refs_icon("copy", FG)), add="+")
@@ -451,7 +459,7 @@ class RefSlotsMixin:
             return
         m = self._refs_model()
         if m.bbox:
-            self.cb_bbox.pack(side="left", padx=(self._px(12), 0))
+            self.cb_bbox.pack(side="left", padx=(self._keep(12), 0))
         else:
             self.cb_bbox.pack_forget()
         self._refs_bbox_changed()
@@ -472,12 +480,12 @@ class RefSlotsMixin:
         s = self._px(self.SLOT)
         per_row = self.PER_ROW
         for c in range(per_row):
-            self.f_refgrid.columnconfigure(c, minsize=s + self._px(6))
+            self.f_refgrid.columnconfigure(c, minsize=s + self._px(3))
         n_used = len(rs.active)
         self.lbl_refs.configure(text=f"Reference images ({n_used}/{rs.max_refs})")
         for k in range(self._refs_visible()):
             cell = ttk.Frame(self.f_refgrid)
-            cell.grid(row=k // per_row, column=k % per_row, sticky="n", padx=(0, self._px(6)), pady=(0, self._px(4)))
+            cell.grid(row=k // per_row, column=k % per_row, sticky="n", padx=(0, self._keep(3)), pady=(0, self._keep(2)))
             box = tk.Frame(cell, width=s, height=self._px(max(self.SLOT, self.BAR_ICONS * (self._icon_px() + 3) + 2)), bg=PANEL, highlightthickness=1, highlightbackground="#5c5c5c")
             box.pack_propagate(False)
             box.pack()
@@ -500,8 +508,8 @@ class RefSlotsMixin:
                 tag = rs.tag(k)
                 # the tag in a box of the slots' colour, white, centred under the slot (user 29.10.)
                 lt = tk.Label(cell, text=tag or f"image {k + 2}", bg=PANEL, fg=FG, font=font(9), anchor="center",
-                              bd=0, padx=0, pady=self._px(2))
-                lt.pack(fill="x", pady=(self._px(3), 0))
+                              bd=0, padx=0, pady=self._px(1))
+                lt.pack(fill="x", pady=(self._keep(1), 0))
                 if tag:         # a click on it adds it to the end of the prompt field
                     lt.configure(cursor="hand2")
                     lt.bind("<Button-1>", lambda e, k=k: self._refs_insert_tag(k))
@@ -570,7 +578,7 @@ class RefSlotsMixin:
         for kind, word, tip, cmd, waits in buttons:
             off = busy and waits
             lb = tk.Label(bar, image=self._refs_icon(kind, DISABLED if off else FG), bg=PANEL, bd=0, cursor="" if off else "hand2")
-            lb.pack(pady=self._px(1))
+            lb.pack(pady=self._keep(1))
             if not off:
                 lb.bind("<Button-1>", lambda e, c=cmd: c())
                 lb.bind("<Enter>", lambda e, l=lb, k=kind: l.configure(image=self._refs_icon(k, ACCENT)), add="+")

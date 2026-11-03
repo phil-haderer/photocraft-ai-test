@@ -42,12 +42,18 @@ def main():
     go("edit")
     app.t_prompt.delete("1.0", "end")
     app.t_prompt.insert("1.0", "make it night")
-    go("upscale")                                          # a text of its own replaces yours
-    assert text() == models.QWEN_UPSCALE_DEFAULT, text()
-    go("refine")
-    assert text() == models.QWEN_UPSCALE_DEFAULT, text()
-    go("edit")                                             # no text of its own: yours comes back
+    go("upscale")                                          # a text you edited is never replaced by a stock text (user 3.11.)
     assert text() == "make it night", text()
+    go("refine")
+    assert text() == "make it night", text()
+    go("edit")
+    assert text() == "make it night", text()
+    app.t_prompt.delete("1.0", "end")                      # an empty field takes the stock text of the function ...
+    go("upscale")
+    assert text() == models.QWEN_UPSCALE_DEFAULT, text()
+    go("edit")                                             # ... and a stock text is dropped again by a plain function
+    assert text() == "", text()
+    app.t_prompt.insert("1.0", "make it night")
     go("outpaint")                                         # Expand empties the field ...
     assert text() == "", text()
     go("edit")                                             # ... and the way back brings the text back

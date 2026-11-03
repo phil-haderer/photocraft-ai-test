@@ -48,6 +48,9 @@ class FakeWS:
     def recv(self):
         return self.msgs.pop(0)
 
+    def settimeout(self, t):
+        pass
+
     def close(self):
         pass
 

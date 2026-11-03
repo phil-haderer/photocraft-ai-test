@@ -42,6 +42,18 @@ def pick_window(infos: list[dict], exe: str) -> int | None:
     return best
 
 
+def set_long_function(user32, ctypes, wintypes):
+    """user32's SetWindowLongPtrW with its types set; 32-bit Windows has no such export (the header maps it to
+    SetWindowLongW), so there the 32-bit function is taken."""
+    fn = getattr(user32, "SetWindowLongPtrW", None)
+    if fn is not None:
+        fn.argtypes, fn.restype = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p], ctypes.c_void_p
+        return fn
+    fn = user32.SetWindowLongW
+    fn.argtypes, fn.restype = [wintypes.HWND, ctypes.c_int, ctypes.c_long], ctypes.c_long
+    return fn
+
+
 class Win32Api:
     def __init__(self):
         import ctypes
@@ -58,8 +70,7 @@ class Win32Api:
         u.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
         k.OpenProcess.restype = wintypes.HANDLE
         k.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
-        u.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
-        u.SetWindowLongPtrW.restype = ctypes.c_void_p
+        self._set_long = set_long_function(u, ctypes, wintypes)
 
     def _exe(self, hwnd) -> str:
         pid = self.w.DWORD()
@@ -114,7 +125,7 @@ class Win32Api:
         return int(self.u.GetWindow(hwnd, GW_OWNER) or 0)
 
     def set_owner(self, hwnd: int, owner: int) -> None:
-        self.u.SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner)
+        self._set_long(hwnd, GWLP_HWNDPARENT, owner)
 
     def set_caption(self, hwnd: int, bg: tuple[int, int, int], fg: tuple[int, int, int]) -> bool:
         """Colour the title bar (Windows 11 build 22000+): dark mode, caption colour, caption text colour."""
@@ -233,11 +244,11 @@ MENU_DROP = int(os.environ.get("PCC_MENU_DROP", "620"))     # px (96 dpi) below 
 
 
 def first_position(owner_rect, width: int, ui: float = 1.0) -> tuple[int, int]:
-    """Where the window goes when no position was saved yet: the top right corner inside PhotoCraft's window, just
+    """Where the window goes when no position was saved yet: the top left corner inside PhotoCraft's window, just
     under its menu bar (never over the menu bar: there a click on our title bar counted as a menu click)."""
     L, T, R, _B = owner_rect
     margin = round(16 * ui)
-    return max(L, R - width - margin), T + round(MENU_BAND * ui) + margin
+    return min(L + margin, max(L, R - width)), T + round(MENU_BAND * ui) + margin
 
 
 def below_menu_bar(pos, width: int, owner_rect, ui: float = 1.0) -> tuple[int, int]:

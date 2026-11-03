@@ -1,5 +1,5 @@
 """The "LLM" button left of the bin beside "Prompt" (user 30.10.): the text model of the chosen model describes the picture in
-PhotoCraft and the text goes to the end of the prompt after a line break (an empty prompt: just the text). The model's own
+PhotoCraft and the text goes in front of the prompt, followed by a line break (an empty prompt: just the text). The model's own
 writer first, then Qwen 3.5 9B int8 ConvRot; no file, no function or the Remove prompt switched off: grey. Stubbed Tk,
 PhotoCraft and ComfyUI.
 
@@ -90,7 +90,7 @@ def gui_checks():
     app.describe_canvas()
     run(app, pending)
     assert got == ["qwen3.5_9b_int8_convrot.safetensors"]
-    assert app.t_prompt.get("1.0", "end").strip() == "make it night\na quiet harbour at dusk"
+    assert app.t_prompt.get("1.0", "end").strip() == "a quiet harbour at dusk\nmake it night"
     assert "Described" in app.v_status.get() and app.b_llm["state"] == "normal"
     app.t_prompt.delete("1.0", "end")
     app.describe_canvas()

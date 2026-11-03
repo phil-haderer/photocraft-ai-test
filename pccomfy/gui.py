@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _COMMON  # noqa: F401
-from .gui_theme import ThemeMixin, HINT_ICON_PX, ICON_PX, SMALL_ICON_PX
+from .gui_theme import ThemeMixin, HINT_ICON_PX, ICON_PX, SMALL_ICON_PX, FOOT_BTN_PX
 from .gui_prompt import PromptMixin
 from .gui_lora import LoraMixin
 from .gui_modes import ModeMixin
-from .gui_state import StateMixin
+from .gui_state import WATCH_MS, StateMixin
 from .gui_run import RunMixin
 from .gui_easy import EasyMixin
 from .gui_tips import TipsMixin
@@ -15,7 +15,7 @@ from .ui_settings import SettingsMixin, GEAR_PX, FOOT_REFRESH_PADX, FOOT_RESET_P
 from .refslots import RefSlotsMixin
 from . import clipboard
 from . import easymode
-from . import hostos
+from . import hostos, spacing
 from .appname import HEADER_TITLE, WINDOW_TITLE
 
 
@@ -34,14 +34,17 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
 
         _dpi_aware()   # without it Windows stretches the window as a bitmap on a scaled display: blurry text
         self.root = tk.Tk(**hostos.ROOT_KW)
-        self.root.title(WINDOW_TITLE)
+        # Linux has the window manager's title bar: no text in it (user 4.11.; one space, because an empty title makes some
+        # desktops show the program's class name instead). Windows has no title bar; the title stays for the task bar.
+        self.root.title(WINDOW_TITLE if hostos.IS_WINDOWS else " ")
         self.root.configure(bg=BG)
-        if hostos.IS_LINUX:
-            self._apply_linux_scale()
+        self._apply_linux_scale()       # Linux: the detected scale; everywhere: the user's own choice (Other settings)
         try:
-            self.ui = max(1.0, float(self.root.winfo_fpixels("1i")) / 96)   # display scaling (150 % = 1.5)
+            # display scaling (150 % = 1.5); never below 100 % unless the user chose a smaller scale (Interface scale)
+            self.ui = max(0.5 if self._own_scale else 1.0, float(self.root.winfo_fpixels("1i")) / 96)
         except Exception:
             self.ui = 1.0
+        spacing.install(self.ui / spacing.REF)      # the gaps keep the proportion to the text at every scale (spacing.py)
         self.root.resizable(False, False)       # a fixed width; the height is set from the content (_fit_height)
         self._sized = False
         # no title bar (user 31.10.): the header is the handle (drag, minimise, close). PCCOMFY_TITLEBAR=1 brings the
@@ -132,6 +135,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self._sized = True
         self.root.after(100, self._poll)
         self.root.after(200, self.refresh)
+        self.root.after(WATCH_MS, self._watch_comfy)
         self._schedule_tip()
         self.root.protocol("WM_DELETE_WINDOW", self._quit)
         self.root.bind("<Destroy>", self._on_destroy, add="+")
@@ -151,10 +155,10 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.f_logo.pack(side="left", fill="x", expand=True)
         self.f_logo.pack_propagate(False)       # the title never makes the header higher
         # a makeshift title until the user's picture comes (user 3.11., variant B): the two names white and thin, the sign
-        # between them blue and bold, 12 pt; the texts come from appname.py
+        # between them in the light blue of the prompt tip (ACCENT_TEXT, user 4.11.) and bold, 12 pt; the texts come from appname.py
         left, sign, right = HEADER_TITLE
         self.lbl_title = [ttk.Label(self.f_logo, text=left, foreground="#ffffff", font=font(12)),
-                          ttk.Label(self.f_logo, text=sign, foreground=ACCENT, font=font(12, bold=True)),
+                          ttk.Label(self.f_logo, text=sign, foreground=ACCENT_TEXT, font=font(12, bold=True)),
                           ttk.Label(self.f_logo, text=right, foreground="#ffffff", font=font(12))]
         self.lbl_title[0].pack(side="left", padx=(2, 5))
         self.lbl_title[1].pack(side="left", padx=(0, 5))
@@ -170,14 +174,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.b_min = ttk.Button(self.f_header, image=self._icon("minimize", px=SMALL_ICON_PX), style="Link.TButton", command=self.toggle_minimize)
         self.b_min.pack(side="right")
         self.tt_min = Tooltip(self.b_min, "Minimise: only this header stays. Click again to show the plugin.")
-        # left of it: Copy canvas to clipboard (user 29.10., option A): the visible picture as one image
-        self.b_copy_canvas = ttk.Button(self.f_header, image=self._icon("copy", px=SMALL_ICON_PX), style="Link.TButton", command=self.copy_canvas)
-        self.b_copy_canvas.pack(side="right", padx=(0, 6))
-        Tooltip(self.b_copy_canvas, "Copy canvas to clipboard: the visible layers of the picture in PhotoCraft as one image.")
-        # the last 20 runs (PLAN point 13, user 30.10.): a click on one loads its settings with a new seed, nothing starts
-        self.b_history = ttk.Button(self.f_header, image=self._icon("clock", px=SMALL_ICON_PX), style="Link.TButton", command=self._history_menu)
-        self.b_history.pack(side="right", padx=(0, 6))
-        Tooltip(self.b_history, "Last runs: click one to load all its settings with a new seed. Nothing starts by itself.")
+        # left of it comes the gear (ui_settings.py, user 4.11.); the clock and Copy canvas sit at the right end of the footer
         self._history_popup = None
         for w in (self.f_header, self.f_logo, *self.lbl_title):      # a double click on the header does the same (user 29.10., option C)
             w.bind("<Double-Button-1>", lambda e: self.toggle_minimize(), add="+")
@@ -193,7 +190,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
             rb = ttk.Radiobutton(f_fn, text=label, value=key, variable=self.v_mode, style="Tab.Toolbutton",
                                  image=self._function_icon(key), compound="left", command=self._on_mode)
             self.rb_modes[key] = rb
-            self.tt_modes[key] = Tooltip(rb, MODE_TIPS[key])
+            self.tt_modes[key] = ChipTooltip(rb, MODE_TIPS[key])
         f_md = self.f_models = ttk.Frame(self.f_tabs)
         f_md.pack(fill="x", pady=(6, 0))
         cols = 3
@@ -206,7 +203,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
                                  command=self._on_model)
             rb.grid(row=i // cols, column=i % cols, sticky="ew", padx=2, pady=2)
             rb.bind("<Button-3>", lambda e, k=m.key: self._chip_menu(k, e), add="+")    # favourite, hide (gui_modes.py)
-            self.tt_tabs[m.key] = Tooltip(rb, m.tip)
+            self.tt_tabs[m.key] = ChipTooltip(rb, m.tip)
             self.rb_tabs[m.key] = rb
         self.m_chip = tk.Menu(self.root, tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT,
                               activeforeground="#1b1b1b", selectcolor=FG, bd=0, font=font(10))
@@ -227,7 +224,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self._body_win = self.cv_body.create_window(0, 0, window=self.f_body, anchor="nw")
         self.cv_body.bind("<Configure>", lambda e: self.cv_body.itemconfigure(self._body_win, width=e.width), add="+")
         self.f_body.bind("<Configure>", self._on_body_size, add="+")
-        self.root.bind_all("<MouseWheel>", self.sb_body.wheel, add="+")
+        bind_wheel(self.root, self.sb_body.wheel, all_=True)
         r = self.f_body
 
         mf = ttk.Frame(r)
@@ -251,7 +248,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         e1 = ttk.Entry(self.adv_body, textvariable=self.v_cmp_res)
         e2 = ttk.Entry(self.adv_body, textvariable=self.v_cmp_ctx)
         self.f_enh = ttk.Frame(r)       # packed under Seed / Variants, above the prompt writer drop-down (see below)
-        self.cb_enhance = ttk.Checkbutton(self.f_enh, text="LLM prompt enhancement", variable=self.v_enhance, command=self._on_workflow)
+        self.cb_enhance = ttk.Checkbutton(self.f_enh, text="Enhance prompt with LLM", variable=self.v_enhance, command=self._on_workflow)
         self.cb_enhance.pack(side="left")
         self.tt_enhance = Tooltip(self.cb_enhance, ENHANCE_TIP)
         self._icons["copy"] = self._icon("copy", px=round(ICON_PX * 0.8))     # 80 % of the usual icon, flat like the other icons: white, blue under the mouse (user 1.11.)
@@ -260,11 +257,11 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.b_copy.pack(side="left", padx=(8, 0))
         self.tt_copy = Tooltip(self.b_copy, "Copy the prompt the text model wrote in the last run.")
         self.cb_turbo = ttk.Checkbutton(mf, text="LoRA", variable=self.v_turbo, command=self._on_turbo)
-        self.cb_turbo.grid(row=1, column=1, sticky="w", padx=(0, 6), pady=(4, 0))   # flush left like the LLM row (user 30.10.)
+        self.cb_turbo.grid(row=1, column=1, sticky="w", padx=(0, 6), pady=(2, 0))   # flush left like the LLM row (user 30.10.)
         self.tt_turbo = Tooltip(self.cb_turbo, LORA_TIP)
 
         self.f_lora = ttk.Frame(mf)    # strength of that LoRA: on the right of its checkbox, like every slider
-        self.f_lora.grid(row=1, column=2, sticky="e", pady=(4, 0))
+        self.f_lora.grid(row=1, column=2, sticky="e", pady=(2, 0))
         self.w_lora_str = Slider(self.f_lora, scale=self.ui, from_=0.0, to=1.0, variable=self.v_lora_str, command=self._on_lora_str,
                                  length=self._px(SLIDER_W))
         self.w_lora_str.grid(row=0, column=0)
@@ -376,15 +373,16 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         # the tip under the prompt: orange text with an orange info icon in front, level with its first line (user 29.10.)
         self.f_hint = ttk.Frame(r)
         self.lbl_hint_icon = ttk.Label(self.f_hint, image=self._icon("info", HINT_TEXT, px=HINT_ICON_PX))
-        self.lbl_hint_icon.pack(side="left", anchor="n", padx=(0, 6), pady=(self._px(4), 0))
+        self.lbl_hint_icon.pack(side="left", anchor="n", padx=(0, 6), pady=(self._keep(4), 0))
         # selectable text (user 1.11.), not the icon; the wrap width is the row's width
         self.lbl_hint = SelectableLabel(self.f_hint, text=EXPAND_HINT, fg=HINT_TEXT, bg=BG, fnt=font(10))   # every mode's tip (see _update_prompt_hint)
-        self.lbl_hint.pack(side="left", anchor="n", fill="x", expand=True, pady=(self._px(4), 0))   # the first line a little lower, level with the icon (user 3.11.)
+        self.lbl_hint.pack(side="left", anchor="n", fill="x", expand=True, pady=(self._keep(4), 0))   # the first line a little lower, level with the icon (user 3.11.)
         # Krea 2 / MOSS Expand: writes a description of the surroundings into the field (under the tip, user 29.10.)
         self.b_describe = ttk.Button(r, text="Describe", style="Small.TButton", command=self.describe_scene)
         Tooltip(self.b_describe, "Qwen 3.5 9B describes the surroundings of your picture (not the main subject) and writes "
                                  "it into the prompt. Edit it as you like.")
-        self.t_prompt.insert("1.0", self.state.get("prompt", ""))
+        # the prompt field starts empty: the function's default fills it (_apply_model_mode); the last session's text is not
+        # restored (user 3.11.: after a start every prompt field is on its default)
         self.f_sharp = ttk.Frame(self.f_post)     # a light sharpening of the finished result (under Advanced settings)
         self.f_sharp.pack(fill="x")
         self._slider_row(self.f_sharp)
@@ -431,7 +429,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         Tooltip(self.b_addlora, "Adds an extra LoRA (strength 0 to 1.5).")
         self.f_xl_rows = ttk.Frame(self.f_xl)
         self.f_xl_rows.pack(fill="x")
-        mf.pack(fill="x", padx=10, pady=4, after=self.f_enh)     # the LoRA / stage box: under the LLM row
+        mf.pack(fill="x", padx=10, pady=(0, 4), after=self.f_enh)     # the LoRA / stage box: under the LLM row
         af = ttk.Frame(self.adv_body)
         af.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(2, 0))
         # Seed sits in the Advanced settings beside Steps and CFG (user 29.10.)
@@ -635,7 +633,16 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.cb_live = ttk.Checkbutton(foot, text="Live preview", variable=self.v_live)
         self.cb_live.pack(side="left", padx=FOOT_RESET_PADX)
         self.tt_live = Tooltip(self.cb_live, LIVE_TIP)
-        self._build_settings(foot)      # the gear at the right end of this row (ui_settings.py)
+        # the right end of the footer (user 4.11., swapped with the gear): Copy canvas to clipboard (user 29.10., option A: the visible
+        # picture as one image) and the last 20 runs (PLAN point 13, user 30.10.: a click on one loads its settings with a new seed,
+        # nothing starts); 90 % of the usual small icon. Visually: clock, Copy canvas.
+        self.b_copy_canvas = ttk.Button(foot, image=self._icon("copy", px=FOOT_BTN_PX), style="Link.TButton", command=self.copy_canvas)
+        self.b_copy_canvas.pack(side="right", padx=(6, 0))
+        Tooltip(self.b_copy_canvas, "Copy canvas to clipboard: the visible layers of the picture in PhotoCraft as one image.")
+        self.b_history = ttk.Button(foot, image=self._icon("clock", px=FOOT_BTN_PX), style="Link.TButton", command=self._history_menu)
+        self.b_history.pack(side="right", padx=(6, 0))
+        Tooltip(self.b_history, "Last runs: click one to load all its settings with a new seed. Nothing starts by itself.")
+        self._build_settings(foot)      # the gear sits in the header (ui_settings.py)
         self._build_easy()              # the Easy Mode switch in the header and the model line (gui_easy.py)
 
         for cb in (self.cb_lm, self.cb_sampler, self.cb_sched):
@@ -701,7 +708,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
 
     def _place_window(self):
         """The window starts where it was last (saved in the state), if that is still on a screen. Otherwise it is placed
-        at the first link: top right inside PhotoCraft, under its menu bar (winlink.first_position)."""
+        at the first link: top left inside PhotoCraft, under its menu bar (winlink.first_position)."""
         self._placed = False
         self._win_pos = None
         pos = self.state.get("win_pos")
@@ -717,7 +724,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self._checked_band = False
 
     def _place_at_owner(self):
-        """Called once PhotoCraft's window is known: a first start goes to its top right corner; a saved position that
+        """Called once PhotoCraft's window is known: a first start goes to its top left corner; a saved position that
         lies in its menu bar moves just below it."""
         rect = winlink.owner_rect()
         if rect is None:
@@ -759,9 +766,6 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         if m:
             x, y = int(m.group(1).replace("+", "")), int(m.group(2).replace("+", ""))
             if x > -10000 and y > -10000:       # a minimized window reports -32000
-                fit_y, home = getattr(self, "_fit_y", None), getattr(self, "_home_y", None)
-                if fit_y is not None and home is not None and fit_y == self.root.winfo_rooty():
-                    y += home - fit_y       # moved up only to fit the screen (_fit_top): the next start uses the user's place
                 self._win_pos = (x, y)
 
     def _yield_popups(self):

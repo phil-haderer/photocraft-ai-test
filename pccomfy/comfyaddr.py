@@ -10,6 +10,8 @@ import http.client
 import json
 import urllib.parse
 
+from .comfy import real_comfy_blocked
+
 DEFAULT_URL = "http://127.0.0.1:8188"
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
 UNENCRYPTED = "unencrypted connection: pictures and prompts cross the network as plain data"
@@ -49,6 +51,8 @@ def probe(url: str, timeout: float = 3.0) -> tuple[bool, str]:
     """Asks the server: (True, "ComfyUI 0.42.0") when it answers like ComfyUI, else (False, the reason)."""
     parts = urllib.parse.urlsplit(url)
     cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    if real_comfy_blocked(parts.hostname or "", parts.port or (443 if parts.scheme == "https" else 80)):
+        return False, "Blocked in tests (port 8188)"
     conn = cls(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80), timeout=timeout)
     try:
         conn.request("GET", "/system_stats")

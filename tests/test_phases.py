@@ -12,6 +12,12 @@ assert prompt_phase_nodes(json.loads((ROOT / "workflows" / "flux3-klein-edit.jso
 
 
 class FakeComfy:
+    def open_events(self):
+        return None
+
+    def close_events(self, ws):
+        pass
+
     def wait(self, pid, on_progress, cancelled):
         for node, f in (("4", -1), ("12", -1), ("12", -1), ("6", -1), ("7", 0.25), ("7", 1.0)):
             on_progress(f, f"step {f}" if f >= 0 else "", node)
@@ -67,6 +73,12 @@ assert _bridge.workflows.main_sampler(up) == "163"
 
 
 class TileComfy:
+    def open_events(self):
+        return None
+
+    def close_events(self, ws):
+        pass
+
     def wait(self, pid, on_progress, cancelled):
         for node, f in (("8", -1), ("163", 0.5), ("164", -1), ("163", 0.25), ("163", 1.0), ("165", -1), ("163", 0.5)):
             on_progress(f, f"step {f}" if f >= 0 else "", node)

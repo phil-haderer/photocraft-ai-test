@@ -27,7 +27,7 @@ CONFIG_DIR = _config_dir()
 # The workflows shipped next to the code, on every system (the Linux default used to be ~/.config/pccomfy/workflows, which
 # nobody filled: no workflow was found). Your own ones: workflows_dir in config.toml.
 WORKFLOWS_DIR = _ROOT / "workflows"
-EXCHANGE_DIR = CONFIG_DIR / "exchange" if IS_WINDOWS else Path("~/.cache/pccomfy/exchange")
+EXCHANGE_DIR = CONFIG_DIR / "exchange" if IS_WINDOWS else Path("~/.cache/pccomfy/exchange").expanduser()     # a "~" left in it made a folder "~" in the working directory (Linux VM 4.11.)
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 STATE_FILE = CONFIG_DIR / "state.json"
 SETTINGS_FILE = CONFIG_DIR / "settings.json"     # what the settings overlay and the tab menu save (model map, favourites ...)

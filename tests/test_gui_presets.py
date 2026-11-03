@@ -183,6 +183,12 @@ def main():
     assert json.loads((Path(TMP) / "state.json").read_text(encoding="utf-8")).get("preset") is None
     print("request/state OK:", req.mode, Path(req.workflow).name)
 
+    # Mask grow reaches the request (a comment once swallowed the line, so every run used 8)
+    app.v_grow.set(20)
+    assert app._request().mask_grow == 20
+    app.v_grow.set(8)
+    print("mask grow OK")
+
     # errors get the red badge (no dialog), normal messages clear it
     shown = []
     app.lbl_err.pack = lambda *a, **k: shown.append("on")

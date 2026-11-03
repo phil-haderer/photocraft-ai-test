@@ -31,9 +31,16 @@ def main():
     mode = models.BY_KEY["qwen"].modes["upscale"]
     assert mode.workflow == WF.name and mode.settings["turbo"] is False and mode.prompt_hint == models.QWEN_UPSCALE_DEFAULT
     assert mode.prompts == ()                                    # no Default / Detailed switches (user 2.11.)
-    refine = models.BY_KEY["qwen"].modes["refine"]               # the same graph at the canvas size, waits for the user's test
-    assert refine.workflow == WF.name and refine.prompt_hint == models.QWEN_UPSCALE_DEFAULT and refine.prompts == ()
-    assert models.RANKING["upscale"][0] == "qwen" and models.ranking_text("refine").endswith("(not ranked: Qwen).")
+    refine = models.BY_KEY["qwen"].modes["refine"]               # the same graph at the canvas size, with a Turbo LoRA switch
+    assert refine.workflow == "qwen-image-21-refine.json" and refine.prompt_hint == models.QWEN_UPSCALE_DEFAULT and refine.prompts == ()
+    assert refine.settings["turbo"] is False                      # starts off: 25 steps like Upscale
+    assert models.RANKING["upscale"][0] == "qwen" and models.ranking_text("refine") == "Ranking: 1. Fibo, 2. Flux 2, 3. Flux 3, 4. Qwen."
+    r = json.loads((ROOT / "workflows" / refine.workflow).read_text(encoding="utf-8"))
+    assert workflows.lora_subgraph(r) and workflows.lora_strength(r) == 1
+    off = workflows.bypass_lora(r)                                # switch off = exactly the Upscale graph
+    strip = lambda gr: {k: {a: b for a, b in n.items() if a != "_meta"} for k, n in gr.items()}      # noqa: E731
+    assert strip(off) == strip(g), "Refine with the LoRA off must be the Upscale graph (25 steps, no LoRA node)"
+    assert r["10"]["inputs"]["steps"] == 8 and r["10"]["inputs"]["model"] == ["2", 0]    # on: the LoRA and 8 steps
     assert inventory.mode_files("qwen", "refine") == manifest.mode_required("qwen", "refine")
     assert inventory.mode_files("qwen", "upscale") == manifest.mode_required("qwen", "upscale")      # no switch brings extra files
     print("ALL OK (qwen upscale)")

@@ -389,6 +389,10 @@ class Bridge:
         self._seq_src = None     # (picture, mask) of the first variant while variants run one after the other
         self.pc = pc
         self.comfy = comfy
+        try:     # the connection log (comfy.ComfyUI._log) lives next to runs.jsonl
+            comfy.log_file = Path(exchange_dir).expanduser() / "comfy-net.log"
+        except (AttributeError, TypeError):
+            pass
         self.exchange = Path(exchange_dir).expanduser()
         self.exchange.mkdir(parents=True, exist_ok=True)
         self.keep_files = keep_files
@@ -550,7 +554,16 @@ class Bridge:
         except OSError:
             pass
 
-    def _wait(self, prompt_id, graph, wf, start, span, suffix, progress, on_preview=None):
+    def _queue_wait(self, graph, wf, progress):
+        """Queue a small job (cut-out, description) and wait for it; the websocket is open before the job is queued and
+        closed whatever happens."""
+        ws = self.comfy.open_events()
+        try:
+            return self._wait(self.comfy.queue(graph), graph, str(wf), 0.1, 0.85, "", progress, ws=ws)
+        finally:
+            self.comfy.close_events(ws)
+
+    def _wait(self, prompt_id, graph, wf, start, span, suffix, progress, on_preview=None, ws=None):
         """comfy.wait with the work split in "prompt" (text model) and "image" (the image model), each with its
         own fraction, elapsed time and, once a run has been timed, an estimate for the text phase."""
         writer = prompt_phase_nodes(graph)
@@ -597,6 +610,8 @@ class Bridge:
             progress(overall, text + suffix, phase=phase, phase_fraction=pf, elapsed=elapsed)
 
         kw = {"on_preview": on_preview} if on_preview is not None else {}
+        if ws is not None:
+            kw["ws"] = ws
         return self.comfy.wait(prompt_id, on_progress=on, cancelled=self._cancel.is_set, **kw)
 
     def _run(self, req: Request, p: workflows.GenParams, tag: str, progress: Progress, seq: tuple | None = None) -> dict:
@@ -762,11 +777,15 @@ class Bridge:
                 self._log_run(req, gp, wf, attempt)
                 live = req.preview and self.on_preview is not None
                 # "taesd": the model's TAESD file when it is installed, else ComfyUI's coarse latent2rgb colours
-                prompt_id = self.comfy.queue(graph, preview="taesd") if live else self.comfy.queue(graph)
-                progress(start, f"Queued in ComfyUI ({self.pipeline}{suffix})" if not attempt
-                         else f"Object still there, trying again ({attempt + 1}/{tries})", phase="prepare")
-                hist = self._wait(prompt_id, graph, wf, start, span, suffix, progress,
-                                  on_preview=self.on_preview if live else None)
+                ws = self.comfy.open_events()      # before the job is queued: no early message is lost
+                try:
+                    prompt_id = self.comfy.queue(graph, preview="taesd") if live else self.comfy.queue(graph)
+                    progress(start, f"Queued in ComfyUI ({self.pipeline}{suffix})" if not attempt
+                             else f"Object still there, trying again ({attempt + 1}/{tries})", phase="prepare")
+                    hist = self._wait(prompt_id, graph, wf, start, span, suffix, progress,
+                                      on_preview=self.on_preview if live else None, ws=ws)
+                finally:
+                    self.comfy.close_events(ws)
                 vgl = self._vgl_text(graph, hist)
                 if vgl:
                     self.last_vgl = vgl
@@ -1005,7 +1024,7 @@ class Bridge:
         name = self.comfy.upload_image(im.convert("RGB") if im.mode not in ("RGB", "RGBA") else im, f"pcc-{uuid.uuid4().hex[:8]}-cut.png")
         graph, out_node = workflows.apply_template(tpl, workflows.GenParams(), name, None)
         progress(0.1, "Cutting out the background")
-        hist = self._wait(self.comfy.queue(graph), graph, str(wf), 0.1, 0.85, "", progress)
+        hist = self._queue_wait(graph, wf, progress)
         out = self.comfy.output_images(hist, out_node)[0]
         progress(1.0, "Background removed")
         return imaging.crop_to_alpha(out.convert("RGBA"))      # the picture ends at the subject's outermost pixels (user 1.11.)
@@ -1026,7 +1045,7 @@ class Bridge:
         if seed is not None:
             workflows.text_sampling(graph, seed)
         progress(0.1, "Describing the picture")
-        hist = self._wait(self.comfy.queue(graph), graph, str(wf), 0.1, 0.85, "", progress)
+        hist = self._queue_wait(graph, wf, progress)
         text = " ".join(self._vgl_text(graph, hist).split())
         if not text:
             raise BridgeError("The text model returned no description.")

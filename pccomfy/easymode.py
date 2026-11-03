@@ -24,7 +24,7 @@ PRIORITY = {
     "remove": ("fibo", "qwen"),
     "outpaint": ("flux2", "flux3", "qwen", "fibo"),
     "upscale": ("qwen", "flux3", "flux2"),
-    "refine": ("fibo", "flux2", "flux3"),          # same order as the ranking (Qwen Refine is not ranked yet)
+    "refine": ("fibo", "flux2", "flux3", "qwen"),   # same order as the ranking
 }
 
 # Functions Easy Mode leaves out, with the models that do them best first (the list in the Easy Mode tab of the settings).

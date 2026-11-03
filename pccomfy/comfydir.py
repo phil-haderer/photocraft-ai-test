@@ -110,3 +110,50 @@ def find_root(url: str, timeout: float = 10.0) -> Path | None:
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
     return root_from_process(info.get("ExecutablePath") or "", info.get("CommandLine") or "")
+
+
+_EXTRA_KEYS = {"text_encoders": ("text_encoders", "clip"), "diffusion_models": ("diffusion_models", "unet")}      # old and new names of a folder
+
+
+def extra_model_dirs(models_dir: Path, folder: str) -> list[Path]:
+    """The extra folders ComfyUI's ``extra_model_paths.yaml`` (next to the ``models`` folder) names for ``folder`` ("loras", "vae" ...),
+    so a file kept outside the models folder can be found on disk. A small reader for the usual shape (sections with ``base_path``
+    and ``key: path``, a path may be a ``|`` block of several lines); a missing or odd file gives no folders."""
+    keys = set(_EXTRA_KEYS.get(folder, (folder,)))
+    try:
+        text = (Path(models_dir).parent / "extra_model_paths.yaml").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    sections: list[dict[str, list[str]]] = []
+    key, key_indent, block = "", 0, False
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].rstrip()
+        if not line.strip():
+            continue
+        indent, body = len(line) - len(line.lstrip()), line.strip()
+        if indent == 0:
+            sections.append({})
+            block = False
+        elif not sections:
+            continue
+        elif block and indent > key_indent:                 # a further line of a "|" block: a path (it may hold a colon, "D:\...")
+            sections[-1][key].append(body.strip("\"'"))
+        elif ":" in body:
+            name, _, value = body.partition(":")
+            key, key_indent, value = name.strip(), indent, value.strip().strip("\"'")
+            block = value[:1] in ("|", ">")
+            sections[-1].setdefault(key, [])
+            if value and not block:
+                sections[-1][key].append(value)
+    out: list[Path] = []
+    for items in sections:
+        base = (items.get("base_path") or [""])[0]
+        for k, values in items.items():
+            if k in keys:
+                for v in values:
+                    q = Path(v)
+                    if not q.is_absolute() and base:
+                        q = Path(base) / v
+                    out.append(q)
+    return out
+

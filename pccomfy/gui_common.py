@@ -229,14 +229,14 @@ def conn_status(parent, name: str = "ComfyUI"):
     """'ComfyUI' and a dot after it (footer and settings window): returns (frame, dot); set_dot colours the dot."""
     f = ttk.Frame(parent)
     ttk.Label(f, text=name, style="Muted.TLabel").pack(side="left")
-    dot = ttk.Label(f, text="●", style="ConnWait.TLabel")
+    dot = ttk.Label(f, text="●", style="ConnBad.TLabel")
     dot.pack(side="left", padx=(3, 0))
     return f, dot
 
 
 def set_dot(dot, ok: bool | None):
-    """Green = connected, red = not connected, grey = not known yet (before the first refresh)."""
-    dot.configure(style="ConnOk.TLabel" if ok else "ConnWait.TLabel" if ok is None else "ConnBad.TLabel")
+    """Green = connected, red = anything else (also before the first refresh): never grey (user 3.11.)."""
+    dot.configure(style="ConnOk.TLabel" if ok else "ConnBad.TLabel")
 
 
 class Tooltip:
@@ -269,6 +269,36 @@ class Tooltip:
         if self.tip:
             self.tip.destroy()
             self.tip = None
+
+
+# The tooltips of the function buttons and the model buttons are switched off (user 4.11.: partly wrong, not necessary; they
+# come back later). Their texts are still kept up to date; set this to True to show them again.
+CHIP_TIPS = False
+
+
+class ChipTooltip(Tooltip):
+    """The tooltip of a function or model button: shown only while CHIP_TIPS is on."""
+
+    def _show(self, _e=None):
+        if CHIP_TIPS:
+            super()._show()
+
+
+def wheel_up(e) -> bool:
+    """True when a mouse wheel event turns the wheel up: Windows sends <MouseWheel> with a delta, X11 (Linux) sends Button-4
+    (up) and Button-5 (down)."""
+    num = getattr(e, "num", None)
+    return num == 4 if num in (4, 5) else e.delta > 0
+
+
+def bind_wheel(widget, func, all_: bool = False) -> None:
+    """Binds the mouse wheel on every system: <MouseWheel> and, on Linux, Button-4 / Button-5 (user 4.11.: the wheel did not scroll
+    the plugin there). `all_`: bind_all, else only this widget."""
+    bind = widget.bind_all if all_ else widget.bind
+    bind("<MouseWheel>", func, add="+")
+    if hostos.IS_LINUX:
+        bind("<Button-4>", func, add="+")
+        bind("<Button-5>", func, add="+")
 
 
 class ThinScrollbar:
@@ -359,7 +389,7 @@ class ThinScrollbar:
                 return
         except Exception:
             pass
-        self.canvas.yview_scroll(-1 if e.delta > 0 else 1, "units")
+        self.canvas.yview_scroll(-1 if wheel_up(e) else 1, "units")
 
 
 class Slider(tk.Canvas):
@@ -659,13 +689,26 @@ STAGE_TIP = "A stage of the workflow you can switch off."
 FONT = "Inter" if fonts.load() else ("Segoe UI" if hostos.IS_WINDOWS else "Sans")   # Inter = PhotoCraft's font (fonts.py)
 
 
+_PX_PER_PT = 0.0                      # Linux only, see set_font_scaling
+
+
+def set_font_scaling(px_per_pt: float) -> None:
+    """Linux: a ``tk scaling`` set after Tk started does not reach the fonts in points (X11): at an interface scale of 175 % the
+    text stayed as small as at 100 % while everything else grew (user 4.11.). With a value here, ``font`` returns pixel sizes
+    (points x this scaling) instead; 0 = untouched, fonts in points as before."""
+    global _PX_PER_PT
+    _PX_PER_PT = px_per_pt
+
+
 def font(size: int, bold: bool = False) -> tuple:
     """A Tk font at `size` pt (the Segoe UI size the layout was made for). Inter runs about 8 % wider, so it is set one
     point smaller (9 pt -> 8 pt: 11 instead of 12 px at 100 %) and keeps the texts as wide as before; its bold is the
     SemiBold file (only Regular and SemiBold are shipped)."""
     if FONT == "Inter":
-        return ("Inter SemiBold" if bold else "Inter", size - 1)
-    return (FONT, size, "bold") if bold else (FONT, size)
+        size, family = size - 1, ("Inter SemiBold" if bold else "Inter")
+        return (family, -max(5, round(size * _PX_PER_PT))) if _PX_PER_PT else (family, size)
+    px = -max(5, round(size * _PX_PER_PT)) if _PX_PER_PT else size
+    return (FONT, px, "bold") if bold else (FONT, px)
 CLIP_DEFAULT = "(workflow default)"
 
 
@@ -678,7 +721,7 @@ ACCENT_TEXT = "#6aaaf5"     # the blue for text and thin lines on the grey (the 
 NA_RED = "#ff6b6b"      # text of a tab that is not available (model files missing); 5.3 : 1 on PANEL
 DISABLED = "#8e8e8e"   # text of a greyed-out control: clearly darker than MUTED, so it reads as "not available here"
 SCALE_MODES = ("upscale", "refine")   # these run only with an upscale workflow (a node titled pc:upscale)
-NO_LLM_MODES = ("outpaint", "remove") + SCALE_MODES   # no "LLM prompt enhancement" row: fixed or ready-made prompts (user 30.10.)
+NO_LLM_MODES = ("outpaint", "remove") + SCALE_MODES   # no "Enhance prompt with LLM" row: fixed or ready-made prompts (user 30.10.)
 LLM_TIP = "Describes the picture in PhotoCraft and adds the text to the end of your prompt. Ctrl+Z undoes it."   # the Describe Canvas button (user 3.11.)
 STYLES_TIP = "Style prompts"
 V10_WORKFLOW = "moss-image-inpaint-v10.json"      # MOSS Fill as published (MOSS Inpainting v10), test switch next to Prompt
@@ -812,11 +855,16 @@ __all__ = [
     "icon_image",
     "SLOT_ART",
     "Tooltip",
+    "wheel_up",
+    "bind_wheel",
+    "ChipTooltip",
+    "CHIP_TIPS",
     "ENHANCE_TIP",
     "LORA_TIP",
     "STAGE_TIP",
     "FONT",
     "font",
+    "set_font_scaling",
     "CLIP_DEFAULT",
     "BG",
     "PANEL",

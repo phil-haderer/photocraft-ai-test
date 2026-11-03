@@ -67,6 +67,20 @@ def main():
     assert app.cb_turbo["state"] == "disabled" and app.v_turbo.get() is False
     notes = app._apply_settings({"turbo": True})
     assert app.v_turbo.get() is False and notes and "needs" in notes[0], notes
+
+    # Enhance prompt with LLM: Qwen Text to image runs without its optional text model, so the box is grey and off while the
+    # file is missing (a tester with only the Fibo files got ComfyUI's "Value not in list" for qwen3.5_9b_w4a8_gptq); a loaded "on" is named
+    app = su.make_app()
+    go_qwen = lambda inv: (app._apply_refresh({"_detect": True, "_inv": inv}), app.v_model.set("qwen"), app.v_mode.set("txt2img"), app._on_model())  # noqa: E731
+    go_qwen(inventory.Inventory(su.lists_without(clip="qwen3.5_9b_w4a8_gptq.safetensors"), NODES))
+    assert app.cb_enhance["state"] == "disabled" and app.v_enhance.get() is False
+    assert "qwen3.5_9b_w4a8_gptq.safetensors" in app.tt_enhance.text and "settings" in app.tt_enhance.text
+    notes = app._apply_settings({"enhance": True})
+    assert app.v_enhance.get() is False and notes and "Enhance prompt with LLM needs qwen3.5" in notes[0], notes
+    assert app._request().enhance is False
+    go_qwen(inventory.Inventory(td.full_lists(), NODES))        # the file is there: usable and stays on
+    assert app.cb_enhance["state"] == "normal"
+    assert app._apply_settings({"enhance": True}) == [] and app.v_enhance.get() is True
     print("ALL OK (optional switches)")
 
 

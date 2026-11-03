@@ -47,6 +47,8 @@ def main():
         assert config.DEFAULTS["comfyui"]["url"] == "http://127.0.0.1:8188"
     else:
         assert config._config_dir() == Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser() / "pccomfy"
+        assert config.EXCHANGE_DIR == Path("~/.cache/pccomfy/exchange").expanduser()
+    assert "~" not in str(config.EXCHANGE_DIR) and "~" not in config.DEFAULTS["photocraft"]["exchange_dir"]      # no folder "~" (Linux VM 4.11.)
 
     # the PhotoCraft binary: photocraft.exe on Windows (found by the old search), photocraft elsewhere; the Linux starter exists
     assert launcher.exe_name() == ("photocraft.exe" if hostos.IS_WINDOWS else "photocraft")

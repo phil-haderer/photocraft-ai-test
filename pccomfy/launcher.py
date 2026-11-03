@@ -43,8 +43,8 @@ def exe_name() -> str:
 def photocraft_args(exe: str, cfg: dict) -> list[str]:
     """The command line the starter .bat uses: control port, token file, the exchange folder for reading and writing."""
     pcc = cfg["photocraft"]
-    xch = str(Path(pcc["exchange_dir"]))
-    return [exe, "--control", str(int(pcc["port"])), "--control-token-file", str(Path(pcc["token_file"])),
+    xch = str(Path(pcc["exchange_dir"]).expanduser())       # Linux: "~/.cache/..." (no shell here, PhotoCraft would take "~" literally)
+    return [exe, "--control", str(int(pcc["port"])), "--control-token-file", str(Path(pcc["token_file"]).expanduser()),
             "--automation-read-root", xch, "--automation-write-root", xch]
 
 
@@ -57,7 +57,7 @@ def start_photocraft(exe: str, cfg: dict, is_open=None, popen=subprocess.Popen, 
         return False                      # running with the control channel: only the window is missing
     if not exe or not Path(exe).exists():
         raise LaunchError(f"PhotoCraft not found:\n{exe or '(no path given; use --photocraft or set PHOTOCRAFT)'}")
-    Path(pcc["exchange_dir"]).mkdir(parents=True, exist_ok=True)
+    Path(pcc["exchange_dir"]).expanduser().mkdir(parents=True, exist_ok=True)
     kw = {} if IS_WINDOWS else {"start_new_session": True}                # Linux: PhotoCraft outlives the terminal
     popen(photocraft_args(exe, cfg), cwd=str(ROOT), close_fds=True, **kw)       # as the .bat (cd /d "%~dp0")
     end = time.monotonic() + wait_s

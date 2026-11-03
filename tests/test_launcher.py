@@ -37,6 +37,33 @@ def args_checks():
             assert flag in bat, flag
 
 
+def tilde_checks():
+    """Linux (found in the VM 4.11.): the exchange folder is "~/.cache/pccomfy/exchange"; PhotoCraft gets the real path, and no
+    folder named "~" appears in the working directory."""
+    home = Path(tempfile.mkdtemp())
+    old = os.environ.get("HOME"), os.environ.get("USERPROFILE")
+    os.environ["HOME"] = os.environ["USERPROFILE"] = str(home)
+    try:
+        c = {"photocraft": {"host": "127.0.0.1", "port": 7878, "token_file": "~/.config/pccomfy/photocraft.token",
+                            "exchange_dir": "~/.cache/pccomfy/exchange"}}
+        args = launcher.photocraft_args(EXE, c)
+        want = str(home / ".cache" / "pccomfy" / "exchange")
+        assert args[args.index("--automation-read-root") + 1] == want and args[args.index("--automation-write-root") + 1] == want
+        assert args[args.index("--control-token-file") + 1] == str(home / ".config" / "pccomfy" / "photocraft.token")
+        assert not any("~" in a for a in args)
+        exe = home / "photocraft"
+        exe.write_bytes(b"")
+        launcher.start_photocraft(str(exe), c, is_open=lambda: True)             # running already: nothing is made
+        launcher.start_photocraft(str(exe), c, is_open=iter([False, True]).__next__, popen=lambda *a, **k: None, sleep=lambda s: None)
+        assert (home / ".cache" / "pccomfy" / "exchange").is_dir() and not (ROOT / "~").exists()
+    finally:
+        for k, v in zip(("HOME", "USERPROFILE"), old):
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 def start_checks():
     tmp = Path(tempfile.mkdtemp())
     exe = tmp / "photocraft.exe"
@@ -206,6 +233,7 @@ def launch_checks():
 
 def main():
     args_checks()
+    tilde_checks()
     find_checks()
     linux_find_checks()
     desktop_checks()

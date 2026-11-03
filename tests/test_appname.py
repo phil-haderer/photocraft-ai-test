@@ -31,13 +31,13 @@ def test_no_other_literal():
 
 
 def test_header_title():
-    """The header shows HEADER_TITLE: the names white and thin, the sign blue and bold, all at 12 pt (user 3.11.)."""
+    """The header shows HEADER_TITLE: the names white and thin, the sign light blue (as the prompt tip) and bold, all at 12 pt (user 3.11.)."""
     sys.path.insert(0, str(ROOT / "tests"))
     import test_gui_presets as t  # noqa: E402  (installs the Tk stub and a temporary PCCOMFY_HOME)
-    from pccomfy.gui_common import ACCENT, font
+    from pccomfy.gui_common import ACCENT_TEXT, font
     app = t.gui.App(t.cfgmod.load())
     assert tuple(w["text"] for w in app.lbl_title) == appname.HEADER_TITLE
-    assert [w["foreground"] for w in app.lbl_title] == ["#ffffff", ACCENT, "#ffffff"]
+    assert [w["foreground"] for w in app.lbl_title] == ["#ffffff", ACCENT_TEXT, "#ffffff"]
     assert [w["font"] for w in app.lbl_title] == [font(12), font(12, bold=True), font(12)]
 
 

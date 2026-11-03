@@ -231,7 +231,7 @@ class ModeMixin:
         if not keep:
             s["workflow"] = spec.workflow
         elif not force:
-            s.pop("enhance", None)       # same workflow: the "LLM prompt enhancement" checkbox keeps what you set (Expand ignores it)
+            s.pop("enhance", None)       # same workflow: the "Enhance prompt with LLM" checkbox keeps what you set (Expand ignores it)
         if getattr(self, "_easy", False):
             s["enhance"] = False       # Easy Mode: always the factory settings, no saved page, no LLM (its row is hidden)
         elif not getattr(self, "_factory", False):         # Shift + "Reset page": the standard settings, not the saved ones
@@ -241,16 +241,16 @@ class ModeMixin:
         t = self.t_prompt
         cur = t.get("1.0", "end").strip() if str(t.cget("state")) != "disabled" else ""
         first = spec.prompts[0] if spec.prompts else None      # Flux 2 Refine: always starts on its "Default" prompt
-        # a function with a text of its own (Upscale, Refine) or none at all (Expand) takes over from your own text; the text
-        # waits aside and comes back with the next function that has no text of its own (user 2.11.)
+        # Expand (no text) takes over from your own text; the text waits aside and comes back with the next function. A text
+        # you edited or generated is never replaced by a stock text of Upscale / Refine (user 3.11.); stock texts only fill an
+        # empty or unedited field
         prev, self._prompt_mode = getattr(self, "_prompt_mode", None), mode
         changed = prev is not None and prev != mode
-        own_text = bool(spec.prompt_hint) or first is not None
-        if changed and cur and cur not in models.STOCK_PROMPTS and (own_text or mode == "outpaint") and str(t.cget("state")) != "disabled":
+        if changed and cur and cur not in models.STOCK_PROMPTS and mode == "outpaint" and str(t.cget("state")) != "disabled":
             self._away_prompt = cur
             cur = ""
-        if first is not None and str(t.cget("state")) != "disabled":
-            t.edit_separator()                  # one undo step: Ctrl+Z in the field brings your own text back
+        if first is not None and str(t.cget("state")) != "disabled" and (cur == "" or cur in models.STOCK_PROMPTS):
+            t.edit_separator()                  # one undo step: Ctrl+Z in the field brings the earlier text back
             t.delete("1.0", "end")
             t.insert("1.0", first[1])
             t.edit_separator()
@@ -504,8 +504,9 @@ class ModeMixin:
             return []
 
     def _switch_missing(self) -> dict:
-        """What the window's switches need that ComfyUI does not have: {"turbo" or "stage<i>": (label, [file or node names])}.
-        A switch needs the loaders of its LoRA / stage nodes (and the node classes of a stage). Nothing is checked while the
+        """What the window's switches need that ComfyUI does not have: {"turbo", "enhance" or "stage<i>": (label, [file or node names])}.
+        A switch needs the loaders of its LoRA / stage nodes (and the node classes of a stage); "Enhance prompt with LLM" the
+        text model of the prompt writer. Nothing is checked while the
         inventory was not read or the workflow is not one of ours."""
         out: dict = {}
         if getattr(self, "inv", None) is None:
@@ -523,6 +524,11 @@ class ModeMixin:
                 miss = names(workflows_stage_subgraph(t, st["id"]))
                 if miss:
                     out[f"stage{i}"] = (st["label"], miss)
+            writer = prompt_phase_nodes(t)       # the text model that writes the prompt (Enhance prompt with LLM)
+            if writer and self._llm_row_wanted():
+                miss = names({nid: t[nid] for nid in writer if nid in t})
+                if miss:
+                    out["enhance"] = ("Enhance prompt with LLM", miss)
             break
         return out
 
@@ -534,7 +540,8 @@ class ModeMixin:
             return []
         miss = self._switch_missing()
         notes: list[str] = []
-        rows = [("turbo", self.cb_turbo, self.v_turbo, self.tt_turbo, self._has_lora_switch())]
+        rows = [("turbo", self.cb_turbo, self.v_turbo, self.tt_turbo, self._has_lora_switch()),
+                ("enhance", self.cb_enhance, self.v_enhance, self.tt_enhance, self._llm_row_wanted())]
         stages = self._stages()
         rows += [(f"stage{i}", cb, self.stage_vars[i], self.stage_tips[i], i < len(stages)) for i, cb in enumerate(self.stage_cbs)]
         for key, cb, var, tip, exists in rows:
@@ -730,7 +737,7 @@ class ModeMixin:
         name = next((n for n in (writer_name(t) for t in self._wf_templates()) if n), "")
         # the model's name only in the tooltip, never in the checkbox (user 30.10.)
         self.tt_enhance.text = ENHANCE_TIP + (f"\nText model: {name}" if name else "") + (f"\n{llm}" if " " in llm and llm != name else "")
-        self.cb_enhance.configure(text="LLM prompt enhancement")
+        self.cb_enhance.configure(text="Enhance prompt with LLM")
         has_lora = self._has_lora_switch()
         self.cb_turbo.configure(state="normal" if has_lora else "disabled", text=self._lora_label())
         for w in (self.cb_turbo, self.f_lora):      # no LoRA of its own in this workflow: nothing to show (no greyed-out box)
@@ -850,7 +857,7 @@ class ModeMixin:
         return out
 
     def _llm_row_wanted(self) -> bool:
-        """The "LLM prompt enhancement" row is shown only where the workflow has a text model that writes the prompt and the
+        """The "Enhance prompt with LLM" row is shown only where the workflow has a text model that writes the prompt and the
         function takes the user's own prompt (not in NO_LLM_MODES)."""
         return self.v_mode.get() not in NO_LLM_MODES and self._has_text_model()
 

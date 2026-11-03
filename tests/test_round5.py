@@ -351,9 +351,13 @@ def main():
         app.lbl_sharpen._commit()
         assert abs(app.v_sharpen.get() - want) < 1e-9, (typed, app.v_sharpen.get())
     assert app.lbl_sharpen.cget("text") == "0 %"
-    # Flux 2 Refine starts on "Default", even when your own text was in the field
+    # Flux 2 Refine keeps your own text (user 3.11.) and starts on "Default" only from an empty or stock field
     app.v_model.set("flux2"); app.v_mode.set("edit"); app._on_model()
     app.t_prompt.delete("1.0", "end"); app.t_prompt.insert("1.0", "my own text")
+    app.v_mode.set("refine"); app._on_mode()
+    assert app._prompt_text() == "my own text" and app.v_pchoice.get() == "", (app._prompt_text(), app.v_pchoice.get())
+    app.v_mode.set("edit"); app._on_mode()
+    app.t_prompt.delete("1.0", "end")
     app.v_mode.set("refine"); app._on_mode()
     assert app._prompt_text() == models.FLUX2_DEFAULT and app.v_pchoice.get() == "Default", (app._prompt_text(), app.v_pchoice.get())
     ok = gui.ValueBox._typed_ok              # only numbers can be typed: digits and one decimal point or comma (more: test_number_fields)

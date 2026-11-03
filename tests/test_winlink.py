@@ -123,12 +123,25 @@ assert not winlink.menu_step({}, (300, 20), True, False, owner, up)["hidden"]   
 assert winlink.menu_step({}, (700, 20), True, False, owner, up)["hidden"]       # a click in the menu bar beside it still is
 
 # start position: first start top right inside PhotoCraft under the menu bar; a saved place in the menu bar moves down
-assert winlink.first_position((0, 0, 1600, 900), 380) == (1600 - 380 - 16, winlink.MENU_BAND + 16)
-assert winlink.first_position((100, 50, 1700, 950), 570, 1.5) == (1700 - 570 - 24, 50 + round(winlink.MENU_BAND * 1.5) + 24)
+assert winlink.first_position((0, 0, 1600, 900), 380) == (16, winlink.MENU_BAND + 16)
+assert winlink.first_position((100, 50, 1700, 950), 570, 1.5) == (100 + 24, 50 + round(winlink.MENU_BAND * 1.5) + 24)
 assert winlink.below_menu_bar((40, 10), 380, (0, 0, 1600, 900)) == (40, winlink.MENU_BAND + 16)
 assert winlink.below_menu_bar((40, 300), 380, (0, 0, 1600, 900)) == (40, 300)          # below the band: stays
 assert winlink.below_menu_bar((1700, 10), 380, (0, 0, 1600, 900)) == (1700, 10)        # beside PhotoCraft: stays
 print("ALL OK (menu guard)")
+
+
+# 64-bit Windows exports SetWindowLongPtrW, 32-bit Windows only SetWindowLongW (user fix 3.11., PhotoCraft has x86 builds)
+import ctypes  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
+
+wt = SimpleNamespace(HWND=object())
+f64, f32 = SimpleNamespace(), SimpleNamespace()
+user64 = SimpleNamespace(SetWindowLongPtrW=f64, SetWindowLongW=SimpleNamespace())
+assert winlink.set_long_function(user64, ctypes, wt) is f64 and f64.restype is ctypes.c_void_p
+user32bit = SimpleNamespace(SetWindowLongW=f32)                                # no SetWindowLongPtrW at all
+assert winlink.set_long_function(user32bit, ctypes, wt) is f32
+assert f32.restype is ctypes.c_long and f32.argtypes[2] is ctypes.c_long
 print("winlink ok")
 
 

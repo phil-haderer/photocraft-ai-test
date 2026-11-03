@@ -14,7 +14,7 @@ class RunMixin:
         self.v_status.set(msg)
         self.lbl_status.configure(style="Error.TLabel" if error else "TLabel")
         if error:
-            self.lbl_err.pack(side="left", padx=(0, 8), before=self.lbl_status)
+            self.lbl_err.pack(side="left", anchor="n", padx=(0, 8), before=self.lbl_status)
         else:
             self.lbl_err.pack_forget()
 
@@ -34,8 +34,8 @@ class RunMixin:
         spec = m.modes.get(self.v_mode.get()) if m else None
         target = p.prompt if (self.v_mode.get() == "remove" and spec is not None and spec.remove_text) else ""
         req = Request(mode=self._run_mode(), params=p, remove_target=target, workflow=wf_path, base_res=int(self.v_res.get()),
-                       context=min(1.0, max(0.0, round(float(self.v_context.get()) * 20) / 20)),   # the slider's range and steps (an old saved 2.0 too) mask_grow=int(self.v_grow.get()),
-                       mask_blur=int(self.v_blur.get()),
+                       context=min(1.0, max(0.0, round(float(self.v_context.get()) * 20) / 20)),   # the slider's range and steps (an old saved 2.0 too)
+                       mask_grow=int(self.v_grow.get()), mask_blur=int(self.v_blur.get()),
                        overlap=int(self.v_overlap.get()), variants=int(self.v_variants.get()),
                        enhance=bool(self.v_enhance.get()) and self._llm_row_wanted(),
                        turbo=bool(self.v_turbo.get()), scale=self._scale(),
@@ -243,7 +243,7 @@ class RunMixin:
         if old is not None and not old.closed:
             old.close()
             return
-        self._history_popup = ListPopup(self.root, self.b_history, self._history_rows(), scale=getattr(self, "ui", 1.0))
+        self._history_popup = ListPopup(self.root, self.b_history, self._history_rows(), scale=getattr(self, "ui", 1.0), above=True)
 
     def erase_history(self):
         runhistory.clear(cfgmod.HISTORY_FILE)
@@ -392,6 +392,8 @@ class RunMixin:
                         self._hist_run["llm"] = self._last_vgl.strip()
                 elif kind == "refresh":
                     self._apply_refresh(data)
+                elif kind == "alive":
+                    self._comfy_alive(*data)
                 elif kind == "comfyaddr":
                     self._comfy_address_done(data)
                 elif kind == "download":

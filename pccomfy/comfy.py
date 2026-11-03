@@ -14,9 +14,13 @@ from __future__ import annotations
 import http.client
 import io
 import json
+import os
+import socket
+import sys
 import struct
 import threading
 import time
+from pathlib import Path
 import uuid
 import urllib.parse
 from typing import Callable
@@ -29,6 +33,23 @@ except Exception:  # pragma: no cover
     websocket = None
 
 
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0")
+
+
+def real_comfy_blocked(host: str, port: int) -> bool:
+    """True when a test script (`python tests/<name>.py`, not a `live_*.py` check) would talk to the ComfyUI of this PC (port 8188).
+    A test run did that on 3.11.2026 and ended the listening socket of the user's ComfyUI three times (a client that drops
+    in the middle of the connection: WinError 64 in asyncio's accept, ComfyUI alive but nothing listens). Tests use ports of
+    their own; PCCOMFY_ALLOW_REAL_COMFY=1 lifts the block."""
+    if port != 8188 or host not in LOCAL_HOSTS or os.environ.get("PCCOMFY_ALLOW_REAL_COMFY"):
+        return False
+    try:
+        script = Path(sys.argv[0]).resolve()
+    except (IndexError, OSError, ValueError):
+        return False
+    return script.parent.name == "tests" and not script.name.startswith("live_")
+
+
 class ComfyError(RuntimeError):
     pass
 
@@ -37,6 +58,7 @@ class Cancelled(Exception):
     pass
 
 
+WS_HANDSHAKE_S = 10.0       # the websocket handshake (see ComfyUI.open_events)
 PREVIEW_IMAGE, PREVIEW_IMAGE_WITH_METADATA = 1, 4      # ComfyUI's binary websocket events (protocol.py BinaryEventTypes)
 
 
@@ -63,6 +85,24 @@ def preview_image(data: bytes, prompt_id: str | None = None) -> Image.Image | No
         return None
 
 
+class NodeProbe:
+    """Which node classes ComfyUI has, asked one class at a time (GET /object_info/<class>, an empty answer = not installed) and
+    remembered. ``cls in probe`` works like a set. A class that cannot be asked counts as installed: no false alarm."""
+
+    def __init__(self, comfy, classes=()):
+        self._comfy, self._known = comfy, {}
+        for c in classes:
+            c in self
+
+    def __contains__(self, cls) -> bool:
+        if cls not in self._known:
+            try:
+                self._known[cls] = bool(self._comfy.object_info(cls))
+            except (ComfyError, ValueError, AttributeError, TypeError):
+                self._known[cls] = True
+        return self._known[cls]
+
+
 class ComfyUI:
     def __init__(self, url: str = "http://127.0.0.1:8188", timeout: float = 30.0):
         self.timeout = timeout
@@ -73,6 +113,28 @@ class ComfyUI:
         self._cache_lock = threading.RLock()
         self.client_id = uuid.uuid4().hex
         self.name_fixer: Callable[[dict], object] | None = None   # called with every graph before it is queued (see inventory.apply_names)
+        self.log_file: Path | None = None    # connection log (set by the Bridge: exchange/comfy-net.log); None = no log
+
+    LOG_MAX_BYTES = 200_000
+
+    def _log(self, event: str, **fields) -> None:
+        """One line per connection event (websocket opened / closed / failed, a request that found no ComfyUI, the end of a
+        wait) in comfy-net.log: to find out afterwards what the plugin was doing when ComfyUI stopped listening (WinError 64).
+        Never raises; the file keeps its last half when it grows past LOG_MAX_BYTES."""
+        f = self.log_file
+        if f is None:
+            return
+        try:
+            line = time.strftime("%Y-%m-%d %H:%M:%S") + f" [{threading.current_thread().name}] {event}"
+            line += "".join(f" {k}={v}" for k, v in fields.items())
+            f.parent.mkdir(parents=True, exist_ok=True)
+            if f.exists() and f.stat().st_size > self.LOG_MAX_BYTES:
+                keep = f.read_text(encoding="utf-8", errors="replace").splitlines()[-1000:]
+                f.write_text("\n".join(keep) + "\n", encoding="utf-8")
+            with f.open("a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+        except (OSError, ValueError):
+            pass
 
     # ---------- HTTP ----------
 
@@ -118,6 +180,8 @@ class ComfyUI:
 
     def _request(self, path: str, data: bytes | None = None, headers: dict | None = None, method: str | None = None):
         method = method or ("POST" if data is not None else "GET")
+        if real_comfy_blocked(self._host, self._port):
+            raise ComfyError("Blocked: a test must not talk to the real ComfyUI on port 8188.")
         fresh = method != "GET"
         for attempt in (0, 1):
             conn = self._connection(fresh)
@@ -133,8 +197,11 @@ class ComfyUI:
                     self._local.conn = None
                 if reused and attempt == 0:       # the server closed an idle connection: once more on a new one (GET only)
                     continue
-                reason = getattr(e, "strerror", None) or e
-                raise ComfyError(f"No connection to ComfyUI at {self.url} ({reason}). Is the server running?") from None
+                self._log("http_failed", method=method, path=path.split("?")[0], attempt=attempt, error=repr(e)[:160])
+                # never the system's own text (strerror is German on a German Windows): our English wording only
+                if isinstance(e, (TimeoutError, socket.timeout)):
+                    raise ComfyError(f"ComfyUI at {self.url} does not answer. Is it running? Start it, then click Refresh.") from None
+                raise ComfyError(f"ComfyUI is not running at {self.url}. Start it, then click Refresh.") from None
             finally:
                 if fresh:
                     conn.close()
@@ -218,10 +285,11 @@ class ComfyUI:
             return []
         return [str(x) for x in j] if isinstance(j, list) else []
 
-    def inventory_raw(self) -> dict:
-        """Model files per loader kind (unet, clip, vae, lora) and, when readable, the names of all node classes
-        ("nodes", one /object_info call; None when that failed). Raises ComfyError when the server cannot be reached,
-        because the empty lists _choices gives then would look like "nothing is installed"."""
+    def inventory_raw(self, classes=()) -> dict:
+        """Model files per loader kind (unet, clip, vae, lora) and ("nodes") a ``NodeProbe`` that answers "is this node class
+        installed?" with one small /object_info/<class> call per class (``classes`` are asked up front); the full /object_info
+        is 5 MB and took about 2 s. Raises ComfyError when the server cannot be reached, because the empty lists _choices
+        gives then would look like "nothing is installed"."""
         self.system_stats()
         out = {
             "unet": self._choices("UNETLoader", "unet_name"),
@@ -232,10 +300,7 @@ class ComfyUI:
             "bg_removal": self._choices("LoadBackgroundRemovalModel", "bg_removal_name"),
             "upscale_model": self._choices("UpscaleModelLoader", "model_name"),
         }
-        try:
-            out["nodes"] = set((self._json("/object_info") or {}).keys())
-        except (ComfyError, ValueError):
-            out["nodes"] = None
+        out["nodes"] = NodeProbe(self, classes)
         return out
 
     # ---------- image I/O ----------
@@ -285,24 +350,53 @@ class ComfyUI:
     def history(self, prompt_id: str) -> dict | None:
         return self._json(f"/history/{prompt_id}").get(prompt_id)
 
+    def open_events(self):
+        """The websocket for progress and preview frames, or None (no websocket-client, or ComfyUI does not answer). Open it
+        BEFORE the job is queued, so no early message is lost. The handshake gets WS_HANDSHAKE_S: a busy ComfyUI (loading a
+        model) must not see the client give up in the middle of it, that can kill its listening socket on Windows (WinError 64,
+        asyncio accept). Afterwards recv() times out after 1 s: the heartbeat of wait()."""
+        if websocket is None or real_comfy_blocked(self._host, self._port):
+            return None
+        ws = None
+        t0 = time.monotonic()
+        try:
+            ws = websocket.create_connection(self.url.replace("http", "ws", 1) + f"/ws?clientId={self.client_id}",
+                                             timeout=WS_HANDSHAKE_S)
+            ws.settimeout(1)
+            self._log("ws_open", id=id(ws) % 10000, ms=round((time.monotonic() - t0) * 1000))
+            return ws
+        except Exception as e:
+            self._log("ws_open_failed", ms=round((time.monotonic() - t0) * 1000), error=repr(e)[:160])
+            self.close_events(ws)
+            return None
+
+    def close_events(self, ws) -> None:
+        """Closes a websocket, whatever its state; never raises."""
+        if ws is None:
+            return
+        try:
+            ws.close()
+            self._log("ws_close", id=id(ws) % 10000)
+        except Exception as e:
+            self._log("ws_close_failed", id=id(ws) % 10000, error=repr(e)[:160])
+
     def wait(self, prompt_id: str, on_progress: Callable[..., None] | None = None,
              cancelled: Callable[[], bool] | None = None, timeout: float = 1800,
-             on_preview: Callable[[Image.Image], None] | None = None) -> dict:
+             on_preview: Callable[[Image.Image], None] | None = None, ws=None) -> dict:
         """Wait for the job to finish. Progress via websocket when available, else poll /history. on_preview gets each
-        live preview frame (a PIL image) the sampler sends."""
+        live preview frame (a PIL image) the sampler sends. `ws`: a websocket the caller opened before queueing
+        (open_events; the caller closes it); without one, wait() opens its own and closes it."""
         # on_progress(fraction, message, node=<id of the node ComfyUI is executing, or None>);
         # fraction is -1 when the node reports no progress (e.g. a text model writing the prompt).
         on_progress = on_progress or (lambda f, msg, node=None: None)
         current = None
         cancelled = cancelled or (lambda: False)
         deadline = time.monotonic() + timeout
-        ws = None
-        if websocket is not None:
-            try:
-                ws_url = self.url.replace("http", "ws", 1) + f"/ws?clientId={self.client_id}"
-                ws = websocket.create_connection(ws_url, timeout=1)
-            except Exception:
-                ws = None
+        own = ws is None
+        if own:
+            ws = self.open_events()
+        t_wait = time.monotonic()
+        self._log("wait_start", prompt=prompt_id[:8], ws="yes" if ws is not None else "no (polling)", own=own)
         try:
             while time.monotonic() < deadline:
                 if cancelled():
@@ -314,7 +408,9 @@ class ComfyUI:
                     except websocket.WebSocketTimeoutException:
                         msg = None
                         on_progress(-1, "", current)  # heartbeat (~1/s): lets the UI show elapsed time
-                    except Exception:
+                    except Exception as e:
+                        self._log("ws_recv_failed", prompt=prompt_id[:8], error=repr(e)[:160])
+                        self.close_events(ws)      # a socket that failed is closed, not dropped
                         ws = None
                         msg = None
                     if isinstance(msg, (bytes, bytearray)):
@@ -351,8 +447,9 @@ class ComfyUI:
             else:
                 raise ComfyError("Timed out waiting for ComfyUI.")
         finally:
-            if ws is not None:
-                ws.close()
+            self._log("wait_end", prompt=prompt_id[:8], secs=round(time.monotonic() - t_wait, 1))
+            if own:
+                self.close_events(ws)
         h = self.history(prompt_id) or {}
         status = h.get("status", {})
         if status.get("status_str") == "error":
