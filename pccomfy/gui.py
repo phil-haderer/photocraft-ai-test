@@ -136,6 +136,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.root.after(100, self._poll)
         self.root.after(200, self.refresh)
         self.root.after(WATCH_MS, self._watch_comfy)
+        self.root.after(WATCH_MS, self._watch_photocraft)
         self._schedule_tip()
         self.root.protocol("WM_DELETE_WINDOW", self._quit)
         self.root.bind("<Destroy>", self._on_destroy, add="+")

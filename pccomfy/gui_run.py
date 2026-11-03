@@ -392,6 +392,8 @@ class RunMixin:
                         self._hist_run["llm"] = self._last_vgl.strip()
                 elif kind == "refresh":
                     self._apply_refresh(data)
+                elif kind == "pc-alive":
+                    self._photocraft_alive(data)
                 elif kind == "alive":
                     self._comfy_alive(*data)
                 elif kind == "comfyaddr":

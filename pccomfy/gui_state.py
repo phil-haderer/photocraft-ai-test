@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import socket
 
 from . import comfyaddr
 from .gui_common import *  # noqa: F401,F403
@@ -39,6 +40,34 @@ class StateMixin:
         set_dot(self.lbl_dot, ok)
         if ok and was is False:
             self.refresh()
+
+    def _watch_photocraft(self):
+        """Where the window cannot be linked to PhotoCraft's window (Linux), it still closes with PhotoCraft: every WATCH_MS a
+        plain connection to its control port (no login) in a thread; gone twice in a row after it was seen, the window quits."""
+        if os.environ.get("PCCOMFY_NO_WATCH") or winlink.available():
+            return
+        if self.v_top.get() and not getattr(self, "_pc_probing", False):
+            self._pc_probing, host, port = True, self.pc.host, self.pc.port
+
+            def work():
+                try:
+                    socket.create_connection((host, port), timeout=2.0).close()
+                    ok = True
+                except OSError:
+                    ok = False
+                self._pc_probing = False
+                self.events.put(("pc-alive", ok))
+            threading.Thread(target=work, daemon=True).start()
+        self.root.after(WATCH_MS, self._watch_photocraft)
+
+    def _photocraft_alive(self, ok: bool):
+        """The answer of _watch_photocraft (same rule as the Windows watchdog in gui._try_link: seen once, gone twice)."""
+        if ok:
+            self._pc_seen, self._pc_gone = True, 0
+        elif getattr(self, "_pc_seen", False) and self.v_top.get():
+            self._pc_gone = getattr(self, "_pc_gone", 0) + 1
+            if self._pc_gone >= 2:
+                self._quit()
 
     def refresh(self):
         def work():

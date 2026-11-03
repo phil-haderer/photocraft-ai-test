@@ -536,6 +536,27 @@ def main():
     assert app.v_conn.get() == "ComfyUI connected" and reads == [1, 1]
     app._comfy_alive("http://other:1", False)                                   # an answer for an old address is ignored
     assert app.lbl_dot.cget("style") == "ConnOk.TLabel"
+    # without a window link (Linux) the window closes with PhotoCraft: seen once, then gone twice in a row (not before it was seen)
+    quits = []
+    app._quit = lambda: quits.append(1)
+    app.v_top.set(True)
+    app._pc_seen, app._pc_gone = False, 0
+    app._photocraft_alive(False)
+    app._photocraft_alive(False)
+    assert quits == [] and not app._pc_seen
+    app._photocraft_alive(True)
+    app._photocraft_alive(False)
+    assert quits == [] and app._pc_gone == 1
+    app._photocraft_alive(True)                                                 # one missed answer is forgiven
+    app._photocraft_alive(False)
+    assert quits == [] and app._pc_gone == 1
+    app._photocraft_alive(False)
+    assert quits == [1]
+    app.v_top.set(False)                                                        # "stay on top" off: the window is free and stays
+    app._pc_gone = 0
+    app._photocraft_alive(False)
+    app._photocraft_alive(False)
+    assert quits == [1]
     test_start_state()
     test_empty_view()
     test_other_settings()
