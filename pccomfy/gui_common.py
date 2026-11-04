@@ -19,10 +19,29 @@ from . import fonts, hostos, models, winlink
 from .bridge import Bridge, BridgeError, Request, mask_is_used, prompt_phase_nodes
 from .comfy import Cancelled, ComfyError, ComfyUI
 from .photocraft import PhotoCraft, PhotoCraftError
+from .refslots import REF_MAX_MP, REF_MP
 from .workflows import _tags as workflows_tags
 from .workflows import FLUX2_SCHEDULER, GenParams, has_upscale_slot, list_templates, load_template, bypass_lora, lora_strength, lora_switches, lora_tip, resolve, sampler_values, stage_info, stage_switches, writer_model, writer_name
 
 FILL_CONTEXT = 0.2   # Context (margin) that Fill Selection starts with
+NATIVE_MAX_MP = 4.0  # the most the "up to" box takes (user 4.11.: the highest value is 4 MP, so there is nothing to warn about)
+NATIVE_MP_EDIT = 2.0   # the limit "Original size" starts with in the editing functions (user 4.11.; it only caps, it never enlarges)
+NATIVE_MP_EXPAND = 1.0  # Expand starts lower until the 1 MP / 2 MP comparison is done (user 4.11.)
+
+
+def native_mp_default(mode: str) -> float:
+    """The limit of "Original size" / "Use canvas size" a function starts with."""
+    return NATIVE_MP if mode == "txt2img" else NATIVE_MP_EXPAND if mode == "outpaint" else NATIVE_MP_EDIT
+
+
+NATIVE_MP = 4.0      # "Original size": the megapixels it sends at most (user 4.11.; each model gets its own value after the tests)
+NATIVE_TIP = ("The picture goes to the model as large as it is, up to this many megapixels, instead of at about 1 MP "
+              "(the model's usual size), and the result is not scaled up afterwards. A smaller picture is not enlarged "
+              "to the limit, only a bigger one is scaled down to it.")
+NATIVE_TIP_CANVAS = ("The picture is made in the size of your canvas, never larger and never enlarged, and at most this many "
+                     "megapixels (a bigger canvas is scaled down to it). The sides are rounded down to the multiple the "
+                     "model needs, so the size can differ from the canvas by a few pixels.")
+NATIVE_TIP_END = " Bigger pictures are slower and need more VRAM; the models are made for about 1 MP, so test it per model."
 
 MODE_LABELS = [
     ("txt2img", "Text to image"),
@@ -785,6 +804,16 @@ MIN_W = 380  # the window's fixed width (it cannot be resized; the height follow
 
 
 __all__ = [
+    "REF_MP",
+    "REF_MAX_MP",
+    "NATIVE_MP",
+    "NATIVE_MP_EDIT",
+    "NATIVE_MP_EXPAND",
+    "native_mp_default",
+    "NATIVE_MAX_MP",
+    "NATIVE_TIP",
+    "NATIVE_TIP_CANVAS",
+    "NATIVE_TIP_END",
     "json",
     "os",
     "queue",

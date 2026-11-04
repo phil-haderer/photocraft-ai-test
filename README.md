@@ -20,7 +20,7 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.1 · ComfyUI version: 0.42.0
 1. **Get the parts**: Windows 10/11 with an NVIDIA card (16 GB VRAM), [Python 3.11+](https://www.python.org/downloads/windows/)
    (tick "tcl/tk" and "Add python.exe to PATH"), PhotoCraft 0.20.1, and ComfyUI 0.42 or newer.
 2. **Install the plugin**: *Code › Download ZIP* and unpack it (or `git clone` the repository), then double-click **`setup-windows.bat`**. It also creates the
-   desktop shortcut **PhotoCraft AI** (it looks for `photocraft.exe` itself and asks once if it can't find it).
+   desktop shortcut **PhotoCraft AI** (it looks for `photocraft.exe` itself and asks once if it can't find it). The script shows its four steps as it goes; `setup-windows.bat /check` only looks and changes nothing.
 3. **Start it**: start ComfyUI, close PhotoCraft, then double-click **PhotoCraft AI** on your desktop. PhotoCraft opens,
    and a few seconds later the plugin window appears.
 4. **Get the models**: open the plugin's settings window (gear symbol). Under **Easy Mode** one button downloads the starter models
@@ -42,13 +42,13 @@ Download all models via the settings tabs to get the full experience!
 The plugin also runs on Linux (X11 and Wayland). It opens as a normal window next to PhotoCraft; unlike on Windows it is not
 attached to the PhotoCraft window.
 
-1. **Get the parts**: an NVIDIA card (16 GB VRAM), PhotoCraft 0.19, ComfyUI 0.42 or newer, and your distribution's Python 3.11+
+1. **Get the parts**: an NVIDIA card (16 GB VRAM), the current PhotoCraft, ComfyUI 0.42 or newer, and your distribution's Python 3.11+
    with tkinter and venv (Debian/Ubuntu: `sudo apt install python3 python3-tk python3-venv`; Fedora: `sudo dnf install python3 python3-tkinter`;
    Arch: `sudo pacman -S python tk`). Use the distribution's Python, not one from uv or pyenv: only its Tk draws the Inter font.
    Optional: `wl-clipboard` (Wayland) or `xclip` (X11) to paste pictures from the clipboard.
 2. **Install the plugin**: unpack or `git clone` it, then run `./setup-linux.sh` in its folder. It makes `.venv`, installs the
    packages and adds **PhotoCraft AI** to your application menu. It never installs system packages itself; if something
-   is missing it prints the command for your distribution.
+   is missing it prints the command for your distribution. It shows its five steps as it goes; `./setup-linux.sh --check` only looks and changes nothing.
 3. **Start it**: start ComfyUI, close PhotoCraft, then start **PhotoCraft AI** from the menu (or run `./photocraft-ai.sh`). PhotoCraft opens and the
    plugin window appears. If the `photocraft` program is not found (it is searched in `PATH`, `/opt`, `~/Applications` and
    a few more places), set `PHOTOCRAFT=/path/to/photocraft` or run `.venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft`.

@@ -101,6 +101,20 @@ def main():
     assert out.mode == "RGB" and out.size == (1024, 512) and out.getpixel((0, 0)) == refslots.DEFAULT_BACKGROUND == (128, 128, 128)
     assert refslots.prepare_image(Image.new("RGB", (100, 75)), 32).size == (96, 64)
     assert refslots.prepare_image(Image.new("RGB", (5, 5)), 16).size == (16, 16)
+    # nearest multiple, not rounded down: a picture under the limit loses at most half a step (user 4.11.)
+    assert refslots.prepare_image(Image.new("RGB", (1000, 700)), 32, 2048).size == (992, 704)
+    assert refslots.prepare_image(Image.new("RGB", (1024, 768)), 32, 2048).size == (1024, 768)      # already on the grid: untouched
+    # "Send reference images in original size, up to N MP" (user 4.11.): each image on its own keeps its size, only a bigger one is capped
+    assert refslots.prepare_image(Image.new("RGB", (4000, 3000)), 32, 1024, max_mp=2.0).size == (1632, 1216)   # 12 MP -> about 2 MP, same aspect
+    assert refslots.prepare_image(Image.new("RGB", (4000, 3000)), 32, 1024).size == (1024, 768)                # switch off: the model's usual size
+    assert refslots.prepare_image(Image.new("RGB", (1600, 1200)), 32, 1024, max_mp=2.0).size == (1600, 1216)  # 1.9 MP: as it is (nearest multiple)
+    assert refslots.prepare_image(Image.new("RGB", (800, 600)), 32, 1024, max_mp=2.0).size == (800, 608)      # small: never enlarged to the limit
+    assert refslots.prepare_image(Image.new("RGB", (6000, 400)), 32, 1024, max_mp=2.0).size == (5472, 352)       # a long strip: capped by area, not by side
+    from pccomfy import models as _models
+    from pccomfy.bridge import Request as _Req
+    assert _Req().ref_native is False and _Req().ref_side == 1024 and _Req().ref_mp == 2.0
+    assert _models.BY_KEY["flux3"].ref_side == 1536 and all(m.ref_side == 1024 for k, m in _models.BY_KEY.items() if k != "flux3")
+    assert all("ref_px" not in m.modes["multi_edit"].settings for m in _models.BY_KEY.values() if "multi_edit" in m.modes)      # one limit for all models
 
     # ---- the workflows ----
     p = workflows.GenParams(prompt="put the dog from image 2 on the sofa")

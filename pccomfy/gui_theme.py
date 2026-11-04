@@ -202,6 +202,8 @@ class ThemeMixin:
         """After a mouse click a button gives the focus up (its orange ring goes), unless the click opened something that has
         the focus now (a list, a dialog). Keyboard use (Tab, Space) keeps the ring."""
         w = event.widget
+        if isinstance(w, str):
+            return              # Tk gave a path name, not a widget (seen on Linux, e.g. a combobox pop-down): nothing to do
 
         def back():
             try:
@@ -382,19 +384,21 @@ class ThemeMixin:
         self._on_content_size()
 
     def _screen_span(self) -> tuple[int, int]:
-        """(top, bottom) the window's content may use on the monitor it is on: bottom leaves room for the taskbar."""
+        """(top, bottom) the window's content may use on the monitor it is on: it starts at the window's own top edge (the
+        window never moves, it only grows downwards; user 4.11.), bottom leaves room for the taskbar."""
         try:
             x = int(self.root.winfo_rootx()) + int(self.root.winfo_width()) // 2
             y = max(0, int(self.root.winfo_rooty()))
             _, top, _, bottom = self._monitor_at(x, y)
-            return int(top), int(bottom) - self._px(56)      # 56: taskbar and frame
+            return max(int(top), y), int(bottom) - self._px(56)      # 56: taskbar and frame
         except (AttributeError, TypeError, ValueError, tk.TclError):
             return 0, 10 ** 6
 
     def _fit_height(self, width: int | None = None):
-        """The window is MIN_W wide (fixed) and exactly as high as its content needs. It never moves by itself and may be pushed
-        down, even partly off the screen (user 4.11.: it used to jump up to fit). Only when the content is taller than the
-        screen's usable height, the body under the tabs gets the room that is left and scrolls (mouse wheel or the thin bar)."""
+        """The window is MIN_W wide (fixed) and exactly as high as its content needs. It never moves by itself (user 4.11.: it
+        used to jump up to fit); it grows downwards. Only when the content does not fit between the window's top edge and the
+        bottom of the screen, the body under the tabs gets the room that is left and scrolls (mouse wheel or the thin bar), so
+        the window is always shown completely (user 4.11., PC C: Advanced settings were cut off at the bottom)."""
         self.root.update_idletasks()
         if getattr(self, "_minimized", False):          # only the header: exactly its height
             w, h = self._px(MIN_W), self.root.winfo_reqheight()
@@ -414,7 +418,7 @@ class ThemeMixin:
                     cur = body
                 others = self.root.winfo_reqheight() - cur          # everything but the scrolled body
                 top, bottom = self._screen_span()
-                room = (bottom - top) - others if isinstance(others, int) else body    # the screen's height, not what is left below the window
+                room = (bottom - top) - others if isinstance(others, int) else body    # from the window's top edge to the screen's bottom
                 target = body if body <= room else max(self._px(120), room)
                 if target != cur:
                     cv.configure(height=target)

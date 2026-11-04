@@ -1,5 +1,5 @@
-"""The window on a small screen (user 3.11., 4.11.). The window never moves by itself: it stays where the user puts it and may be
-pushed down, even partly off the screen. Only when the content is taller than the screen's usable height the body scrolls (mouse
+"""The window on a small screen (user 3.11., 4.11.). The window never moves by itself: it stays where the user puts it and grows
+downwards. Only when the content does not fit between its top edge and the screen's bottom the body scrolls (mouse
 wheel or the thin bar), and opening Advanced settings scrolls them into view. Also the mouse wheel on Linux (Button-4/5).
 Real Tk window (invisible), the monitor is simulated. Skipped when Tk cannot open a window.
 
@@ -37,6 +37,12 @@ def settle(app, s=0.6):
         time.sleep(0.02)
 
 
+def stays_at(app, home, what):
+    """Windows only: on Linux the window manager places the window and may do it after the test has measured (VM 4.11.: 283, then 337)."""
+    if sys.platform == "win32":
+        assert abs(app.root.winfo_rooty() - home) <= 1, (what, app.root.winfo_rooty(), home)
+
+
 def visible_in_body(app, w) -> bool:
     cv = app.cv_body
     top, bot = cv.winfo_rooty(), cv.winfo_rooty() + cv.winfo_height()
@@ -70,30 +76,33 @@ def main():
     tall = app.root.winfo_height()
     app._toggle_advanced()
     settle(app)
-    assert abs(app.root.winfo_rooty() - home) <= 1, "a big screen moves nothing"
+    stays_at(app, home, "a big screen moves nothing")
 
-    # 1. the screen is tall enough for the whole window but not below the window's place: nothing moves, no scroll bar,
-    #    the window height does not depend on where it stands (it may hang below the screen)
-    screen_h = tall + taskbar + home // 2
+    # 1. the screen reaches below the window's whole height: nothing moves, no scroll bar. Where the window does not fit between
+    #    its top edge and the screen's bottom, the body scrolls (the window never moves and is never cut off: user 4.11., PC C)
+    screen_h = tall + taskbar + home + 40
     app._monitor_at = lambda x, y: (0, 0, 4000, screen_h)
     app._toggle_advanced()
     settle(app)
-    assert abs(app.root.winfo_rooty() - home) <= 1, "the window stays where the user put it"
-    assert not app.sb_body.shown, "the whole window fits the screen's height: no scroll bar"
-    h_here = app.root.winfo_height()
-    app.root.geometry(f"+60+{screen_h - 100}")                      # pushed far down
+    stays_at(app, home, "the window stays where the user put it")
+    assert not app.sb_body.shown, "the whole window fits below its top edge: no scroll bar"
+    app._toggle_advanced()
     settle(app)
-    app._fit_height()
+    screen_h = tall + taskbar + home // 2                              # fits from the top of the screen, not from the window's place
+    app._monitor_at = lambda x, y: (0, 0, 4000, screen_h)
+    app._toggle_advanced()
     settle(app)
-    assert app.root.winfo_height() == h_here and not app.sb_body.shown, "pushing it down changes neither its height nor the scroll bar"
-    assert app.root.winfo_rooty() > home, "it stays where it was pushed"
-    app.root.geometry(f"+60+{HOME_Y - frame}")
+    stays_at(app, home, "it does not jump up to fit")
+    assert app.sb_body.shown, "not enough room below the window's top edge: the body scrolls"
+    assert app.root.winfo_rooty() + app.root.winfo_height() <= screen_h - taskbar + 1, "the window is not cut off at the bottom"
+    assert visible_in_body(app, app.btn_adv), "the Advanced heading is in sight after opening"
+    app._toggle_advanced()
     settle(app)
 
     # 2. closed again: same place
     app._toggle_advanced()
     settle(app)
-    assert abs(app.root.winfo_rooty() - home) <= 1, (app.root.winfo_rooty(), home)
+    stays_at(app, home, "closed again: same place")
 
     # 3. a screen smaller than the window: it stays too, the body scrolls, opening Advanced scrolls them into view
     small = tall // 2 + taskbar + app._px(300)
@@ -103,7 +112,7 @@ def main():
     app._toggle_advanced()
     settle(app)
     assert app.sb_body.shown, "taller than the screen: the body scrolls"
-    assert abs(app.root.winfo_rooty() - home) <= 1, "it does not jump to the top"
+    stays_at(app, home, "it does not jump to the top")
     assert app.root.winfo_height() <= small - taskbar + 1, (app.root.winfo_height(), small - taskbar)
     assert visible_in_body(app, app.btn_adv), "the Advanced heading is in sight after opening"
 
@@ -124,6 +133,56 @@ def main():
     app.sb_body.wheel(Ev(delta=-120))
     settle(app, 0.2)
     assert app.cv_body.yview()[0] > 0, "Windows wheel down scrolls"
+    app._toggle_advanced()
+    settle(app)
+
+    # "Original size" (user 4.11.): in the window for every function but Upscale / real Refine (Fibo Refine runs as Edit); Text to image starts with it on
+    app._toggle_advanced()
+    settle(app)
+    for model, mode, wanted in (("qwen", "inpaint", True), ("qwen", "upscale", False), ("qwen", "refine", False),
+                                ("fibo", "refine", False), ("flux3", "txt2img", True), ("flux3", "edit", True)):
+        app.v_model.set(model)
+        app.v_mode.set(mode)
+        app._on_model()
+        settle(app)
+        assert app._native_wanted() is wanted, (model, mode)
+        assert bool(app.f_native.winfo_manager()) is wanted, (model, mode)
+        assert app.v_native.get() is True, (model, mode, app.v_native.get())        # on at every start (user 4.11.)
+        assert float(app.v_native_mp.get()) == {"txt2img": 4.0, "outpaint": 1.0}.get(mode, 2.0), (model, mode, app.v_native_mp.get())
+        assert str(app.w_native_mp.cget("state")) == ("normal" if (app.v_native.get() or mode == "txt2img") else "disabled")
+        # the label follows the function: the whole canvas for Text to image, the area around the selection otherwise
+        if wanted:
+            # Text to image: no switch, a plain "Use canvas size up to" label; the others keep the "Original size, up to" switch
+            assert bool(app.cb_native.winfo_manager()) is (mode != "txt2img"), (model, mode)
+            assert bool(app.lbl_canvas.winfo_manager()) is (mode == "txt2img"), (model, mode)
+            assert str(app.cb_native.cget("text")) == "Original size, up to"
+            assert str(app.lbl_canvas.cget("text")) == "Use canvas size up to"
+            assert all(("canvas" in t.text) == (mode == "txt2img") for t in app.tt_native), (model, mode)
+    # "Send reference images in original size, up to N MP" (Multi Image Edit): on at every start with 2 MP for all models, the MP box follows the tick
+    for model in ("flux3", "flux2", "qwen", "fibo"):
+        app.v_model.set(model)
+        app.v_mode.set("multi_edit")
+        app._on_model()
+        settle(app)
+        assert app.v_ref_native.get() is True and float(app.v_ref_mp.get()) == 2.0, (model, app.v_ref_native.get(), app.v_ref_mp.get())
+        assert str(app.w_refpx.cget("state")) == "normal" and str(app.cb_refsize.cget("text")) == "Send reference images in original size, up to"
+        app.v_ref_native.set(False)
+        assert str(app.w_refpx.cget("state")) == "disabled"
+        app.v_ref_native.set(True)
+        c = app._collect()
+        assert c["ref_native"] is True and c["ref_mp"] == 2.0
+    app.v_ref_native.set(True)
+    app.v_ref_mp.set(3.5)
+    req = app._request()
+    assert req.ref_native is True and req.ref_mp == 3.5 and req.ref_side == (1536 if app.v_model.get() == "flux3" else 1024)
+    app.v_ref_mp.set(9.0)
+    assert app._request().ref_mp == 4.0                       # the highest value is 4 MP
+    app.v_ref_mp.set(2.0)
+    app.v_mode.set("txt2img")
+    app._on_mode_ui()
+    app.v_native.set(True)
+    app.v_native_mp.set(6.5)
+    assert app._collect()["native"] is True and app._collect()["native_mp"] == 6.5
     app._toggle_advanced()
     settle(app)
 

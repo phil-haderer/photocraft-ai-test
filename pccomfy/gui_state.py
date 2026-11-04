@@ -75,6 +75,10 @@ class StateMixin:
             try:
                 self.pc.close()
                 self.pc.ping()
+                if not winlink.available():
+                    # seen at the start: the Linux watcher need not wait for its first probe (5 s), so PhotoCraft
+                    # closed within the first seconds still closes the window
+                    self.events.put(("pc-alive", True))
             except PhotoCraftError as e:
                 info["err"] = str(e)         # shown as a message; the footer has no PhotoCraft mark
             try:
@@ -138,6 +142,8 @@ class StateMixin:
             "denoise": float(self.v_denoise.get()), "seed": int(self.v_seed.get()), "variants": int(self.v_variants.get()),
             "sampler": self.v_sampler.get(), "scheduler": self.v_scheduler.get(),
             "base_res": int(self.v_res.get()), "context": float(self.v_context.get()),
+            "native": bool(self.v_native.get()), "native_mp": round(float(self.v_native_mp.get()), 1),
+            "ref_native": bool(self.v_ref_native.get()), "ref_mp": round(float(self.v_ref_mp.get()), 1),
             "mask_grow": int(self.v_grow.get()), "mask_blur": int(self.v_blur.get()), "overlap": int(self.v_overlap.get()),
             "scale": self._scale(),
             "enhance": bool(self.v_enhance.get()),
@@ -187,6 +193,10 @@ class StateMixin:
         put(self.v_sampler, "sampler", str)
         put(self.v_scheduler, "scheduler", str)
         put(self.v_res, "base_res", int)
+        put(self.v_native, "native", bool)
+        put(self.v_native_mp, "native_mp", float)
+        put(self.v_ref_native, "ref_native", bool)
+        put(self.v_ref_mp, "ref_mp", float)
         put(self.v_context, "context", float)
         put(self.v_grow, "mask_grow", int)
         put(self.v_blur, "mask_blur", int)
@@ -242,6 +252,7 @@ class StateMixin:
             "mode": self.v_mode.get(), "workflow": self.v_workflow.get(), "clip": p.clip, "checkpoint": p.checkpoint, "prompt": p.prompt,
             "negative": p.negative, "steps": p.steps, "cfg": p.cfg, "denoise": self.v_denoise.get(),
             "sampler": p.sampler, "scheduler": p.scheduler, "variants": req.variants, "base_res": req.base_res,
+            "native": req.native, "native_mp": req.native_mp,
             "context": req.context, "mask_grow": req.mask_grow, "mask_blur": req.mask_blur, "overlap": req.overlap, "scale": req.scale,
             "on_top": bool(self.v_top.get()), "adv_open": bool(self.v_adv_open.get()), "model": self.v_model.get(), "neg_open": bool(self.v_neg_open.get()), "prompt_h": self._prompt_lines(), "enhance": bool(self.v_enhance.get()), "turbo": req.turbo, "layer_mask": req.layer_mask, "mask_density": req.mask_density,
             "stage_on": req.stage_on, "stage2_on": bool(self.v_stage2.get()), "stage3_on": bool(self.v_stage3.get()), "stage_strengths": [round(float(v.get()), 2) for v in self.v_sstr], "detail": req.detail, "sharpen": round(float(self.v_sharpen.get()), 2), "match": req.match, "loras": [list(x) for x in req.loras], "lora_strength": req.lora_strength if req.lora_strength is not None else self.state.get("lora_strength", 1.0),

@@ -79,6 +79,9 @@ class Request:
     params: workflows.GenParams = field(default_factory=workflows.GenParams)
     workflow: str | None = None          # None = built-in graph, else path to an API-format JSON
     base_res: int = 1024                 # side of a square with the generation's area (SD1.5: 512–768, SDXL/Flux: 1024)
+    native: bool = False                 # "Original size": a crop larger than base_res² goes to the model as it is (up to native_mp)
+    full_size: bool = False              # Refine that runs as Edit (Fibo): the picture goes in at its own size, never scaled down
+    native_mp: float = 4.0               # megapixels: the most that "Original size" sends to the model
     context: float = 0.4                 # context around the mask (fraction of the selection's longer side)
     mask_grow: int = 8                   # px (document scale) the model mask is grown by
     mask_blur: int = 8                   # px the model mask is blurred by
@@ -101,6 +104,9 @@ class Request:
     stage_strengths: dict = field(default_factory=dict)   # stage node id -> LoRA strength (a stage with a slider, e.g. MOSS' Lenovo LoRA)
     stages_off: list = field(default_factory=list)   # node ids of more stages (pc_stage_off) to skip: an optional LoRA, SLG ...
     detail: float = 1.0                  # Upscale/Refine: share of the new result mixed with the plainly scaled original (1 = all new)
+    ref_side: int = refslots.MAX_SIDE   # Multi Image Edit: the longest side of a reference image (the model's value)
+    ref_native: bool = False             # "Send reference images in original size": each one keeps its size, up to ref_mp megapixels
+    ref_mp: float = 2.0
     refs: list = field(default_factory=list)     # Multi Image Edit: the reference images (PIL, RGB or RGBA); image 1 is the picture, these are 2, 3 ...
     loras: list = field(default_factory=list)   # extra LoRAs [(file name, strength), ...] chained in front of the samplers
     match: float = 0.0                   # 0..1: pull colours that are louder than the surroundings back towards them (Fill / Expand / Reference)
@@ -712,9 +718,19 @@ class Bridge:
             p.extra["megapixels"] = mp
         elif full:
             gw, gh = region.w, region.h
+        elif req.full_size:
+            mult = max(workflows.size_multiple(workflows.load_template(w)) for w in wf_paths if w) if wf_paths[0] else 16
+            gw, gh = (max(mult, round(v / mult) * mult) for v in (region.w, region.h))     # the nearest multiple, no scaling
+            mp = gw * gh / 1e6
+            if mp > MAX_RESULT_MP:
+                raise BridgeError(f"The picture is {mp:.0f} megapixels; the limit is {MAX_RESULT_MP:.0f}. Select a smaller area.")
         else:
             mult = max(workflows.size_multiple(workflows.load_template(w)) for w in wf_paths if w) if wf_paths[0] else 16
-            gw, gh = imaging.gen_size(region.w, region.h, req.base_res, multiple=mult)
+            if req.mode == "txt2img":      # always the canvas size, at most native_mp, never scaled up (user 4.11.)
+                gw, gh = imaging.canvas_size(region.w, region.h, req.native_mp, multiple=mult)
+            else:
+                base = imaging.native_base(region.w, region.h, req.base_res, req.native_mp) if req.native else req.base_res
+                gw, gh = imaging.gen_size(region.w, region.h, base, multiple=mult)
         p.width, p.height = gw, gh
         progress(0.1, f"Sending to ComfyUI ({gw}×{gh})", phase="prepare")
 
@@ -733,7 +749,8 @@ class Bridge:
         ref_name = None
         if req.refs:
             mult = max(workflows.size_multiple(workflows.load_template(w)) for w in wf_paths if w)
-            ref_name = [self.comfy.upload_image(refslots.prepare_image(im, mult), f"pcc-{tag}-ref{n + 1}.png")
+            ref_mp = req.ref_mp if req.ref_native else None       # original size: each image on its own, up to ref_mp megapixels
+            ref_name = [self.comfy.upload_image(refslots.prepare_image(im, mult, req.ref_side, max_mp=ref_mp), f"pcc-{tag}-ref{n + 1}.png")
                         for n, im in enumerate(req.refs)]
         # a workflow without a pc:mask node (the Flux 2/3 Klein edit ones) gets the instruction only, no mask
         wf_mask_node = (not wf_paths[0]) or any(has_tag(json.loads(Path(w).read_text(encoding="utf-8")), "mask") for w in wf_paths if w)
@@ -1169,6 +1186,8 @@ class Bridge:
             rec = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "mode": ("remove" if req.remove else req.mode), "attempt": attempt,
                    "workflow": Path(wf).name if wf else "builtin", "seed": gp.seed, "size": [gp.width, gp.height],
                    "turbo": req.turbo, "enhance": req.enhance, "layer_mask": req.layer_mask, "base_res": req.base_res,
+                   "native": req.native, "native_mp": req.native_mp,
+                   "ref_native": req.ref_native, "ref_mp": req.ref_mp, "ref_side": req.ref_side,
                    "context": req.context, "sampler": req.sampler_override, "prompt": (gp.prompt or "")[:600]}
             f.write_text("\n".join(old + [json.dumps(rec, ensure_ascii=False)]) + "\n", encoding="utf-8")
         except (OSError, TypeError, ValueError):

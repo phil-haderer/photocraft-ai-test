@@ -28,6 +28,11 @@ class ModeMixin:
             self._pack_post(self.f_detail)
         else:
             self.f_detail.pack_forget()
+        self._update_native_text()
+        if self._native_wanted():
+            self._pack_post(self.f_native)
+        else:
+            self.f_native.pack_forget()
         self.w_denoise.configure(state="disabled" if mode == "txt2img" or self._ignores_mask() else "normal")   # an editor always runs at 1.0
         expand = mode == "outpaint"        # Expand image: the plugin's own defaults, none of the finishing options
         if self._run_mode() in ("txt2img", "edit") + SCALE_MODES or expand:    # nothing to blend into / a new document / the whole picture: no layer mask
@@ -55,6 +60,37 @@ class ModeMixin:
         self._update_availability()
         if self._sized:
             self._fit_height()
+
+    def _native_wanted(self) -> bool:
+        """"Original size" applies to every function that sends a re-scaled picture to the model: not to Upscale and
+        Refine, which always work at full size (Fibo Refine runs as Edit, but is the function Refine: also full size)."""
+        return self._run_mode() not in SCALE_MODES and self.v_mode.get() not in SCALE_MODES
+
+    def _update_native_text(self):
+        """Text to image works on the whole canvas, so the switch says "Canvas size"; the other functions work on the
+        area around the selection ("Original size"). Same switch and value either way (user 4.11.)."""
+        t2i = self._run_mode() == "txt2img"
+        if t2i:         # no switch: Text to image always uses the canvas size, only the limit can be set
+            self.cb_native.pack_forget()
+            self.lbl_canvas.pack(side="left", before=self.w_native_mp)
+        else:
+            self.lbl_canvas.pack_forget()
+            self.cb_native.pack(side="left", before=self.w_native_mp)
+        for tt in self.tt_native:
+            tt.text = (NATIVE_TIP_CANVAS if t2i else NATIVE_TIP) + NATIVE_TIP_END
+
+    def _native_mp(self) -> float:
+        try:
+            return min(NATIVE_MAX_MP, max(1.0, float(self.v_native_mp.get())))
+        except (tk.TclError, ValueError):
+            return NATIVE_MP
+
+    def _on_native(self):
+        """The switch changed: the megapixel box is only usable while it is on."""
+        try:
+            self.w_native_mp.configure(state="normal" if (self.v_native.get() or self._run_mode() == "txt2img") else "disabled")
+        except (AttributeError, tk.TclError):
+            pass
 
     def _run_mode(self) -> str:
         """The mode the bridge runs: the selected one, unless the model's mode says otherwise (Fibo Refine runs as Edit)."""
@@ -227,6 +263,10 @@ class ModeMixin:
         # a mode without a Context of its own starts at the function's default, not at what the tab before had
         # (Fibo Fill showed 0.4 after Qwen and 0.2 after Reset)
         s.setdefault("context", FILL_CONTEXT if mode == "inpaint" else self._ctx_default)
+        s.setdefault("native", True)           # "Original size" belongs to the function too: on, capped at 2 MP (Expand 1 MP; user 4.11.)
+        s.setdefault("native_mp", native_mp_default(mode))
+        s.setdefault("ref_native", True)        # Multi Image Edit: reference images in original size, each up to 2 MP (user 4.11.)
+        s.setdefault("ref_mp", REF_MP)
         s.setdefault("mask_density", 100)      # likewise: a density set by hand does not travel to the next function
         if not keep:
             s["workflow"] = spec.workflow
@@ -377,6 +417,24 @@ class ModeMixin:
         if factory:
             self._status("Reset to the standard settings (your saved ones are ignored).")
 
+    def _start_fresh(self):
+        """At every start the sliders, sampler, steps, LoRAs and the other starting settings are the standard ones of the
+        function and model, not what the last run left; "Set as my settings" is loaded, as before (user 4.11., evening: the factory
+        start had ignored it). Model, function, prompt, the number of variants and the chosen workflow stay as they were. The
+        settings window is not touched."""
+        t = self.t_prompt
+        text = t.get("1.0", "end").strip() if str(t.cget("state")) != "disabled" else None
+        variants, wf = self.v_variants.get(), self.v_workflow.get()
+        self._reset_settings()
+        if text and str(t.cget("state")) != "disabled":
+            t.delete("1.0", "end")
+            t.insert("1.0", text)
+        self.v_variants.set(variants)
+        if wf in list(self.cb_workflow["values"]) and wf != self.v_workflow.get():
+            self.v_workflow.set(wf)
+            self._on_workflow()
+        self.v_status.set("Ready")
+
     def _reset_settings(self):
         d = self.cfg["defaults"]
         self.v_seed.set(-1)
@@ -385,6 +443,10 @@ class ModeMixin:
         self.v_blur.set(int(d["mask_blur"]))
         self.v_overlap.set(int(d["overlap"]))
         self.v_res.set(int(d["base_res"]))
+        self.v_native.set(True)
+        self.v_native_mp.set(native_mp_default(self.v_mode.get()))
+        self.v_ref_native.set(True)
+        self.v_ref_mp.set(REF_MP)
         self.v_denoise.set(1.0)       # as a new window has it; the workflow's own value and the function's rule follow below
         self.v_sharpen.set(0.0)
         self.v_match.set(0.0)
@@ -433,7 +495,7 @@ class ModeMixin:
         shown = (lambda f: bool(f.winfo_manager())) if hasattr(frame, "winfo_manager") else (lambda f: False)
         if shown(frame):
             return
-        order = [f for f in (getattr(self, n, None) for n in ("f_detail", "f_sharp", "f_ctx", "f_feather", "f_density", "f_lm")) if f is not None]
+        order = [f for f in (getattr(self, n, None) for n in ("f_detail", "f_sharp", "f_ctx", "f_feather", "f_density", "f_lm", "f_native")) if f is not None]
         later = [f for f in order[order.index(frame) + 1:] if shown(f)] if frame in order else []
         frame.pack(fill="x", pady=(2, 0), **({"before": later[0]} if later else {}))
 

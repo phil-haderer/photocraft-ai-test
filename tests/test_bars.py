@@ -43,6 +43,14 @@ assert app.v_pl.v == "Loading models · 5 s" and app._bar_value == 0.5
 app._set_progress(0.6, "tile 2 · step 3/15", "image", 0.2, 9)
 assert app.v_pl.v == "Generating · tile 2 · step 3/15"
 
+# with a model chosen the line names it (user 4.11.)
+class _M:
+    label = "Qwen 2.1 Edit"
+app._model = lambda: _M()
+app._set_progress(0.6, "Sampling 6/10…", "image", 0.6, 9)
+assert app.v_pl.v == "Qwen 2.1 Edit is generating · Sampling 6/10", app.v_pl.v
+app._model = lambda: None
+
 # a new run starts from zero, a finished one is full
 app._reset_progress()
 assert app._bar_value == 0.0 and app.v_pl.v == ""

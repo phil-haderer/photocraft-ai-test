@@ -93,6 +93,11 @@ def window():
     rl, rr = app.root.winfo_rootx(), app.root.winfo_rootx() + app.root.winfo_width()
     if sw - rr >= 308 or rl >= 308:
         assert x >= rr or x + 300 <= rl
+    btn = max(rb.winfo_reqheight() for rb in app.rb_modes.values())
+    assert app._tip_gap() >= max(btn, 8) > 0                 # the room between plugin and popup: as high as a function button (user 4.11.)
+    if sw - rr >= 300 + app._tip_gap():
+        assert x - rr >= btn
+    assert bool(win.attributes("-topmost")) == (bool(app.v_top.get()) and not gui_tips.winlink.available())   # like the plugin
     shown = cfgmod.get_setting(gui_tips.SHOWN_KEY)
     assert isinstance(shown, list) and len(shown) == 1
     app._show_tip_popup()                                    # no second popup while one is open

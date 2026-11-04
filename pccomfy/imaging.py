@@ -135,6 +135,22 @@ def gen_size(w: int, h: int, base: int, multiple: int = 16, max_upscale: float =
     return gw, gh
 
 
+def canvas_size(w: int, h: int, cap_mp: float, multiple: int = 16) -> tuple[int, int]:
+    """Text to image: the generation gets the canvas size, at most `cap_mp` megapixels (then scaled down, same aspect),
+    never scaled up. Both sides are rounded DOWN to a multiple, so it never exceeds the canvas or the cap."""
+    cap = max(0.25, float(cap_mp)) * 1e6
+    k = min(1.0, math.sqrt(cap / float(w * h)))
+    return (max(multiple, int(w * k) // multiple * multiple), max(multiple, int(h * k) // multiple * multiple))
+
+
+def native_base(w: int, h: int, base: int, cap_mp: float) -> float:
+    """"Original size": the side of the square whose area the generation gets (for gen_size). A crop larger than the model's
+    base size is kept as it is, up to `cap_mp` megapixels (above that it is scaled down to the cap); a smaller crop
+    is handled as usual (up to the base size). Never below `base`."""
+    cap = max(0.25, float(cap_mp)) * 1e6
+    return math.sqrt(max(float(base) * base, min(float(w) * h, cap)))
+
+
 def prepare_mask(mask: Image.Image, grow: int, blur: int) -> Image.Image:
     """Mask for the model: grown and blurred a little so the generation overlaps the edge."""
     m = mask.convert("L")

@@ -34,6 +34,7 @@ class Model:
     tag_style: str = ""             # Multi Image Edit: how this model names an image in the prompt; {n} counts from 1 (the picture
                                     # is image 1, the first reference image 2), {i} from 0 ("" = no names)
     requires: tuple = ()            # model detection: the model files this tab needs (file names, as ComfyUI lists them); () = not set yet
+    ref_side: int = 1024            # Multi Image Edit: the longest side of a reference image sent to the model (user 4.11.; Flux 3 as its picture)
     bbox: bool = False              # Multi Image Edit: the BBOX switch (the selection becomes <obj_1>, see bridge.BBOX_SENTENCE); Flux 3 only
     seam: str = "off"               # seam correction in Fill / Remove / Expand: "on" always (one corrected layer), "off" never
                                     # (user 29.10.: Fibo on, the others off; the A/B checkbox was removed 1.11., Qwen fixed off)
@@ -105,12 +106,12 @@ QWEN = Model(
     "qwen", "Qwen 2.1 Edit",
     "Qwen Image 2.1 Edit: instruction editor, best at Fill Selection, Remove Selection and Expand. Base res. 1024 works best.",
     {
-        "txt2img": Mode("qwen-image-21-t2i.json", dict(base_res=1024, turbo=False, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),   # LLM off like the others (user 30.10.)
+        "txt2img": Mode("qwen-image-21-t2i.json", dict(native=True, base_res=1024, turbo=False, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),   # LLM off like the others (user 30.10.)
         "edit": Mode("qwen-image-21-edit.json", dict(base_res=1024, turbo=False, layer_mask="none"), prompt_tip=EDIT_TIP),
         "multi_edit": Mode("qwen-image-21-edit.json", dict(base_res=1024, turbo=False, layer_mask="none"), prompt_tip=MULTI_TIP, run_as="edit"),
         # soft: opaque over the selection, fading out to the crop's side (Bridge: soft_layer_mask; Fill mask test round 30.10.)
         "inpaint": Mode("qwen-image-21-edit.json", dict(_SOFT, base_res=1024, context=0.4, turbo=False, feather_pct=4.0), prompt_tip=FILL_TIP + " " + QWEN_SMALL),
-        "outpaint": Mode("qwen-image-21-edit.json", dict(base_res=1024, turbo=False, layer_mask="none")),   # = the old "auto"
+        "outpaint": Mode("qwen-image-21-edit.json", dict(base_res=1024, context=0.4, turbo=False, layer_mask="soft")),   # soft mask: only the new area (+ overlap) is returned, the original stays untouched (user 4.11.); Context 40 %
         "remove": Mode("qwen-image-21-edit.json", dict(_SOFT, base_res=1024, context=0.4, turbo=False, feather_pct=10.0), prompt_tip=REMOVE_TIP, remove_text=True),
         # native 2K upscale: no upscaler node and no LoRA, 25 steps; the result is about the scale factor times the picture, up to 24 MP
         "upscale": Mode("qwen-image-21-upscale.json", dict(scale=1.5, turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=DESCRIBE_TIP),
@@ -128,11 +129,11 @@ FLUX2 = Model(
     "flux2", "Flux 2 Klein Edit",
     "FLUX.2 Klein 9B: text to image, whole-image edits, Remove Selection, Expand, Upscale, Refine.",
     {
-        "txt2img": Mode("flux2-klein-t2i.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
+        "txt2img": Mode("flux2-klein-t2i.json", dict(native=True, base_res=1024, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
         "edit": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="none"), prompt_tip=EDIT_TIP),
         "multi_edit": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="none"), prompt_tip=MULTI_TIP, run_as="edit"),
         "remove": Mode("flux2-klein-edit.json", dict(_SOFT, base_res=1024, context=0.4, feather_pct=10.0), prompt_tip=REMOVE_TIP, remove_text=True),
-        "outpaint": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="none")),
+        "outpaint": Mode("flux2-klein-edit.json", dict(base_res=1024, layer_mask="soft")),   # soft mask: only the new area is returned (user 4.11.)
         "upscale": Mode("flux2-klein-upscale.json", dict(scale=1.5, turbo=True, context=0.0), FLUX2_DEFAULT, prompt_tip=DESCRIBE_TIP),
         "refine": Mode("flux2-klein-upscale.json", dict(turbo=True, context=0.0), FLUX2_DEFAULT, FLUX2_REFINE_PROMPTS, REFINE_TIP),
     },
@@ -147,13 +148,13 @@ FLUX3 = Model(
     "flux3", "Flux 3 Klein Edit",
     "FLUX.3 Klein: text to image, whole-image edits, Remove Selection, Expand, Upscale, Refine.",
     {
-        "txt2img": Mode("flux3-klein-t2i.json", dict(base_res=1536, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
+        "txt2img": Mode("flux3-klein-t2i.json", dict(native=True, base_res=1536, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
         "edit": Mode("flux3-klein-edit.json", dict(base_res=1536, layer_mask="none"), prompt_tip=EDIT_TIP),
         "multi_edit": Mode("flux3-klein-edit.json", dict(base_res=1536, layer_mask="none"), prompt_tip=MULTI_TIP, run_as="edit"),
         "remove": Mode("flux3-klein-edit.json", dict(_SOFT, base_res=1536, context=0.4, feather_pct=10.0), prompt_tip=REMOVE_TIP, remove_text=True),
         # Expand: its own graph with ausboss' outpaint LoRA (29.10., after Pixaroma's "14. Flux 3 Klein - Outpaint"; without
-        # it Flux 3 slid or zoomed the picture instead of filling the margin): grey margin, ~1 megapixel, Context 1.0
-        "outpaint": Mode("flux3-klein-outpaint.json", dict(base_res=1024, context=1.0, layer_mask="none")),
+        # it Flux 3 slid or zoomed the picture instead of filling the margin): grey margin, ~1 megapixel, Context 1.0 (confirmed 4.11.)
+        "outpaint": Mode("flux3-klein-outpaint.json", dict(base_res=1024, context=1.0, layer_mask="soft")),   # Context 100 % fits (user 4.11. evening); soft mask: only the new area is returned
         "upscale": Mode("flux3-klein-upscale.json", dict(scale=1.5, turbo=True, stage_on=False, stage2_on=True, context=0.0, detail=0.7), FLUX3_DEFAULT, prompt_tip=DESCRIBE_TIP),
         "refine": Mode("flux3-klein-refine.json", dict(turbo=False, context=0.0), FLUX3_DEFAULT, FLUX3_REFINE_PROMPTS, REFINE_TIP),
     },
@@ -162,7 +163,7 @@ FLUX3 = Model(
         "qwen3vl_4b_int8_convrot.safetensors",
         "flux2-vae.safetensors",
     ),   # the model files this tab needs (details per mode: manifest.py)
-    max_refs=3, tag_style="<ref_image_{i}>", seam="off", bbox=True)   # with BBOX ticked only one (refslots.BBOX_MAX_REFS)
+    max_refs=3, tag_style="<ref_image_{i}>", seam="off", bbox=True, ref_side=1536)   # with BBOX ticked only one (refslots.BBOX_MAX_REFS)
 
 # MOSS: the DMD2 speed LoRA (8 steps, CFG 1.5) is the model's own LoRA; the Lenovo UltraReal LoRA and the skip-layer
 # guidance (SLG) are switches that start on (best result in the live tests); the LLM prompt enhancer starts off.
@@ -177,7 +178,7 @@ MOSS = Model(
         # Text to image starts without DMD2 and without SLG, no LLM: the user's live test 29.10. (with DMD2 or SLG the photos
         # looked artificial, with the LLM prompt too). Without DMD2 the workflow runs 25 steps at CFG 3.0 (35 was the blind-test winner, 25 is the default since 2.11.) (pc_no_lora; blind
         # test docs/tests/moss-cfg.md)
-        "txt2img": Mode("moss-image-t2i.json", {**_MOSS, "turbo": False, "base_res": 1280,
+        "txt2img": Mode("moss-image-t2i.json", {**_MOSS, "turbo": False, "native": True, "base_res": 1280,
                                                 "layer_mask": "none", "enhance": False},
                         prompt_tip=T2I_TIP, steps_tip=MOSS_STEPS_TIP),
     },
@@ -194,7 +195,7 @@ KREA2 = Model(
     "krea2", "Krea 2 Turbo",
     "Krea-2 Turbo: fast text to image.",
     {
-        "txt2img": Mode("krea2-turbo-t2i.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
+        "txt2img": Mode("krea2-turbo-t2i.json", dict(native=True, base_res=1024, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),
     },
     requires=(
         "krea2_turbo_int8_convrot.safetensors",
@@ -219,13 +220,13 @@ FIBO = Model(
     "fibo", "Fibo 2.0 Edit Turbo",
     "Instruction editor with all edit functions.",
     {
-        "txt2img": Mode("fibo2-t2i.json", dict(base_res=1224, layer_mask="none", enhance=False, sharpen=0.2), prompt_tip=T2I_TIP),   # Sharpen 20 % (user 28.10.)
+        "txt2img": Mode("fibo2-t2i.json", dict(native=True, base_res=1224, layer_mask="none", enhance=False, sharpen=0.2), prompt_tip=T2I_TIP),   # Sharpen 20 % (user 28.10.)
         "edit": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=EDIT_TIP),
         "multi_edit": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=MULTI_TIP, run_as="edit"),
         "refine": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False, sharpen=0.1), FLUX2_DEFAULT, run_as="edit",
                        prompt_tip=REFINE_TIP),   # Sharpen 10 % (final, user 31.10.)
         "inpaint": Mode("fibo2-edit.json", dict(base_res=1024, context=0.1, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=FILL_TIP),   # Context 0.1 chosen by the user 1.11. (was 0.4 from the test round 28.10.); Edge feather 10 % stays
-        "outpaint": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False)),
+        "outpaint": Mode("fibo2-edit.json", dict(base_res=1024, context=1.0, layer_mask="soft", enhance=False)),   # Context 100 %: with 40 % Fibo saw mostly the white margin and drew bars (user 4.11.); soft mask: only the new area is returned
         "remove": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=REMOVE_TIP, remove_text=True),
     },
     requires=(

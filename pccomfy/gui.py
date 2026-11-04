@@ -70,6 +70,10 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.v_sampler = tk.StringVar(value=g("sampler", d["sampler"]))
         self.v_scheduler = tk.StringVar(value=g("scheduler", d["scheduler"]))
         self.v_res = tk.IntVar(value=g("base_res", d["base_res"]))
+        self.v_native = tk.BooleanVar(value=bool(g("native", True)))      # "Original size" (Advanced settings)
+        self.v_native_mp = tk.DoubleVar(value=float(g("native_mp", native_mp_default(g("mode", "inpaint")))))
+        self.v_ref_native = tk.BooleanVar(value=bool(g("ref_native", True)))   # Multi Image Edit: reference images in original size
+        self.v_ref_mp = tk.DoubleVar(value=float(g("ref_mp", REF_MP)))
         self.v_context = tk.DoubleVar(value=g("context", d["context"]))
         # Context is remembered per mode. Fill Selection starts at 0.2: with a wide margin Fibo lets the new object grow
         # beyond the selection or doubles it (live test); the other modes keep the global default.
@@ -122,6 +126,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self._on_mode()
         self._booting = False
         self._easy_boot()
+        self._start_fresh()
         # the edge feather is not kept from the last time: every start has the function's own value (decision of the
         # user 28.10.; before, every start showed 2 % and Fibo Fill / Qwen Fill looked hard until the function was chosen again)
         spec = self._model().modes.get(self.v_mode.get()) if self._model() else None
@@ -561,6 +566,22 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
                               "Click again, or Generate, to get your selection back.")
         for w in (lb, cb_lm):
             Tooltip(w, "How the result is blended into your picture: soft (soft edge), hard (the selection as it is), none (the whole redrawn area).")
+
+        # "Original size": the picture goes to the model as large as it is (up to a number of megapixels) instead of at about
+        # 1 MP, and comes back without being scaled up (user 4.11.); not for Upscale and Refine, which always work at full size
+        nf = self.f_native = ttk.Frame(self.f_post)
+        nf.pack(fill="x", pady=(2, 0))
+        self.cb_native = ttk.Checkbutton(nf, text="Original size, up to", variable=self.v_native)
+        self.cb_native.pack(side="left")
+        self.lbl_canvas = ttk.Label(nf, text="Use canvas size up to")      # Text to image: no switch, it always uses the canvas size
+        self.w_native_mp = self._spin(nf, self.v_native_mp, 1, NATIVE_MAX_MP, 0.5, 5)
+        self.w_native_mp.pack(side="left", padx=6)
+        self.lbl_native = ttk.Label(nf, text="MP", style="Muted.TLabel")
+        self.lbl_native.pack(side="left")
+        # text and label follow the function (_update_native_text)
+        self.tt_native = [Tooltip(w, NATIVE_TIP + NATIVE_TIP_END) for w in (self.cb_native, self.lbl_canvas, self.w_native_mp, self.lbl_native)]
+        self.v_native.trace_add("write", lambda *a: self._on_native())
+        self._on_native()
 
         bf = self.f_go = ttk.Frame(r)   # Generate, Cancel, Undo, Redo: above the line over "Prompt", under the functions
         bf.pack(fill="x", padx=10, pady=(6, 2), before=self.sep_prompt)

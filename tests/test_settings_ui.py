@@ -163,7 +163,7 @@ def test_empty_view():
     app._apply_start_state()
     assert on() == {"f_tabs", "lbl_empty"} | all_foot and app.v_empty.get() == "Choose a model"       # tabs + one sentence + footer, no body
     app._apply_refresh(det(inventory.Inventory({})))
-    assert on() == {"lbl_empty"} and app.v_empty.get() == "Link your model in the settings"          # nothing linked: sentence + gear only
+    assert on() == {"lbl_empty"} and app.v_empty.get() == "Link your models in the settings"          # nothing linked: sentence + gear only
     app._apply_refresh(det(inventory.Inventory(td.full_lists(), NODES)))
     assert on() == {"f_tabs", "lbl_empty"} | all_foot
     app.v_model.set("flux3")
@@ -552,6 +552,20 @@ def main():
     assert quits == [] and app._pc_gone == 1
     app._photocraft_alive(False)
     assert quits == [1]
+    # the start ping counts as "seen": PhotoCraft closed in the first 5 s (before the first probe) still closes the window
+    import queue, time
+    app.events = queue.Queue()
+    app.pc = type("PC", (), {"close": lambda s: None, "ping": lambda s: True})()
+    if not gui.winlink.available():
+        type(app).refresh(app)                       # app.refresh is a stub above
+        t0 = time.time()
+        got = []
+        while time.time() - t0 < 5 and ("pc-alive", True) not in got:
+            try:
+                got.append(app.events.get(timeout=0.2))
+            except queue.Empty:
+                pass
+        assert ("pc-alive", True) in got, got
     app.v_top.set(False)                                                        # "stay on top" off: the window is free and stays
     app._pc_gone = 0
     app._photocraft_alive(False)

@@ -50,7 +50,7 @@ def tilde_checks():
         want = str(home / ".cache" / "pccomfy" / "exchange")
         assert args[args.index("--automation-read-root") + 1] == want and args[args.index("--automation-write-root") + 1] == want
         assert args[args.index("--control-token-file") + 1] == str(home / ".config" / "pccomfy" / "photocraft.token")
-        assert not any("~" in a for a in args)
+        assert not any(a.startswith("~") for a in args)                          # inside a path "~" is fine: FDK-DE~1 on Windows
         exe = home / "photocraft"
         exe.write_bytes(b"")
         launcher.start_photocraft(str(exe), c, is_open=lambda: True)             # running already: nothing is made

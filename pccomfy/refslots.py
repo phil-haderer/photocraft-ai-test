@@ -6,6 +6,7 @@ from `Model.max_refs`. Everything here that does not need Tk is tested on any sy
 """
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,7 +15,9 @@ from PIL import Image
 
 from . import clipboard, hostos
 
-MAX_SIDE = 1024                      # the longest side of a reference image sent to the model
+REF_MP = 2.0                         # "Send reference images in original size": the limit it starts with, per image (user 4.11.)
+REF_MAX_MP = 4.0
+MAX_SIDE = 1024                      # the longest side of a reference image sent to the model (Model.ref_side); "original size" uses a megapixel limit instead
 # What shows where a reference image is transparent (a cut-out, a PNG with alpha): neutral mid grey. The ONE place to change it;
 # the model gets a flat picture, and white behind a cut-out subject disturbed it.
 DEFAULT_BACKGROUND = (128, 128, 128)
@@ -75,14 +78,17 @@ def flatten(im: Image.Image, background=DEFAULT_BACKGROUND) -> Image.Image:
     return clipboard.flatten(im, background)
 
 
-def prepare_image(im: Image.Image, multiple: int = 16, max_side: int = MAX_SIDE, background=DEFAULT_BACKGROUND) -> Image.Image:
-    """The reference image as it is sent: flat RGB, at most `max_side` px on the longer side, both sides a multiple of
-    `multiple` (Qwen Image 2.1 needs 32; any other size shifts the edit). Never smaller than one `multiple`."""
+def prepare_image(im: Image.Image, multiple: int = 16, max_side: int = MAX_SIDE, background=DEFAULT_BACKGROUND,
+                  max_mp: float | None = None) -> Image.Image:
+    """The reference image as it is sent: flat RGB, both sides a multiple of `multiple` (Qwen Image 2.1 needs 32; any other size
+    shifts the edit). Normally at most `max_side` px on the longer side. With `max_mp` ("original size") it keeps its own size
+    and is only scaled down when it has more than `max_mp` megapixels (each image on its own, user 4.11.). Never scaled up,
+    never smaller than one `multiple`."""
     rgb = flatten(im, background)
     w, h = rgb.size
-    k = min(1.0, max_side / max(w, h))
-    nw = max(multiple, int(w * k) // multiple * multiple)
-    nh = max(multiple, int(h * k) // multiple * multiple)
+    k = min(1.0, max_side / max(w, h)) if max_mp is None else min(1.0, math.sqrt(max(0.1, float(max_mp)) * 1e6 / (w * h)))
+    nw = max(multiple, round(w * k / multiple) * multiple)       # to the nearest multiple: a picture under the limit loses at most half a step
+    nh = max(multiple, round(h * k / multiple) * multiple)
     return rgb if (nw, nh) == (w, h) else rgb.resize((nw, nh), Image.LANCZOS)
 
 
@@ -331,6 +337,14 @@ class RefSlotsMixin:
     def _request(self):
         req = super()._request()
         req.refs = self._refs_for(req.mode)     # the descriptions are already in the prompt field (Describe writes them there)
+        m = self._refs_model()
+        if m is not None:
+            req.ref_side = m.ref_side
+        req.ref_native = bool(self.v_ref_native.get())
+        try:
+            req.ref_mp = min(REF_MAX_MP, max(1.0, float(self.v_ref_mp.get())))
+        except Exception:
+            req.ref_mp = REF_MP
         req.bbox = self._bbox_on() and req.mode == "edit"
         if req.bbox:
             req.layer_mask = "soft"     # Flux 3's start value for this mode is "none" and the row is hidden: BBOX needs the margin mask
@@ -374,6 +388,21 @@ class RefSlotsMixin:
         self.lbl_refs = ttk.Label(head, text="Reference images", style="Muted.TLabel")     # not shown (user 3.11.): only "Max. images: n"
         self.lbl_refmax = ttk.Label(head, text="", style="Muted.TLabel")      # always shown, on the line above the slots
         self.lbl_refmax.pack(side="left")
+        # "Send reference images in original size": each image keeps its size up to a limit instead of the model's usual one (user 4.11.)
+        self.f_refsize = ttk.Frame(self.f_refs)
+        self.f_refsize.pack(fill="x", pady=(4, 0))
+        self.cb_refsize = ttk.Checkbutton(self.f_refsize, text="Send reference images in original size, up to", variable=self.v_ref_native)
+        self.cb_refsize.pack(side="left")
+        self.w_refpx = self._spin(self.f_refsize, self.v_ref_mp, 1, REF_MAX_MP, 0.5, 5)
+        self.w_refpx.pack(side="left", padx=6)
+        self.lbl_refpx = ttk.Label(self.f_refsize, text="MP", style="Muted.TLabel")
+        self.lbl_refpx.pack(side="left")
+        for w in (self.cb_refsize, self.w_refpx, self.lbl_refpx):
+            Tooltip(w, "Off: the reference images are scaled down to the model's usual size (1024 px on the longer side, "
+                       "Flux 3 1536 px). On: each one keeps its own size and is only scaled down when it has more than this many "
+                       "megapixels. Never scaled up. Larger images take more VRAM and time.")
+        self.v_ref_native.trace_add("write", lambda *a: self._refs_size_changed())
+        self._refs_size_changed()
         self.f_refgrid = ttk.Frame(self.f_refs)
         self.f_refgrid.pack(fill="x", pady=(4, 0))
         self.lbl_refnames = ttk.Label(self.f_refs, text="", style="Muted.TLabel", wraplength=self._px(380 - 24), justify="left")
@@ -401,6 +430,13 @@ class RefSlotsMixin:
             self.root.bind("<Control-v>", self._refs_ctrl_v, add="+")
             self.root.bind("<Control-V>", self._refs_ctrl_v, add="+")
         except tk.TclError:
+            pass
+
+    def _refs_size_changed(self):
+        """The switch changed: the px box is only usable while it is on."""
+        try:
+            self.w_refpx.configure(state="normal" if self.v_ref_native.get() else "disabled")
+        except Exception:
             pass
 
     def _refs_max(self, m) -> int:

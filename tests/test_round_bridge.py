@@ -52,6 +52,20 @@ def main():
     req.params = workflows.GenParams(prompt="a red fox", seed=5)
     b.run(req)
     assert not b.comfy.uploads and any(n["class_type"] == "EmptyLatentImage" for n in b.comfy.graphs[0].values())
+    lat = next(n for n in b.comfy.graphs[0].values() if n["class_type"] == "EmptyLatentImage")["inputs"]
+    assert lat["width"] <= T.W and lat["height"] <= T.H and lat["width"] > T.W - 32 and lat["height"] > T.H - 32, (lat, T.W, T.H)   # the canvas size, rounded down: not the 1 MP base (user 4.11.)
+
+    # Fibo Refine runs as Edit but sends the picture at its own size (nearest multiple), never scaled; a normal Edit scales it to the base size
+    sizes = {}
+    for full in (False, True):
+        pc, _, b = T.make(tempfile.mkdtemp(), with_sel=False)
+        b.comfy = T.FakeComfy()
+        req = Request(mode="edit", workflow=str(ROOT / "workflows" / "fibo2-edit.json"), preset="X", run_no=1, base_res=1024, full_size=full)
+        req.params = workflows.GenParams(prompt="x", seed=1)
+        b.run(req)
+        n = next(n for n in b.comfy.graphs[0].values() if n["class_type"] == "TextEncodeFibo2")["inputs"]
+        sizes[full] = (n["width"], n["height"])
+    assert sizes[True] == (192, 128) and sizes[False][0] > T.W, sizes      # 200x120 canvas: its own size vs. enlarged to the base size
 
     # Expand with the Flux 2 / 3 Klein edit workflows (no pc:mask node): no mask is sent, no error
     from PIL import Image

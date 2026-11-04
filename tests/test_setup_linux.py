@@ -57,6 +57,22 @@ def function_checks():
     r = subprocess.run(["bash", "-c", f'source "{SCRIPT}"; PYTHON=/nonexistent PATH=/nonexistent pick_python'], capture_output=True, text=True)
     assert r.returncode != 0 and r.stdout == ""
     assert subprocess.run(["bash", "-n", str(SCRIPT)]).returncode == 0
+    # --check shows the five steps and changes nothing (no venv is made); a wrong option stops with the usage
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        venv = Path(tmp) / "v"
+        env = {**os.environ, "PYTHON": sys.executable, "VENV_DIR": str(venv)}
+        r = subprocess.run(["bash", str(SCRIPT), "--check"], capture_output=True, text=True, env=env, timeout=60)
+        if ok:
+            assert r.returncode == 0 and not venv.exists(), (r.stdout, r.stderr)
+            for n in range(1, 6):
+                assert f"[{n}/5]" in r.stdout, r.stdout
+            assert "nothing was changed" in r.stdout
+    r = subprocess.run(["bash", str(SCRIPT), "--bogus"], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 1 and "Usage:" in r.stdout
+    r = subprocess.run(["bash", str(SCRIPT), "--help"], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0 and "--check" in r.stdout
 
 
 def main():

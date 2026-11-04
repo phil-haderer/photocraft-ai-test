@@ -228,7 +228,12 @@ def main():
         if "outpaint" in m.modes:
             spec = m.modes["outpaint"]
             ed = is_editor(_wfs.resolve(str(t.ROOT / "workflows" / spec.workflow)))
-            assert spec.settings["layer_mask"] == effective_layer_mask("auto", "outpaint", ed, True), m.key
+            # Expand returns only the new area through a soft layer mask (user 4.11.), every model that has Expand
+            want = "soft"
+            assert spec.settings["layer_mask"] == want, m.key
+    assert models.BY_KEY["fibo"].modes["outpaint"].settings["context"] == 1.0          # user 4.11.
+    assert models.BY_KEY["flux3"].modes["outpaint"].settings["context"] == 1.0
+    assert models.BY_KEY["qwen"].modes["outpaint"].settings["context"] == 0.4
     assert mm["fibo"].modes["inpaint"].prompt_tip == models.FILL_TIP   # the user's wording
     assert mm["qwen"].modes["inpaint"].prompt_tip == models.FILL_TIP + " Small selections don't work well with Qwen."   # user 30.10.
     assert models.FILL_TIP == "Draw a selection and prompt e.g. “add a red flower”. Always hide the layers of previous results before running again."   # user 3.11.

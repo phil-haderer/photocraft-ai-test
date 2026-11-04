@@ -199,7 +199,11 @@ class TipsMixin:
             win.update_idletasks()
             w, h = max(self._px(POPUP_W), win.winfo_reqwidth()), win.winfo_reqheight()
             x, y = self._tip_position(w, h)
-            win.attributes("-topmost", True)           # the log of 2.11. showed it mapped beside the plugin yet not seen: behind PhotoCraft
+            # Like the plugin (gui._on_top): where the plugin is tied to PhotoCraft (Windows) the popup is owned by it (transient)
+            # and lies above PhotoCraft only, not above every other program (user 4.11.). Without that link (Linux, or "always
+            # on top" off) the popup is topmost only if the plugin is: the log of 2.11. showed it mapped beside the plugin yet
+            # not seen, behind PhotoCraft.
+            win.attributes("-topmost", bool(self.v_top.get()) and not winlink.available())
             self._tip_target = f"{w}x{h}+{x}+{y}"
             win.geometry(self._tip_target)             # after topmost: topmost first made it come up at the screen corner (user 2.11.)
             win.focus_force()
@@ -227,11 +231,19 @@ class TipsMixin:
         except tk.TclError as e:
             tip_log(f"popup after {ms} ms: {e}")
 
+    def _tip_gap(self) -> int:
+        """The room between the plugin and the popup: as high as a function button (user 4.11.)."""
+        try:
+            h = max(rb.winfo_reqheight() for rb in self.rb_modes.values())
+        except (AttributeError, ValueError, tk.TclError):
+            h = 0
+        return max(self._px(8), h)
+
     def _tip_position(self, w: int, h: int) -> tuple[int, int]:
         """Beside the plugin where there is room (right first, then left), not on top of it; with no room on either side it
         goes to the screen edge on the side with more room. Always inside the screen."""
         r = self.root
-        gap = self._px(8)
+        gap = self._tip_gap()
         left, top = r.winfo_vrootx(), r.winfo_vrooty()
         right, bottom = left + r.winfo_vrootwidth(), top + r.winfo_vrootheight()
         rl, rr = r.winfo_rootx(), r.winfo_rootx() + r.winfo_width()

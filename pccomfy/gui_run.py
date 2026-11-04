@@ -34,6 +34,8 @@ class RunMixin:
         spec = m.modes.get(self.v_mode.get()) if m else None
         target = p.prompt if (self.v_mode.get() == "remove" and spec is not None and spec.remove_text) else ""
         req = Request(mode=self._run_mode(), params=p, remove_target=target, workflow=wf_path, base_res=int(self.v_res.get()),
+                       native=bool(self.v_native.get()) and self._native_wanted(), native_mp=self._native_mp(),
+                       full_size=self.v_mode.get() in SCALE_MODES,
                        context=min(1.0, max(0.0, round(float(self.v_context.get()) * 20) / 20)),   # the slider's range and steps (an old saved 2.0 too)
                        mask_grow=int(self.v_grow.get()), mask_blur=int(self.v_blur.get()),
                        overlap=int(self.v_overlap.get()), variants=int(self.v_variants.get()),
@@ -463,6 +465,14 @@ class RunMixin:
         if v is not None and v.get() != text:
             v.set(text)
 
+    def _generating_word(self) -> str:
+        """The words before the step while the image model works: "<model> is generating" (user 4.11.)."""
+        try:
+            m = self._model()
+        except Exception:
+            m = None
+        return f"{m.label} is generating" if m is not None else "Generating"
+
     def _set_progress(self, fraction: float, msg: str | None, phase: str, phase_fraction: float, elapsed: float | None):
         """Move the single bar and name the step. Idempotent and only forward: Tk is touched only when the value or the
         text really changed (stop()/mode switches on the bar made it blink), and the bar never jumps back when a
@@ -472,7 +482,7 @@ class RunMixin:
             text = f"Expanding Prompt · {secs}"
         elif phase == "image":
             step = (msg or "").split("…")[0].strip()
-            text = "Generating · " + (step if phase_fraction >= 0 and step else secs)
+            text = f"{self._generating_word()} · " + (step if phase_fraction >= 0 and step else secs)
         elif phase == "stage":
             text = f"{msg} · {secs}" if secs else (msg or "Working")
         elif phase == "place":

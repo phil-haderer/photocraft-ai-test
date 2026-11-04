@@ -22,7 +22,7 @@ from .gui_theme import ICON_PX
 from .ui_downloads import DownloadMixin, browser_only, site_hint, size_text
 
 _LABELS = dict(MODE_LABELS)      # noqa: F405
-EMPTY_TEXT = {"choose": "Choose a model", "none_linked": "Link your model in the settings"}
+EMPTY_TEXT = {"choose": "Choose a model", "none_linked": "Link your models in the settings"}
 STATE_TEXT = {"ready": "is ready.", "partial": "is not yet available", "missing": "is not yet available"}      # after the model name (user 1.11.)
 HINT_SAME = "same size and header as "          # behind a file in the chain list (user 3.11.)
 HINT_INCOMPLETE = "incomplete? shorter than its header says"
