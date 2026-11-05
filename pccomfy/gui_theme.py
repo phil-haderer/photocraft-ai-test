@@ -433,6 +433,20 @@ class ThemeMixin:
                 else:
                     sb.hide()
                 self.root.update_idletasks()
+                try:      # a trace of how the room was worked out (exchange folder, fit.log; only when the body scrolls): finds a window that is cut off
+                    line = (f"body={body} cur={cur} others={others} top={top} bottom={bottom} mon_top={mon_top} room={room} target={target} lift={lift} "
+                            f"ui={self.ui:.2f} tk_screen={self.root.winfo_screenwidth()}x{self.root.winfo_screenheight()} "
+                            f"monitor={self._monitor_at(int(self.root.winfo_rootx()) + 50, max(0, int(self.root.winfo_rooty())))} "
+                            f"work={self._monitor_at(int(self.root.winfo_rootx()) + 50, max(0, int(self.root.winfo_rooty())), work=True)} "
+                            f"win_y={self.root.winfo_rooty()} win_h={self.root.winfo_height()}")
+                    if target < body and line != getattr(self, "_fit_line", ""):
+                        self._fit_line = line
+                        f = cfgmod.EXCHANGE_DIR / "fit.log"
+                        f.parent.mkdir(parents=True, exist_ok=True)
+                        old = f.read_text(encoding="utf-8").splitlines()[-39:] if f.exists() else []
+                        f.write_text("\n".join(old + [line]) + "\n", encoding="utf-8")
+                except Exception:
+                    pass
         empty = bool(getattr(self, "start_state", lambda: "")())      # no model chosen: a small window (tabs, one sentence, footer)
         w, h = self._px(MIN_W), max(self._px(80 if empty else 320), self.root.winfo_reqheight())
         if lift:
