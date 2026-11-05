@@ -437,10 +437,10 @@ class ThemeMixin:
             if isinstance(body, int) and body > 1:
                 # the target height straight away: setting the full height first and then a smaller one changed the
                 # canvas twice per call, and each change asked for the next fit (a loop every 60 ms: flicker, a jumping bar)
-                try:
-                    cur = int(float(cv.cget("height")))
+                try:      # what the canvas asks for now (not cget("height"): that gives "7c" until a number was set, and the fit then thought it was done)
+                    cur = int(cv.winfo_reqheight())
                 except (TypeError, ValueError, tk.TclError):
-                    cur = body
+                    cur = -1
                 others = stack_height(self.root) - cur          # everything but the scrolled body
                 top, bottom, mon_top = self._screen_span()
                 room = (bottom - top) - others if isinstance(others, int) else body    # from the window's top edge to the screen's bottom

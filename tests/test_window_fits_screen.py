@@ -85,6 +85,7 @@ def main():
         tall = app.root.winfo_height()
         assert tall > closed_h + app._px(40), (name, "Advanced opened but the window did not grow", closed_h, tall)
         assert not app.sb_body.shown, (name, "no scroll bar: the window is as tall as its content")
+        assert app.cv_body.winfo_reqheight() == app.f_body.winfo_reqheight(), (name, "the canvas asks for the body's height (Tk 9: cget gave '7c')")
         assert abs(tall - gui_theme.stack_height(app.root)) <= 2, (name, tall, gui_theme.stack_height(app.root))
         stays_at(app, home, name + ": the window does not move")
         app._toggle_advanced()
