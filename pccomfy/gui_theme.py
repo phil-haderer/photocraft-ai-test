@@ -407,6 +407,7 @@ class ThemeMixin:
                 self._geom = (w, h)
                 self.root.geometry(f"{w}x{h}")
             return
+        trace = ""                # one line for fit.log (written at the end of this method)
         lift = 0                  # how far the window has to move up when it starts so low that not even a strip of the body fits
         cv, sb = getattr(self, "cv_body", None), getattr(self, "sb_body", None)
         if cv is not None and sb is not None:
@@ -439,14 +440,9 @@ class ThemeMixin:
                             f"monitor={self._monitor_at(int(self.root.winfo_rootx()) + 50, max(0, int(self.root.winfo_rooty())))} "
                             f"work={self._monitor_at(int(self.root.winfo_rootx()) + 50, max(0, int(self.root.winfo_rooty())), work=True)} "
                             f"win_y={self.root.winfo_rooty()} win_h={self.root.winfo_height()}")
-                    if target < body and line != getattr(self, "_fit_line", ""):
-                        self._fit_line = line
-                        f = cfgmod.EXCHANGE_DIR / "fit.log"
-                        f.parent.mkdir(parents=True, exist_ok=True)
-                        old = f.read_text(encoding="utf-8").splitlines()[-39:] if f.exists() else []
-                        f.write_text("\n".join(old + [line]) + "\n", encoding="utf-8")
-                except Exception:
-                    pass
+                    trace = line
+                except Exception as e:
+                    trace = f"trace failed: {e!r}"
         empty = bool(getattr(self, "start_state", lambda: "")())      # no model chosen: a small window (tabs, one sentence, footer)
         w, h = self._px(MIN_W), max(self._px(80 if empty else 320), self.root.winfo_reqheight())
         if lift:
@@ -455,6 +451,19 @@ class ThemeMixin:
         elif getattr(self, "_geom", None) != (w, h):
             self._geom = (w, h)
             self.root.geometry(f"{w}x{h}")
+        if trace:
+            try:
+                self.root.update_idletasks()
+                trace += (f" | set={w}x{h} req={self.root.winfo_reqheight()} now={self.root.winfo_width()}x{self.root.winfo_height()} "
+                          f"tk={self.root.tk.call('info', 'patchlevel')}")
+                if trace != getattr(self, "_fit_line", ""):
+                    self._fit_line = trace
+                    f = cfgmod.EXCHANGE_DIR / "fit.log"
+                    f.parent.mkdir(parents=True, exist_ok=True)
+                    old = f.read_text(encoding="utf-8").splitlines()[-59:] if f.exists() else []
+                    f.write_text("\n".join(old + [trace]) + "\n", encoding="utf-8")
+            except Exception:
+                pass
 
     def _pl_style(self, style: str):
         lbl = getattr(self, "lbl_pl", None)

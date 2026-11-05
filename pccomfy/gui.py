@@ -34,6 +34,18 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
 
         _dpi_aware()   # without it Windows stretches the window as a bitmap on a scaled display: blurry text
         self.root = tk.Tk(**hostos.ROOT_KW)
+
+        def tk_error(exc, val, tb):         # an error inside a button or timer: Tk only prints it, and without a console nobody sees it
+            import traceback
+            traceback.print_exception(exc, val, tb)      # as before, for a console
+            try:
+                f = cfgmod.EXCHANGE_DIR / "error.log"
+                f.parent.mkdir(parents=True, exist_ok=True)
+                old = f.read_text(encoding="utf-8").splitlines()[-150:] if f.exists() else []
+                f.write_text("\n".join(old + "".join(traceback.format_exception(exc, val, tb)).splitlines()) + "\n", encoding="utf-8")
+            except Exception:
+                pass
+        self.root.report_callback_exception = tk_error
         # Linux has the window manager's title bar: no text in it (user 4.11.; one space, because an empty title makes some
         # desktops show the program's class name instead). Windows has no title bar; the title stays for the task bar.
         self.root.title(WINDOW_TITLE if hostos.IS_WINDOWS else " ")
