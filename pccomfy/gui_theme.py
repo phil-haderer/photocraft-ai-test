@@ -21,6 +21,28 @@ CHECK_PX = 16      # the checkbox square (PhotoCraft's, measured from docs/desig
 CHECK_GAP = 6      # room between the checkbox and its text
 
 
+def stack_height(root) -> int:
+    """The height the window's pieces ask for: what the packed children request, plus their gaps and the window's border. Used
+    instead of ``root.winfo_reqheight()``: with Tk 9 (PC C, Python with Tk 9.0.4, 5 Nov) that value keeps the size
+    ``geometry()`` set and does not follow a child that became higher, so the window never grew when Advanced opened."""
+    root.update_idletasks()
+    slaves = root.pack_slaves()
+    if not slaves:                  # a stand-in window of the tests
+        return root.winfo_reqheight()
+    total = 0
+    for w in slaves:
+        info = w.pack_info()
+        pady, ipady = (
+            [int(float(str(x))) for x in (v if isinstance(v, (tuple, list)) else root.tk.splitlist(str(v)))] or [0]
+            for v in (info.get("pady", 0), info.get("ipady", 0)))
+        total += (sum(pady) if len(pady) == 2 else pady[0] * 2) + 2 * ipady[0] + w.winfo_reqheight()
+    try:
+        total += 2 * (int(float(str(root.cget("highlightthickness")))) + int(float(str(root.cget("bd")))))
+    except (tk.TclError, ValueError):
+        pass
+    return total
+
+
 class ThemeMixin:
     # ---------- UI ----------
 
@@ -402,7 +424,7 @@ class ThemeMixin:
         the window is always shown completely (user 4.11., PC C: Advanced settings were cut off at the bottom)."""
         self.root.update_idletasks()
         if getattr(self, "_minimized", False):          # only the header: exactly its height
-            w, h = self._px(MIN_W), self.root.winfo_reqheight()
+            w, h = self._px(MIN_W), stack_height(self.root)
             if getattr(self, "_geom", None) != (w, h):
                 self._geom = (w, h)
                 self.root.geometry(f"{w}x{h}")
@@ -419,14 +441,12 @@ class ThemeMixin:
                     cur = int(float(cv.cget("height")))
                 except (TypeError, ValueError, tk.TclError):
                     cur = body
-                others = self.root.winfo_reqheight() - cur          # everything but the scrolled body
+                others = stack_height(self.root) - cur          # everything but the scrolled body
                 top, bottom, mon_top = self._screen_span()
                 room = (bottom - top) - others if isinstance(others, int) else body    # from the window's top edge to the screen's bottom
-                strip = min(body, self._px(200))
-                if room < strip:          # sits too low to show even a strip of the body: the one case where it moves up, just far enough
-                    lift = max(0, min(strip - room, top - mon_top))
-                    room += lift
-                target = body if body <= room else max(self._px(120), room)
+                # The window always gets the height its content needs, even if that is more than the screen (user 5.11., PC C): no
+                # scroll area, no limit by the screen, no moving. ``room`` is only written to fit.log.
+                target = body
                 if target != cur:
                     cv.configure(height=target)
                 if target < body:
@@ -444,7 +464,7 @@ class ThemeMixin:
                 except Exception as e:
                     trace = f"trace failed: {e!r}"
         empty = bool(getattr(self, "start_state", lambda: "")())      # no model chosen: a small window (tabs, one sentence, footer)
-        w, h = self._px(MIN_W), max(self._px(80 if empty else 320), self.root.winfo_reqheight())
+        w, h = self._px(MIN_W), max(self._px(80 if empty else 320), stack_height(self.root))
         if lift:
             self._geom = (w, h)
             self.root.geometry(f"{w}x{h}+{int(self.root.winfo_rootx())}+{int(self.root.winfo_rooty()) - lift}")
@@ -454,7 +474,7 @@ class ThemeMixin:
         if trace:
             try:
                 self.root.update_idletasks()
-                trace += (f" | set={w}x{h} req={self.root.winfo_reqheight()} now={self.root.winfo_width()}x{self.root.winfo_height()} "
+                trace += (f" | set={w}x{h} req={self.root.winfo_reqheight()} stack={stack_height(self.root)} now={self.root.winfo_width()}x{self.root.winfo_height()} "
                           f"tk={self.root.tk.call('info', 'patchlevel')}")
                 if trace != getattr(self, "_fit_line", ""):
                     self._fit_line = trace

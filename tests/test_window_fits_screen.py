@@ -1,7 +1,7 @@
-"""The window on a small screen (user 3.11., 4.11.). The window never moves by itself: it stays where the user puts it and grows
-downwards. Only when the content does not fit between its top edge and the screen's bottom the body scrolls (mouse
-wheel or the thin bar), and opening Advanced settings scrolls them into view. Also the mouse wheel on Linux (Button-4/5).
-Real Tk window (invisible), the monitor is simulated. Skipped when Tk cannot open a window.
+"""The window's height (user 3.11. to 5.11.): it always gets the height its content needs, even when that is more than the screen
+(PC C: it was cut off at a fixed height). It does not scroll, does not move and ignores the screen's size. Also with Tk 9,
+whose winfo_reqheight of the root does not follow a child that grew. Also the Linux mouse wheel helpers. Real Tk window
+(invisible), the monitor is simulated. Skipped when Tk cannot open a window.
 
     python tests/test_window_fits_screen.py
 """
@@ -25,7 +25,7 @@ except Exception as e:                      # no display / no Tk
     sys.exit(0)
 
 from pccomfy import config as cfgmod  # noqa: E402
-from pccomfy import gui, models  # noqa: E402
+from pccomfy import gui, gui_theme, models  # noqa: E402
 
 HOME_Y = 300
 
@@ -69,94 +69,51 @@ def main():
     home = app.root.winfo_rooty()
     taskbar = app._px(56)
 
-    # how tall the window is with Advanced open, measured on a screen that is big enough
-    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, 10 ** 5)
-    app._toggle_advanced()
-    settle(app)
-    tall = app.root.winfo_height()
-    app._toggle_advanced()
-    settle(app)
-    stays_at(app, home, "a big screen moves nothing")
+    # The window always gets the height its content needs, even if that is more than the screen (user 5.11., PC C): it never scrolls,
+    # never moves and is never limited by the screen. Tested on screens of every size, and with Tk 9's behaviour (below).
+    closed_h = app.root.winfo_height()
+    for name, screen in (("big", lambda x, y, work=False: (0, 0, 4000, 10 ** 5)),
+                         ("small", lambda x, y, work=False: (0, 0, 4000, closed_h + taskbar + 20 - (taskbar if work else 0))),
+                         ("real", app._monitor_at)):
+        app._monitor_at = screen
+        app.root.geometry(f"+60+{HOME_Y}")
+        settle(app)
+        home = app.root.winfo_rooty()
+        app._toggle_advanced()
+        settle(app)
+        assert app.v_adv_open.get()
+        tall = app.root.winfo_height()
+        assert tall > closed_h + app._px(40), (name, "Advanced opened but the window did not grow", closed_h, tall)
+        assert not app.sb_body.shown, (name, "no scroll bar: the window is as tall as its content")
+        assert abs(tall - gui_theme.stack_height(app.root)) <= 2, (name, tall, gui_theme.stack_height(app.root))
+        stays_at(app, home, name + ": the window does not move")
+        app._toggle_advanced()
+        settle(app)
+        assert abs(app.root.winfo_height() - closed_h) <= 2, (name, "closed again: back to its old height")
+        stays_at(app, home, name + ": closed again: same place")
 
-    # 1. the screen reaches below the window's whole height: nothing moves, no scroll bar. Where the window does not fit between
-    #    its top edge and the screen's bottom, the body scrolls (the window never moves and is never cut off: user 4.11., PC C)
-    screen_h = tall + taskbar + home + 40
-    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, screen_h - (taskbar if work else 0))
-    app._toggle_advanced()
-    settle(app)
-    stays_at(app, home, "the window stays where the user put it")
-    assert not app.sb_body.shown, "the whole window fits below its top edge: no scroll bar"
-    app._toggle_advanced()
-    settle(app)
-    screen_h = tall + taskbar + home // 2                              # fits from the top of the screen, not from the window's place
-    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, screen_h - (taskbar if work else 0))
-    app._toggle_advanced()
-    settle(app)
-    stays_at(app, home, "it does not jump up to fit")
-    assert app.sb_body.shown, "not enough room below the window's top edge: the body scrolls"
-    assert app.root.winfo_rooty() + app.root.winfo_height() <= screen_h - taskbar + 1, "the window is not cut off at the bottom"
-    assert visible_in_body(app, app.btn_adv), "the Advanced heading is in sight after opening"
-    app._toggle_advanced()
-    settle(app)
-
-    # 2. closed again: same place
-    app._toggle_advanced()
-    settle(app)
-    stays_at(app, home, "closed again: same place")
-
-    # 3. a screen smaller than the window: it stays too, the body scrolls, opening Advanced scrolls them into view
-    small = tall // 2 + taskbar + app._px(300)
-    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, small - (taskbar if work else 0))
+    # Tk 9 (PC C): the root's own winfo_reqheight keeps the size geometry() set and ignores a child that grew. The window must
+    # still follow its content: stack_height adds up the children, and equals the root's value where that one is right.
     app._fit_height()
-    settle(app)
+    assert abs(gui_theme.stack_height(app.root) - app.root.winfo_reqheight()) <= 2, (gui_theme.stack_height(app.root), app.root.winfo_reqheight())
+    frozen = app.root.winfo_reqheight()
+    app.root.winfo_reqheight = lambda: frozen               # what Tk 9 does
     app._toggle_advanced()
     settle(app)
-    assert app.sb_body.shown, "taller than the screen: the body scrolls"
-    assert app.root.winfo_height() <= small - taskbar + 1, (app.root.winfo_height(), small - taskbar)
-    assert app.root.winfo_rooty() + app.root.winfo_height() <= small - taskbar + 1, "not cut off at the bottom (it may move up for that)"
-    app.root.geometry(f"+60+{HOME_Y}")
+    assert app.root.winfo_height() > closed_h + app._px(40), ("Tk 9: Advanced opened but the window did not grow", closed_h, app.root.winfo_height())
+    app._toggle_advanced()
     settle(app)
-    assert visible_in_body(app, app.btn_adv), "the Advanced heading is in sight after opening"
+    assert abs(app.root.winfo_height() - closed_h) <= 2
+    del app.root.winfo_reqheight
 
-    # 3b. the window starts so low that not even a strip of the body fits above the work area: only then it moves up, just far
-    #     enough (it never ends under the taskbar), and the body scrolls. A taller taskbar than the old guess of 56 px counts.
-    app._toggle_advanced()
-    settle(app)
-    big_bar = app._px(140)
-    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, 10 ** 4 - (big_bar if work else 0))
-    bottom = 10 ** 4 - big_bar
-    app.root.geometry(f"+60+{bottom - app._px(250)}")
-    settle(app)
-    app._fit_height()
-    settle(app)
-    assert app.root.winfo_rooty() < bottom - app._px(250), "too low: it moved up"
-    assert app.root.winfo_rooty() + app.root.winfo_height() <= bottom + 1, "and is not under the taskbar"
-    assert app.sb_body.shown, "the body scrolls"
-    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, small - (taskbar if work else 0))      # the small screen again for the wheel
-    app.root.geometry(f"+60+{HOME_Y}")
-    settle(app)
-    app._fit_height()
-    settle(app)
-    app._toggle_advanced()
-    settle(app)
-
-    # 4. the mouse wheel scrolls the body: Windows <MouseWheel> (delta), Linux Button-4 (up) and Button-5 (down)
+    # the mouse wheel helpers: Windows <MouseWheel> (delta), Linux Button-4 (up) and Button-5 (down)
     class Ev:
         def __init__(self, num=0, delta=0, widget=None):
             self.num, self.delta, self.widget = num, delta, widget or app.root
     assert gui.wheel_up(Ev(delta=120)) and not gui.wheel_up(Ev(delta=-120))
     assert gui.wheel_up(Ev(num=4)) and not gui.wheel_up(Ev(num=5))
-    app.cv_body.yview_moveto(0)
-    app.sb_body.wheel(Ev(num=5))
-    settle(app, 0.2)
-    assert app.cv_body.yview()[0] > 0, "wheel down (Button-5) scrolls the body"
-    y1 = app.cv_body.yview()[0]
-    app.sb_body.wheel(Ev(num=4))
-    settle(app, 0.2)
-    assert app.cv_body.yview()[0] < y1, "wheel up (Button-4) scrolls back"
-    app.sb_body.wheel(Ev(delta=-120))
-    settle(app, 0.2)
-    assert app.cv_body.yview()[0] > 0, "Windows wheel down scrolls"
+    app._toggle_advanced()
+    settle(app)
     app._toggle_advanced()
     settle(app)
 
