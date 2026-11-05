@@ -443,9 +443,10 @@ class PromptMixin:
         except Exception:
             pass
 
-    def _monitor_at(self, px: int, py: int) -> tuple:
+    def _monitor_at(self, px: int, py: int, work: bool = False) -> tuple:
         """(x0, y0, x1, y1) of the monitor under the point (Windows API); the window may sit on a second monitor, where Tk's
-        screen size (the first monitor) is wrong. Falls back to Tk's screen."""
+        screen size (the first monitor) is wrong. Falls back to Tk's screen. ``work``: the work area, i.e. without the
+        taskbar (as Windows reports it, whatever its height or side); without the API a guessed taskbar is taken off."""
         try:
             import ctypes
             from ctypes import wintypes
@@ -460,11 +461,11 @@ class PromptMixin:
             mi.cbSize = ctypes.sizeof(MI)
             hm = u.MonitorFromPoint(wintypes.POINT(px, py), 2)       # 2 = the nearest monitor
             if hm and u.GetMonitorInfoW(hm, ctypes.byref(mi)):
-                r = mi.rcMonitor
+                r = mi.rcWork if work else mi.rcMonitor
                 return r.left, r.top, r.right, r.bottom
         except Exception:
             pass
-        return 0, 0, self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        return 0, 0, self.root.winfo_screenwidth(), self.root.winfo_screenheight() - (self._px(56) if work else 0)
 
     def _menu_span(self, menu, px: int, py: int) -> tuple:
         """(left, right) screen x of a posted menu: Tk's own numbers when it has some, else the window under the mouse (Windows

@@ -70,7 +70,7 @@ def main():
     taskbar = app._px(56)
 
     # how tall the window is with Advanced open, measured on a screen that is big enough
-    app._monitor_at = lambda x, y: (0, 0, 4000, 10 ** 5)
+    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, 10 ** 5)
     app._toggle_advanced()
     settle(app)
     tall = app.root.winfo_height()
@@ -81,7 +81,7 @@ def main():
     # 1. the screen reaches below the window's whole height: nothing moves, no scroll bar. Where the window does not fit between
     #    its top edge and the screen's bottom, the body scrolls (the window never moves and is never cut off: user 4.11., PC C)
     screen_h = tall + taskbar + home + 40
-    app._monitor_at = lambda x, y: (0, 0, 4000, screen_h)
+    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, screen_h - (taskbar if work else 0))
     app._toggle_advanced()
     settle(app)
     stays_at(app, home, "the window stays where the user put it")
@@ -89,7 +89,7 @@ def main():
     app._toggle_advanced()
     settle(app)
     screen_h = tall + taskbar + home // 2                              # fits from the top of the screen, not from the window's place
-    app._monitor_at = lambda x, y: (0, 0, 4000, screen_h)
+    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, screen_h - (taskbar if work else 0))
     app._toggle_advanced()
     settle(app)
     stays_at(app, home, "it does not jump up to fit")
@@ -106,15 +106,39 @@ def main():
 
     # 3. a screen smaller than the window: it stays too, the body scrolls, opening Advanced scrolls them into view
     small = tall // 2 + taskbar + app._px(300)
-    app._monitor_at = lambda x, y: (0, 0, 4000, small)
+    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, small - (taskbar if work else 0))
     app._fit_height()
     settle(app)
     app._toggle_advanced()
     settle(app)
     assert app.sb_body.shown, "taller than the screen: the body scrolls"
-    stays_at(app, home, "it does not jump to the top")
     assert app.root.winfo_height() <= small - taskbar + 1, (app.root.winfo_height(), small - taskbar)
+    assert app.root.winfo_rooty() + app.root.winfo_height() <= small - taskbar + 1, "not cut off at the bottom (it may move up for that)"
+    app.root.geometry(f"+60+{HOME_Y}")
+    settle(app)
     assert visible_in_body(app, app.btn_adv), "the Advanced heading is in sight after opening"
+
+    # 3b. the window starts so low that not even a strip of the body fits above the work area: only then it moves up, just far
+    #     enough (it never ends under the taskbar), and the body scrolls. A taller taskbar than the old guess of 56 px counts.
+    app._toggle_advanced()
+    settle(app)
+    big_bar = app._px(140)
+    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, 10 ** 4 - (big_bar if work else 0))
+    bottom = 10 ** 4 - big_bar
+    app.root.geometry(f"+60+{bottom - app._px(250)}")
+    settle(app)
+    app._fit_height()
+    settle(app)
+    assert app.root.winfo_rooty() < bottom - app._px(250), "too low: it moved up"
+    assert app.root.winfo_rooty() + app.root.winfo_height() <= bottom + 1, "and is not under the taskbar"
+    assert app.sb_body.shown, "the body scrolls"
+    app._monitor_at = lambda x, y, work=False: (0, 0, 4000, small - (taskbar if work else 0))      # the small screen again for the wheel
+    app.root.geometry(f"+60+{HOME_Y}")
+    settle(app)
+    app._fit_height()
+    settle(app)
+    app._toggle_advanced()
+    settle(app)
 
     # 4. the mouse wheel scrolls the body: Windows <MouseWheel> (delta), Linux Button-4 (up) and Button-5 (down)
     class Ev:

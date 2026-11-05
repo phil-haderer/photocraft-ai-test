@@ -383,16 +383,17 @@ class ThemeMixin:
                 pass
         self._on_content_size()
 
-    def _screen_span(self) -> tuple[int, int]:
-        """(top, bottom) the window's content may use on the monitor it is on: it starts at the window's own top edge (the
-        window never moves, it only grows downwards; user 4.11.), bottom leaves room for the taskbar."""
+    def _screen_span(self) -> tuple[int, int, int]:
+        """(top, bottom, monitor top) the window's content may use on the monitor it is on: it starts at the window's own top
+        edge (the window never moves, it only grows downwards; user 4.11.), bottom is the bottom of the work area, i.e.
+        above the taskbar whatever its height (user 5.11., PC C: a fixed guess of 56 px let the window run under it)."""
         try:
             x = int(self.root.winfo_rootx()) + int(self.root.winfo_width()) // 2
             y = max(0, int(self.root.winfo_rooty()))
-            _, top, _, bottom = self._monitor_at(x, y)
-            return max(int(top), y), int(bottom) - self._px(56)      # 56: taskbar and frame
+            _, top, _, bottom = self._monitor_at(x, y, work=True)
+            return max(int(top), y), int(bottom) - self._px(4), int(top)
         except (AttributeError, TypeError, ValueError, tk.TclError):
-            return 0, 10 ** 6
+            return 0, 10 ** 6, 0
 
     def _fit_height(self, width: int | None = None):
         """The window is MIN_W wide (fixed) and exactly as high as its content needs. It never moves by itself (user 4.11.: it
@@ -406,6 +407,7 @@ class ThemeMixin:
                 self._geom = (w, h)
                 self.root.geometry(f"{w}x{h}")
             return
+        lift = 0                  # how far the window has to move up when it starts so low that not even a strip of the body fits
         cv, sb = getattr(self, "cv_body", None), getattr(self, "sb_body", None)
         if cv is not None and sb is not None:
             body = self.f_body.winfo_reqheight()
@@ -417,8 +419,12 @@ class ThemeMixin:
                 except (TypeError, ValueError, tk.TclError):
                     cur = body
                 others = self.root.winfo_reqheight() - cur          # everything but the scrolled body
-                top, bottom = self._screen_span()
+                top, bottom, mon_top = self._screen_span()
                 room = (bottom - top) - others if isinstance(others, int) else body    # from the window's top edge to the screen's bottom
+                strip = min(body, self._px(200))
+                if room < strip:          # sits too low to show even a strip of the body: the one case where it moves up, just far enough
+                    lift = max(0, min(strip - room, top - mon_top))
+                    room += lift
                 target = body if body <= room else max(self._px(120), room)
                 if target != cur:
                     cv.configure(height=target)
@@ -429,7 +435,10 @@ class ThemeMixin:
                 self.root.update_idletasks()
         empty = bool(getattr(self, "start_state", lambda: "")())      # no model chosen: a small window (tabs, one sentence, footer)
         w, h = self._px(MIN_W), max(self._px(80 if empty else 320), self.root.winfo_reqheight())
-        if getattr(self, "_geom", None) != (w, h):
+        if lift:
+            self._geom = (w, h)
+            self.root.geometry(f"{w}x{h}+{int(self.root.winfo_rootx())}+{int(self.root.winfo_rooty()) - lift}")
+        elif getattr(self, "_geom", None) != (w, h):
             self._geom = (w, h)
             self.root.geometry(f"{w}x{h}")
 

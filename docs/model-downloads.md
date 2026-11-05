@@ -49,6 +49,14 @@ answers "401" until then.
 - **DMD2 LoRA for MOSS**: the user's `lora_dmd2.safetensors` is the file of that name in
   `lodestones/MOSS-Image-Base-8-steps-dmd` (same SHA256, also in `lodestones/Kromoss`), not the `lora.safetensors` of
   the SFT repo that the manifest guessed before.
+- **Qwen Image 2.1 Turbo LoRA** (decision of the user, 5 Nov 2026: stays in for now, may be switched off later): the file
+  tested and used is `qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors` from `Comfy-Org/Qwen-Image-2.1`
+  (`loras/`, 913 314 512 bytes, SHA256 208dd432…, Qwen research licence), in ComfyUI's `models\loras\qwen\`. It sits in
+  the node "Qwen turbo LoRA" (`LoraLoaderModelOnly`, strength 1.0) of `qwen-image-21-t2i.json`, `qwen-image-21-edit.json`
+  and `qwen-image-21-refine.json`; the switch "Turbo LoRA" is off at every start (25 steps), on it runs 8 steps. It is
+  optional: without the file the switch is greyed out. Text to image round of 4 Nov 2026
+  (`docs/tests/t2i-steps-ergebnis.md`): the standard steps won 11 of 12 pages, the Turbo LoRA none (median time at 1 MP: 9 s
+  standard, 3 s Turbo).
 - **flux2-vae**: the copy in `Comfy-Org/Flux-2-Dev` is byte-identical with the user's; the copies in the Klein, MOSS,
   Fibo and FLUX.3 repos are 2264 bytes smaller (a different file header) and load the same way.
 - **Licences for the release**: Fibo 2.0 (CC BY-NC) and the FLUX.2 files are non-commercial; Lenovo UltraReal on
