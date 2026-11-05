@@ -7,7 +7,7 @@ from .gui_theme import ThemeMixin, HINT_ICON_PX, ICON_PX, SMALL_ICON_PX, FOOT_BT
 from .gui_prompt import PromptMixin
 from .gui_lora import LoraMixin
 from .gui_modes import ModeMixin
-from .gui_state import WATCH_MS, StateMixin
+from .gui_state import COMFY_WATCH_MS, WATCH_MS, StateMixin
 from .gui_run import RunMixin
 from .gui_easy import EasyMixin
 from .gui_tips import TipsMixin
@@ -151,7 +151,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self._sized = True
         self.root.after(100, self._poll)
         self.root.after(200, self.refresh)
-        self.root.after(WATCH_MS, self._watch_comfy)
+        self.root.after(COMFY_WATCH_MS, self._watch_comfy)
         self.root.after(WATCH_MS, self._watch_photocraft)
         self._schedule_tip()
         self.root.protocol("WM_DELETE_WINDOW", self._quit)

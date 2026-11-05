@@ -191,6 +191,36 @@ def linux_find_checks():
     assert launcher._find_photocraft_linux([tmp2]) == str(app)
 
 
+def flatpak_checks():
+    """PhotoCraft as a Flatpak (tester report 5.11.): `flatpak:<id>` becomes `flatpak run --filesystem=... <id> --control ...`;
+    the sandbox sees only Pictures/Documents, so the token and exchange folders are opened for the run."""
+    tmp = Path(tempfile.mkdtemp())
+    c = cfg(tmp)
+    exe = "flatpak:ai.storyteller.photocraft"
+    args = launcher.photocraft_args(exe, c)
+    assert args[:5] == ["flatpak", "run", f"--filesystem={tmp}", f"--filesystem={tmp / 'exchange'}", "ai.storyteller.photocraft"], args
+    assert args[5:] == launcher.photocraft_args("/x/photocraft", c)[1:]               # the rest is the same as for a binary
+    assert launcher.photocraft_args("/x/photocraft", c)[0] == "/x/photocraft"       # a binary is unchanged
+    started = []
+    state = {"open": False}
+    assert launcher.start_photocraft(exe, c, is_open=lambda: state["open"], sleep=lambda s: None,
+                                     popen=lambda a, **k: (started.append(a), state.update(open=True))) is True
+    assert started == [args] and (tmp / "exchange").is_dir()
+    # detection: `flatpak info` ok -> flatpak:<id>; not installed, failing or no flatpak -> None
+    class Done:
+        def __init__(self, rc): self.returncode = rc
+    assert launcher._find_flatpak(run=lambda *a, **k: Done(0), which=lambda n: "/usr/bin/flatpak") == (
+        None if launcher.IS_WINDOWS else exe)
+    assert launcher._find_flatpak(run=lambda *a, **k: Done(1), which=lambda n: "/usr/bin/flatpak") is None
+    assert launcher._find_flatpak(run=lambda *a, **k: Done(0), which=lambda n: None) is None
+    def boom(*a, **k): raise OSError("x")
+    assert launcher._find_flatpak(run=boom, which=lambda n: "/usr/bin/flatpak") is None
+    assert launcher.is_flatpak(exe) and not launcher.is_flatpak("/x/flatpak") and not launcher.is_flatpak("")
+    # a shortcut for it is accepted (nothing to look up on disk)
+    folder = tempfile.mkdtemp()
+    assert launcher.create_desktop_entry(exe, folder=folder).read_text(encoding="utf-8").count("flatpak:ai.storyteller.photocraft") == 1
+
+
 def desktop_checks():
     # quoting: spaces stay in one argument; " ` $ \ are escaped and backslashes doubled; % is doubled
     assert launcher._desktop_arg("/a b/c") == '"/a b/c"'
@@ -236,6 +266,7 @@ def main():
     tilde_checks()
     find_checks()
     linux_find_checks()
+    flatpak_checks()
     desktop_checks()
     launch_checks()
     start_checks()

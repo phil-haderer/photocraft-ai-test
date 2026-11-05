@@ -17,45 +17,86 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.1 · ComfyUI version: 0.42.0
 
 ## Install on Windows
 
-1. **Get the parts**: Windows 10/11 with an NVIDIA card (16 GB VRAM), [Python 3.11+](https://www.python.org/downloads/windows/)
-   (tested with 3.13 and 3.14; tick "tcl/tk" and "Add python.exe to PATH"; if several versions are installed, the setup prefers 3.13, 3.12, 3.11 and takes 3.14 last), PhotoCraft 0.20.1, and ComfyUI 0.42 or newer.
-2. **Install the plugin**: *Code › Download ZIP* and unpack it (or `git clone` the repository), then double-click **`setup-windows.bat`**. It also creates the
-   desktop shortcut **PhotoCraft AI** (it looks for `photocraft.exe` itself and asks once if it can't find it). The script shows its four steps as it goes; `setup-windows.bat /check` only looks and changes nothing.
-3. **Start it**: start ComfyUI, close PhotoCraft, then double-click **PhotoCraft AI** on your desktop. PhotoCraft opens,
-   and a few seconds later the plugin window appears.
-4. **Get the models**: open the plugin's settings window (gear symbol). Under **Easy Mode** one button downloads the starter models
-   (Flux 3 Klein Image, Qwen 2.1 Edit and Fibo 2.0 Edit Turbo; the button shows the total size). Easy Mode needs **Flux 3 plus
-   Qwen or Fibo**: together they cover all seven Easy Mode functions, so you can also get just one of the two from its model tab in the gear window. Flux 3 needs a free Hugging Face login
-   once (the button opens its page). Restart ComfyUI afterwards.
-5. **Custom node**: the plugin needs one ComfyUI custom node pack, [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
-   (Flux 3 Upscale uses its *Color Match* node). Install it from the ComfyUI Manager or the link, then restart ComfyUI. If you already have it,
-   nothing changes. Without it only Flux 3 Upscale cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes.
-6. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
-   GGUF files work too (link them with the chain symbol in the gear window; needs [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)).
+You need Windows 10/11 with an NVIDIA card (16 GB VRAM), [Python 3.11+](https://www.python.org/downloads/windows/) (tested with 3.13 and 3.14; tick "tcl/tk" and "Add python.exe to PATH"), PhotoCraft 0.20.1, and ComfyUI 0.42 or newer.
 
-Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested
-settings. Multi Image Edit is not part of Easy Mode: switch it off to use it and to get all settings. 
+### Installer script
 
-Download all models via the settings tabs to get the full experience!
+```bat
+:: unpack the ZIP (Code > Download ZIP) or: git clone <this repository>
+setup-windows.bat
+:: setup-windows.bat /check only looks and changes nothing
+```
+
+It makes `.venv`, installs the packages and creates the desktop shortcut **PhotoCraft AI** (it looks for `photocraft.exe` itself and asks once if it can't find it).
+
+### Manual installation
+
+```bat
+py -3.13 -m venv .venv
+.venv\Scripts\python.exe -m pip install pillow numpy websocket-client tkinterdnd2
+:: desktop shortcut (optional)
+.venv\Scripts\python.exe -m pccomfy shortcut --photocraft "C:\path\to\photocraft.exe"
+:: start without the shortcut (ComfyUI running, PhotoCraft closed)
+.venv\Scripts\python.exe photocraft-ai.pyw --photocraft "C:\path\to\photocraft.exe"
+```
+
+Then go on with [First start](#first-start): start ComfyUI, close PhotoCraft, double-click **PhotoCraft AI** on your desktop. PhotoCraft opens, and a few seconds later the plugin window appears.
 
 ## Install on Linux
 
-The plugin also runs on Linux (X11 and Wayland). It opens as a normal window next to PhotoCraft; unlike on Windows it is not
-attached to the PhotoCraft window.
+X11 and Wayland. You need an NVIDIA card (16 GB VRAM), the current PhotoCraft, ComfyUI 0.42 or newer, and your distribution's Python 3.11+ (tested with 3.13 and 3.14) with tkinter and venv.
+On Linux the window is not docked to PhotoCraft (Wayland does not allow it); it is a normal window next to it and closes with PhotoCraft.
 
-1. **Get the parts**: an NVIDIA card (16 GB VRAM), the current PhotoCraft, ComfyUI 0.42 or newer, and your distribution's Python 3.11+ (tested with 3.13 and 3.14)
-   with tkinter and venv (Debian/Ubuntu: `sudo apt install python3 python3-tk python3-venv`; Fedora: `sudo dnf install python3 python3-tkinter`;
-   Arch: `sudo pacman -S python tk`). Use the distribution's Python, not one from uv or pyenv: only its Tk draws the Inter font.
-   Optional: `wl-clipboard` (Wayland) or `xclip` (X11) to paste pictures from the clipboard.
-2. **Install the plugin**: unpack or `git clone` it, then run `./setup-linux.sh` in its folder. It makes `.venv`, installs the
-   packages and adds **PhotoCraft AI** to your application menu. It never installs system packages itself; if something
-   is missing it prints the command for your distribution. It shows its five steps as it goes; `./setup-linux.sh --check` only looks and changes nothing.
-3. **Start it**: start ComfyUI, close PhotoCraft, then start **PhotoCraft AI** from the menu (or run `./photocraft-ai.sh`). PhotoCraft opens and the
-   plugin window appears. If the `photocraft` program is not found (it is searched in `PATH`, `/opt`, `~/Applications` and
-   a few more places), set `PHOTOCRAFT=/path/to/photocraft` or run `.venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft`.
-4. **Models and use**: as in steps 4 to 6 above (the custom node pack ComfyUI-KJNodes is needed on Linux too). Settings and the PhotoCraft token live in `~/.config/pccomfy/`; a different ComfyUI address or port
-   goes into `~/.config/pccomfy/config.toml` (see `config.example.toml`).
-5. **Window too small or too big?** The plugin takes PhotoCraft's scale, else your desktop's. If that is wrong, open the gear window › **Other settings** › **Interface scale** and pick a value; it counts from the next start. `.venv/bin/python -m pccomfy scale` shows what the plugin detected.
+### Installer script
+
+```bash
+# Debian/Ubuntu; Fedora: sudo dnf install python3 python3-tkinter; Arch: sudo pacman -S python tk
+sudo apt install python3 python3-tk python3-venv
+# optional, to paste pictures from the clipboard: wl-clipboard (Wayland) or xclip (X11)
+sudo apt install wl-clipboard xclip
+git clone <this repository> && cd <this repository>
+./setup-linux.sh
+# ./setup-linux.sh --check only looks and changes nothing
+```
+
+It makes `.venv`, installs the packages and adds **PhotoCraft AI** to your application menu. It never installs system packages itself; if something is missing it prints the command for your distribution.
+
+### Manual installation
+
+```bash
+# create the venv with the system Python: a Python from uv or pyenv brings a Tk that does not draw the Inter font
+/usr/bin/python3 -m venv .venv
+.venv/bin/pip install pillow numpy websocket-client tkinterdnd2
+# start (ComfyUI running, PhotoCraft closed); PhotoCraft is found in PATH, /opt, ~/Applications ... or as a Flatpak
+./photocraft-ai.sh
+# PhotoCraft elsewhere: PHOTOCRAFT=/path/to/photocraft ./photocraft-ai.sh
+# PhotoCraft as a Flatpak is found by itself; to name it: PHOTOCRAFT=flatpak:ai.storyteller.photocraft ./photocraft-ai.sh
+# menu entry (optional)
+.venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft
+```
+
+Settings and the PhotoCraft token live in `~/.config/pccomfy/`. A different ComfyUI address or port goes into `~/.config/pccomfy/config.toml` (see `config.example.toml`). With a Flatpak, the plugin opens `~/.config/pccomfy` and `~/.cache/pccomfy` for the Flatpak run, so PhotoCraft can write its token file there.
+
+Window too small or too big? The plugin takes PhotoCraft's scale, else your desktop's. Gear window › **Other settings** › **Interface scale** sets it (from the next start); `.venv/bin/python -m pccomfy scale` shows what the plugin detected.
+
+Then go on with [First start](#first-start).
+
+## First start
+
+1. **Get the models**: open the plugin's settings window (gear symbol). Under **Easy Mode** one button downloads the starter models
+   (Flux 3 Klein Image, Qwen 2.1 Edit and Fibo 2.0 Edit Turbo; the button shows the total size). Easy Mode needs **Flux 3 plus
+   Qwen or Fibo**: together they cover all seven Easy Mode functions, so you can also get just one of the two from its model tab in the gear window. Flux 3 needs a free Hugging Face login
+   once (the button opens its page). Restart ComfyUI afterwards.
+2. **Custom node**: the plugin needs one ComfyUI custom node pack, [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
+   (Flux 3 Upscale uses its *Color Match* node). Install it from the ComfyUI Manager or the link, then restart ComfyUI. If you already have it,
+   nothing changes. Without it only Flux 3 Upscale cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes.
+3. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
+   GGUF files work too (link them with the chain symbol in the gear window; needs [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)).
+
+Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested
+settings. Multi Image Edit is not part of Easy Mode: switch it off to use it and to get all settings.
+
+Download all models via the settings tabs to get the full experience!
 
 ## What it does
 

@@ -9,14 +9,15 @@ from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
 
-WATCH_MS = 5000       # how often the ComfyUI dot asks the server whether it is still there
+WATCH_MS = 5000       # how often the window asks PhotoCraft's control port (Linux: closing with PhotoCraft)
+COMFY_WATCH_MS = 1000   # how often the ComfyUI dot asks the server whether it is still there (tester 5.11.: 5 s felt slow)
 
 
 class StateMixin:
     # ---------- connections ----------
 
     def _watch_comfy(self):
-        """The dot at the bottom left follows ComfyUI while the window is open: every WATCH_MS a short question on a fresh
+        """The dot at the bottom left follows ComfyUI while the window is open: every COMFY_WATCH_MS a short question on a fresh
         connection (in a thread), so a ComfyUI that was closed turns it red and a started one turns it green (user 4.11.)."""
         if os.environ.get("PCCOMFY_NO_WATCH"):
             return
@@ -28,7 +29,7 @@ class StateMixin:
                 self._watching = False
                 self.events.put(("alive", (url, ok)))
             threading.Thread(target=work, daemon=True).start()
-        self.root.after(WATCH_MS, self._watch_comfy)
+        self.root.after(COMFY_WATCH_MS, self._watch_comfy)
 
     def _comfy_alive(self, url: str, ok: bool):
         """The answer of _watch_comfy. A ComfyUI that comes back is read again (lists, files); an old address is ignored."""

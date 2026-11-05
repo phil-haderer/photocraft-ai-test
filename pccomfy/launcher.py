@@ -40,12 +40,28 @@ def exe_name() -> str:
     return "photocraft.exe" if IS_WINDOWS else "photocraft"
 
 
+FLATPAK_ID = "ai.storyteller.photocraft"
+FLATPAK_PREFIX = "flatpak:"       # "path" of a Flatpak install: `flatpak:ai.storyteller.photocraft` (Linux only)
+
+
+def is_flatpak(exe: str) -> bool:
+    return bool(exe) and exe.startswith(FLATPAK_PREFIX)
+
+
 def photocraft_args(exe: str, cfg: dict) -> list[str]:
-    """The command line the starter .bat uses: control port, token file, the exchange folder for reading and writing."""
+    """The command line the starter .bat uses: control port, token file, the exchange folder for reading and writing.
+    A Flatpak install (`flatpak:<id>`) runs as `flatpak run --filesystem=... <id>`: the sandbox sees only Pictures and
+    Documents, so the folders of the token file and the exchange are opened for this one run (PhotoCraft docs: it
+    creates a missing token file itself, but only where it may write)."""
     pcc = cfg["photocraft"]
     xch = str(Path(pcc["exchange_dir"]).expanduser())       # Linux: "~/.cache/..." (no shell here, PhotoCraft would take "~" literally)
-    return [exe, "--control", str(int(pcc["port"])), "--control-token-file", str(Path(pcc["token_file"]).expanduser()),
-            "--automation-read-root", xch, "--automation-write-root", xch]
+    token = str(Path(pcc["token_file"]).expanduser())
+    if is_flatpak(exe):
+        head = ["flatpak", "run", f"--filesystem={Path(token).parent}", f"--filesystem={xch}", exe[len(FLATPAK_PREFIX):]]
+    else:
+        head = [exe]
+    return head + ["--control", str(int(pcc["port"])), "--control-token-file", token,
+                   "--automation-read-root", xch, "--automation-write-root", xch]
 
 
 def start_photocraft(exe: str, cfg: dict, is_open=None, popen=subprocess.Popen, sleep=time.sleep, wait_s: float = WAIT_S):
@@ -55,9 +71,10 @@ def start_photocraft(exe: str, cfg: dict, is_open=None, popen=subprocess.Popen, 
     is_open = is_open or (lambda: autostart.port_open(host, port))
     if is_open():
         return False                      # running with the control channel: only the window is missing
-    if not exe or not Path(exe).exists():
+    if not exe or not (is_flatpak(exe) or Path(exe).exists()):
         raise LaunchError(f"PhotoCraft not found:\n{exe or '(no path given; use --photocraft or set PHOTOCRAFT)'}")
     Path(pcc["exchange_dir"]).expanduser().mkdir(parents=True, exist_ok=True)
+    Path(pcc["token_file"]).expanduser().parent.mkdir(parents=True, exist_ok=True)      # Flatpak: the folder must exist to be opened
     kw = {} if IS_WINDOWS else {"start_new_session": True}                # Linux: PhotoCraft outlives the terminal
     popen(photocraft_args(exe, cfg), cwd=str(ROOT), close_fds=True, **kw)       # as the .bat (cd /d "%~dp0")
     end = time.monotonic() + wait_s
@@ -156,7 +173,7 @@ def _find_photocraft_linux(roots: list[Path] | None = None) -> str | None:
     With `roots` only those are searched (the tests). Several copies: the highest version in the folder name."""
     if roots is None:
         env = os.environ.get("PHOTOCRAFT")
-        if env and Path(env).is_file():
+        if env and (is_flatpak(env) or Path(env).is_file()):
             return env
         on_path = shutil.which("photocraft")
         if on_path:
@@ -176,7 +193,20 @@ def _find_photocraft_linux(roots: list[Path] | None = None) -> str | None:
                     found.append((_version(d), d))
         except OSError:
             continue
-    return str(max(found, key=lambda f: f[0])[1]) if found else None
+    if found:
+        return str(max(found, key=lambda f: f[0])[1])
+    return _find_flatpak() if roots is None else None
+
+
+def _find_flatpak(run=subprocess.run, which=shutil.which) -> str | None:
+    """`flatpak:<id>` when PhotoCraft is installed as a Flatpak (`flatpak info` succeeds), else None."""
+    if IS_WINDOWS or not which("flatpak"):
+        return None
+    try:
+        done = run(["flatpak", "info", FLATPAK_ID], capture_output=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return FLATPAK_PREFIX + FLATPAK_ID if done.returncode == 0 else None
 
 
 def _desktop_arg(s: str) -> str:
@@ -232,7 +262,7 @@ def main_shortcut(exe: str | None = None, name: str = NAME) -> int:
             print(f"{exe_name()} not found. Create the shortcut later: python -m pccomfy shortcut --photocraft <{exe_name()}>")
             return 1
         print(f"PhotoCraft: {exe}")
-    if not Path(exe).exists():
+    if not (is_flatpak(exe) or Path(exe).exists()):
         print(f"PhotoCraft not found: {exe}")
         return 1
     try:
