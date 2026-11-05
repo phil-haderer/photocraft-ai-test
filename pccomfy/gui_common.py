@@ -254,7 +254,7 @@ def conn_status(parent, name: str = "ComfyUI"):
 
 
 def set_dot(dot, ok: bool | None):
-    """Green = connected, red = anything else (also before the first refresh): never grey (user 3.11.)."""
+    """Green = connected, red = anything else: never grey (user 3.11.). The start asks first (_initial_comfy_state), so the first picture is already right."""
     dot.configure(style="ConnOk.TLabel" if ok else "ConnBad.TLabel")
 
 

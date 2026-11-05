@@ -132,6 +132,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.v_conn = tk.StringVar(value="")
 
         self._build(d)
+        self._initial_comfy_state()          # the dot shows the real state from the first moment
         self._set_loras(self.state.get("loras"))
         self._booting = True    # the saved window state is shown as it was: the model's starting settings are not applied
         self._on_mode()

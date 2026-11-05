@@ -48,7 +48,7 @@ def function_checks():
         import tkinter  # noqa: F401
         import venv  # noqa: F401
         import ensurepip  # noqa: F401
-        ok = sys.version_info >= (3, 11)
+        ok = sys.version_info >= (3, 10)
     except ImportError:
         ok = False
     r = subprocess.run(["bash", "-c", f'source "{SCRIPT}"; PYTHON="{sys.executable}" pick_python'], capture_output=True, text=True)

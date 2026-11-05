@@ -5,10 +5,15 @@ from __future__ import annotations
 import copy
 import json
 import os
-import tomllib
+import sys
 from pathlib import Path
 
 from .hostos import IS_WINDOWS
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:      # Ubuntu 22.04 and Mint 21 ship Python 3.10: tomli is the same reader (setup-linux.sh installs it)
+    import tomli as tomllib
 
 _ROOT = Path(__file__).resolve().parent.parent
 

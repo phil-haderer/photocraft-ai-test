@@ -2,110 +2,106 @@
 
 # PhotoCraft AI
 
-**Text to Image, Fill, Remove, Expand, Edit, Upscale and more — inside PhotoCraft, running locally in ComfyUI.**
+**Photoshop-style generative AI for PhotoCraft, running on your own PC.**
+Pick a function, type a prompt, press Generate: the result arrives as a new layer in your document.
 
-Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.1 · ComfyUI version: 0.42.0 
+<img src="readme-images/plugin-window.png" alt="The plugin window: eight functions, six models, prompt box and Generate button" width="330">
 
-<sub>Replace Photoshop's generative AI features with locally running models. Supports: MOSS Image, Krea 2 Turbo, Flux 3 Image Klein, Flux 2 Image Klein, Qwen 2.1 Edit and Fibo 2.0 Edit Turbo  </sub>
+Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.2 · ComfyUI version: 0.42.0 
+
+[Quick start](#quick-start) · [Install on Windows](#install-on-windows) · [Install on Linux](#install-on-linux) · [First start](#first-start) · [Functions](#functions) · [Help](#help) · [Technical details](#technical-details) · [Licences](#licences-of-the-models)
 
 </div>
 
 ---
 
+- **Eight functions:** Text to image, Expand, Fill, Remove, Edit Canvas, Multi Image Edit, Upscale and Refine.
+- **Six models:** Flux 3 Klein, Flux 2 Klein, Qwen 2.1 Edit, Fibo 2.0 Edit Turbo, Krea 2 Turbo and MOSS Image.
+- **Local:** the models run in ComfyUI on your own graphics card.
+- **Easy Mode:** only the function buttons and the prompt; the plugin picks the best installed model.
+
 > Unofficial community project, not affiliated with PhotoCraft, ArtCraft or Storyteller. PhotoCraft is in early alpha
 > and so is this plugin. "PhotoCraft AI" is a working title.
 
+## Quick start
+
+You need [PhotoCraft](https://github.com/storytold/photocraft/releases) and [ComfyUI](https://github.com/comfyanonymous/ComfyUI#installing) installed, an NVIDIA graphics card with 16 GB VRAM, and Python 3.11 or newer ([download](https://www.python.org/downloads/windows/)).
+
+**Windows**
+
+1. Click **Code ▸ Download ZIP** (green button at the top of this page) and unpack it to a folder you keep, for example `C:\Tools\photocraft-ai`.
+2. Double-click **`setup-windows.bat`**. It sets everything up and puts **PhotoCraft AI** on your desktop.
+3. Start ComfyUI, close PhotoCraft, then double-click **PhotoCraft AI** on your desktop. PhotoCraft opens and the plugin window appears next to it.
+4. In the plugin window click the gear ▸ **Easy Mode** tab ▸ download the starter models, then restart ComfyUI.
+5. Switch on **Easy Mode**, pick a function, type a prompt and press **Generate** (Ctrl+Enter).
+
+**Linux** (Debian/Ubuntu; other distributions: [Install on Linux](#install-on-linux))
+
+```bash
+sudo apt install python3 python3-tk python3-venv
+git clone <this repository> && cd <this repository>
+./setup-linux.sh
+```
+
+Then do steps 3 to 5 above, starting **PhotoCraft AI** from your application menu.
+
+## How it fits together
+
+```
+PhotoCraft  <-->  this plugin (a small window)  <-->  ComfyUI (your graphics card)
+```
+
+- **PhotoCraft** is the image editor where you work and where the results land as layers.
+- **ComfyUI** runs the AI models on your graphics card.
+- **This plugin** sits between them: it sends your picture or selection to ComfyUI and puts the result back as a layer.
+
+You need Windows 10/11 or Linux, an NVIDIA card with 16 GB VRAM, Python 3.11+ (Linux: 3.10+), PhotoCraft 0.20.2, and ComfyUI 0.42 or newer.
+
 ## Install on Windows
 
-You need Windows 10/11 with an NVIDIA card (16 GB VRAM), [Python 3.11+](https://www.python.org/downloads/windows/) (tested with 3.13 and 3.14; tick "tcl/tk" and "Add python.exe to PATH"), PhotoCraft 0.20.1, and ComfyUI 0.42 or newer.
+1. **Download**: click **Code ▸ Download ZIP** at the top of this page and unpack it to a folder you keep (not Downloads). Using git is fine too, see [Technical details](#technical-details).
+2. **Set up**: double-click **`setup-windows.bat`**. It shows its four steps as it goes: Python, a private Python environment, the packages, and the desktop shortcut **PhotoCraft AI**. It finds `photocraft.exe` itself and asks once if it can't. (`setup-windows.bat /check` only looks and changes nothing.)
+3. **Start**: start ComfyUI, close PhotoCraft, double-click **PhotoCraft AI** on your desktop. PhotoCraft opens, and a few seconds later the plugin window appears.
 
-### Installer script
-
-```bat
-:: unpack the ZIP (Code > Download ZIP) or: git clone <this repository>
-setup-windows.bat
-:: setup-windows.bat /check only looks and changes nothing
-```
-
-It makes `.venv`, installs the packages and creates the desktop shortcut **PhotoCraft AI** (it looks for `photocraft.exe` itself and asks once if it can't find it).
-
-### Manual installation
-
-```bat
-py -3.13 -m venv .venv
-.venv\Scripts\python.exe -m pip install pillow numpy websocket-client tkinterdnd2
-:: desktop shortcut (optional)
-.venv\Scripts\python.exe -m pccomfy shortcut --photocraft "C:\path\to\photocraft.exe"
-:: start without the shortcut (ComfyUI running, PhotoCraft closed)
-.venv\Scripts\python.exe photocraft-ai.pyw --photocraft "C:\path\to\photocraft.exe"
-```
-
-Then go on with [First start](#first-start): start ComfyUI, close PhotoCraft, double-click **PhotoCraft AI** on your desktop. PhotoCraft opens, and a few seconds later the plugin window appears.
+When you install Python, keep its default options: "tcl/tk" and "Add python.exe to PATH" must stay ticked.
+Then go on with [First start](#first-start).
 
 ## Install on Linux
 
-X11 and Wayland. You need an NVIDIA card (16 GB VRAM), the current PhotoCraft, ComfyUI 0.42 or newer, and your distribution's Python 3.11+ (tested with 3.13 and 3.14) with tkinter and venv.
-On Linux the window is not docked to PhotoCraft (Wayland does not allow it); it is a normal window next to it and closes with PhotoCraft.
+X11 and Wayland. On Linux the window is not docked to PhotoCraft (Wayland does not allow it); it is a normal window next to it and closes with PhotoCraft.
 
-### Installer script
+1. **System packages** (Python 3.10+ with tkinter and venv):
 
-```bash
-# Debian/Ubuntu; Fedora: sudo dnf install python3 python3-tkinter; Arch: sudo pacman -S python tk
-sudo apt install python3 python3-tk python3-venv
-# optional, to paste pictures from the clipboard: wl-clipboard (Wayland) or xclip (X11)
-sudo apt install wl-clipboard xclip
-git clone <this repository> && cd <this repository>
-./setup-linux.sh
-# ./setup-linux.sh --check only looks and changes nothing
-```
+   ```bash
+   # Debian/Ubuntu
+   sudo apt install python3 python3-tk python3-venv
+   # Fedora
+   sudo dnf install python3 python3-tkinter
+   # Arch
+   sudo pacman -S python tk
+   # optional, to paste pictures from the clipboard: wl-clipboard (Wayland) or xclip (X11)
+   sudo apt install wl-clipboard xclip
+   ```
 
-It makes `.venv`, installs the packages and adds **PhotoCraft AI** to your application menu. It never installs system packages itself; if something is missing it prints the command for your distribution.
+2. **Get the plugin**: download the ZIP and unpack it, or `git clone <this repository>`.
+3. **Set up**: run `./setup-linux.sh` in the plugin folder. It makes a private Python environment, installs the packages and adds **PhotoCraft AI** to your application menu. It never installs system packages itself; if something is missing it prints the command for your distribution. (`./setup-linux.sh --check` only looks and changes nothing.)
+4. **Start**: start ComfyUI, close PhotoCraft, then start **PhotoCraft AI** from the menu (or run `./photocraft-ai.sh`). PhotoCraft is found in `PATH`, `/opt`, `~/Applications`, `~/.local/bin` or as a Flatpak. If it is somewhere else: `PHOTOCRAFT=/path/to/photocraft ./photocraft-ai.sh`.
 
-### Manual installation
-
-```bash
-# create the venv with the system Python: a Python from uv or pyenv brings a Tk that does not draw the Inter font
-/usr/bin/python3 -m venv .venv
-.venv/bin/pip install pillow numpy websocket-client tkinterdnd2
-# start (ComfyUI running, PhotoCraft closed); PhotoCraft is found in PATH, /opt, ~/Applications ... or as a Flatpak
-./photocraft-ai.sh
-# PhotoCraft elsewhere: PHOTOCRAFT=/path/to/photocraft ./photocraft-ai.sh
-# PhotoCraft as a Flatpak is found by itself; to name it: PHOTOCRAFT=flatpak:ai.storyteller.photocraft ./photocraft-ai.sh
-# menu entry (optional)
-.venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft
-```
-
-Settings and the PhotoCraft token live in `~/.config/pccomfy/`. A different ComfyUI address or port goes into `~/.config/pccomfy/config.toml` (see `config.example.toml`). With a Flatpak, the plugin opens `~/.config/pccomfy` and `~/.cache/pccomfy` for the Flatpak run, so PhotoCraft can write its token file there.
-
-Window too small or too big? The plugin takes PhotoCraft's scale, else your desktop's. Gear window › **Other settings** › **Interface scale** sets it (from the next start); `.venv/bin/python -m pccomfy scale` shows what the plugin detected.
-
-Then go on with [First start](#first-start).
+Then go on with [First start](#first-start). Window too small or too big? Gear window ▸ **Other settings** ▸ **Interface scale**.
 
 ## First start
 
-1. **Get the models**: open the plugin's settings window (gear symbol). Under **Easy Mode** one button downloads the starter models
-   (Flux 3 Klein Image, Qwen 2.1 Edit and Fibo 2.0 Edit Turbo; the button shows the total size). Easy Mode needs **Flux 3 plus
-   Qwen or Fibo**: together they cover all seven Easy Mode functions, so you can also get just one of the two from its model tab in the gear window. Flux 3 needs a free Hugging Face login
-   once (the button opens its page). Restart ComfyUI afterwards.
-2. **Custom node**: the plugin needs one ComfyUI custom node pack, [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
-   (Flux 3 Upscale uses its *Color Match* node). Install it from the ComfyUI Manager or the link, then restart ComfyUI. If you already have it,
-   nothing changes. Without it only Flux 3 Upscale cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes.
-3. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
-   GGUF files work too (link them with the chain symbol in the gear window; needs [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)).
+1. **Get the models.** Open the plugin's settings window (gear symbol) ▸ **Easy Mode** tab. One button downloads the starter models: Flux 3 Klein, plus Qwen 2.1 Edit and Fibo 2.0 Edit Turbo (the button shows the total size). Easy Mode needs Flux 3 plus Qwen or Fibo, so you can also get just one of the two from its model tab. Flux 3 needs a free Hugging Face login once (the button opens its page). Restart ComfyUI afterwards. The models have different licences, some without commercial use: see [Licences of the models](#licences-of-the-models).
+2. **Generate.** Switch on **Easy Mode**, pick a function, type a prompt and press **Generate** (Ctrl+Enter).
 
-Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested
-settings. Multi Image Edit is not part of Easy Mode: switch it off to use it and to get all settings.
+Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested settings. Multi Image Edit is not part of Easy Mode: switch it off to use it and to get all settings. To use every model, download the rest from the model tabs of the settings window.
 
-Download all models via the settings tabs to get the full experience!
+Optional: Flux 3 Upscale needs one ComfyUI custom node pack, and GGUF model files need another. Both are described in [Technical details](#technical-details).
 
-## What it does
+## Functions
 
-You pick a **function** at the top, type a prompt and press **Generate**. The plugin sends the picture (or the selection) 
+You pick a **function** at the top, type a prompt and press **Generate**. The plugin sends the picture (or the selection)
 to ComfyUI and puts the result back into PhotoCraft as a new layer in a group, with a soft layer mask where that makes sense.
-
-More settings in the window: **variants** (generates several results as layers in one group), prompt history, prompt templates,
-Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**Remove background**) cuts the subject out of the visible picture and adds it as a new layer with a transparent background; it needs the optional `birefnet.safetensors` (gear window › Models › Additional). Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), add custom LoRAs, sharpen.**
-
 
 | Function | What it does |
 |---|---|
@@ -118,8 +114,8 @@ Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**R
 | **Upscale (new file)** | Enlarges the picture or selection into a new document, up to 24 MP. |
 | **Refine (same size)** | Cleans up the picture or selection at the same size, as a new layer. |
 
-
-Which model offers which function:
+<details>
+<summary>Which model offers which function</summary>
 
 | | Flux 3 | Flux 2 | Qwen | Fibo | Krea 2 | MOSS |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -132,36 +128,77 @@ Which model offers which function:
 | Refine (same size) | ✓ | ✓ | ✓ | ✓ | | |
 | Text to image | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
+</details>
 
-## Update and troubleshooting
+More in the window: **variants** (several results as layers in one group), prompt history, prompt templates, Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**Remove background**) cuts the subject out of the visible picture and adds it as a new layer with a transparent background; it needs the optional `birefnet.safetensors` (gear window ▸ Models ▸ Additional). Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), custom LoRAs, sharpen.**
 
-- **Update**: download the new version, or run `git pull` in the plugin folder if you used `git clone`, and restart
-  the plugin. Your settings stay in `data\`.
-- **What the shortcut does**: it starts PhotoCraft with a control channel for the plugin (local only, protected by a
-  token, file access limited to `data\exchange`) and then the plugin, without a console window.
-- **Recreate the desktop shortcut**: run this in the plugin folder (type `powershell` into Explorer's address bar):
+## Help
 
-  ```
-  .venv\Scripts\python.exe -m pccomfy shortcut
-  ```
+| You see | What to do |
+|---|---|
+| The dot next to **ComfyUI** (bottom left) is red, or "ComfyUI not connected" | Start ComfyUI. If it runs on another address or port: gear ▸ **Other settings** ▸ **ComfyUI address**, then Refresh. |
+| "PhotoCraft not found" when you start | Windows: run `.venv\Scripts\python.exe -m pccomfy shortcut --photocraft "C:\path\to\photocraft.exe"` in the plugin folder (type `powershell` into Explorer's address bar). Linux: `PHOTOCRAFT=/path/to/photocraft ./photocraft-ai.sh`. |
+| "PhotoCraft did not open the control port" | Another PhotoCraft is already running: close all of them and start through the shortcut or menu entry. Or another program uses port 7878. |
+| "No control-channel token" or "rejected the token" | PhotoCraft was started without the plugin's start options. Close it and start through the shortcut or menu entry. Flatpak: see [Technical details](#technical-details). |
+| "You need to download …", or a model button is greyed out | Open the gear window: a red dot marks a missing file. Download it, then restart ComfyUI (it reads its model folders only at start). |
+| A Flux 3 download is refused | Log in to Hugging Face and accept the licence on the model page first. |
+| On Linux nothing appears | Run `./photocraft-ai.sh` in a terminal; the message tells you what is missing. |
 
-  Add `--photocraft "C:\path\to\photocraft.exe"` to name the file yourself. If `setup-windows.bat` said it
-  uses Python directly, use the path in `data\python.txt` instead of `.venv\Scripts\python.exe`.
+**Update.** Download the new ZIP and unpack it over the old folder, or run `git pull` in the plugin folder if you used `git clone`; then run the setup script again and restart the plugin. Your settings, including "Set as my settings", stay in `data\` (Linux: `~/.config/pccomfy/`) and are not touched.
 
-## Models
+**Report a problem.** Open an issue on this repository's **Issues** page and tell us:
+- what you did, what you expected and what happened (the status line at the bottom of the window is useful);
+- your operating system, graphics card, and the versions of PhotoCraft, ComfyUI and the plugin (the ZIP's date or the git commit);
+- the last lines of `data\exchange\runs.jsonl` (Linux: `~/.cache/pccomfy/exchange/runs.jsonl`): one line per run. `last-graph.json` in the same folder is the exact request sent to ComfyUI.
 
-You only need the files for the models you want. The gear window lists the files each model needs, with size, ComfyUI target
-folder and a download button; the plugin enables a model when it finds all the files for its standard settings.
+Both files can contain your prompts, so look through them before you post.
 
-- Release 1 uses the **int8 ConvRot** files, which fit into 16 GB VRAM.
-- Some files are **gated**: log in to Hugging Face and accept the licence on the model page first. Flux 3 is one of them.
+## Technical details
 
+**Install with git.**
 
-## Known limitations
+```bash
+git clone <this repository>
+cd <this repository>
+```
 
-- Tested on Windows with a 16 GB NVIDIA card. Linux is new: so far it was run in WSL (WSLg) only, not yet on a full desktop distribution.
-- During a run, PhotoCraft briefly opens a temporary document. Please don't switch documents or change the
-  selection while a run is going.
+**Windows, by hand** (what `setup-windows.bat` does):
+
+```bat
+py -3.13 -m venv .venv
+.venv\Scripts\python.exe -m pip install pillow numpy websocket-client tkinterdnd2
+:: desktop shortcut (optional)
+.venv\Scripts\python.exe -m pccomfy shortcut --photocraft "C:\path\to\photocraft.exe"
+:: start without the shortcut (ComfyUI running, PhotoCraft closed)
+.venv\Scripts\python.exe photocraft-ai.pyw --photocraft "C:\path\to\photocraft.exe"
+```
+
+If `setup-windows.bat` said it uses Python directly, use the path in `data\python.txt` instead of `.venv\Scripts\python.exe`.
+The shortcut starts PhotoCraft with a control channel for the plugin (local only, protected by a token, file access limited to `data\exchange`) and then the plugin, without a console window.
+
+**Linux, by hand** (what `setup-linux.sh` does):
+
+```bash
+# create the venv with the system Python: a Python from uv or pyenv brings a Tk that does not draw the Inter font
+/usr/bin/python3 -m venv .venv
+.venv/bin/pip install pillow numpy websocket-client tkinterdnd2
+# Python 3.10 (Ubuntu 22.04) also needs: .venv/bin/pip install tomli
+./photocraft-ai.sh
+# menu entry (optional)
+.venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft
+```
+
+Settings and the PhotoCraft token live in `~/.config/pccomfy/`. A different ComfyUI address or port goes into `~/.config/pccomfy/config.toml` (see `config.example.toml`). `.venv/bin/python -m pccomfy scale` shows how the plugin detected the display scale.
+
+**PhotoCraft as a Flatpak.** It is found by itself; to name it: `PHOTOCRAFT=flatpak:ai.storyteller.photocraft ./photocraft-ai.sh`. The Flatpak sandbox sees only Pictures and Documents, so the plugin opens `~/.config/pccomfy` and `~/.cache/pccomfy` for the Flatpak run; that lets PhotoCraft write its token file there.
+
+**Custom nodes.** Flux 3 Upscale uses the *Color Match* node of [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes). Install the pack from the ComfyUI Manager or the link, then restart ComfyUI. Without it only Flux 3 Upscale cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes. GGUF files (link them with the chain symbol in the gear window) need [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF).
+
+**Model files.** You only need the files for the models you want. The gear window lists the files each model needs, with size, ComfyUI target folder and a download button; the plugin enables a model when it finds all the files for its standard settings. To fit into 16 GB VRAM, release 1 uses the int8 ConvRot files. Some files are gated: log in to Hugging Face and accept the licence on the model page first. Flux 3 is one of them.
+
+**Known limitations.**
+- Developed and tested on Windows 11 with a 16 GB NVIDIA card. On Linux it was run on Ubuntu 24.04 (Wayland); other distributions and X11 are not tested yet.
+- During a run, PhotoCraft briefly opens a temporary document. Please don't switch documents or change the selection while a run is going.
 - A run consists of several PhotoCraft steps (history entries).
 - CMYK, Lab and 16-bit documents go through 8-bit RGB.
 

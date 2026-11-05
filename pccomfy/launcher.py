@@ -154,7 +154,9 @@ def find_photocraft(roots: list[Path] | None = None) -> str | None:
     if roots is None:
         home = Path.home()
         env = [os.environ.get(k) for k in ("ProgramFiles", "ProgramFiles(x86)")]
-        roots = [ROOT.parent] + [Path(e) for e in env if e] + [Path(os.environ.get("LOCALAPPDATA", home)) / "Programs",
+        local = Path(os.environ.get("LOCALAPPDATA", home)) / "Programs"
+        # the MSI installs to %LOCALAPPDATA%\Programs\ArtCraft\PhotoCraft (per user; checked 5.11., 0.20.2) or the same under Program Files
+        roots = [ROOT.parent] + [Path(e) for e in env if e] + [Path(e) / "ArtCraft" for e in env if e] + [local, local / "ArtCraft",
                                                               home / "Downloads", home / "Desktop"]
     found = []
     for root in roots:
@@ -169,7 +171,7 @@ def find_photocraft(roots: list[Path] | None = None) -> str | None:
 
 def _find_photocraft_linux(roots: list[Path] | None = None) -> str | None:
     """The `photocraft` binary: $PHOTOCRAFT, then PATH (/usr/bin ...), then folders with "photocraft" in their name under the
-    usual roots (next to this folder, /opt, ~/Applications, ~/.local/opt, Downloads, Desktop), then a photocraft*.AppImage.
+    usual roots (next to this folder, /opt, ~/Applications, ~/.local/opt, ~/.local/bin, ~/bin, Downloads, Desktop), then a photocraft*.AppImage.
     With `roots` only those are searched (the tests). Several copies: the highest version in the folder name."""
     if roots is None:
         env = os.environ.get("PHOTOCRAFT")
@@ -179,7 +181,8 @@ def _find_photocraft_linux(roots: list[Path] | None = None) -> str | None:
         if on_path:
             return on_path
         home = Path.home()
-        roots = [ROOT.parent, Path("/opt"), home / "Applications", home / ".local" / "opt", home / "Downloads", home / "Desktop"]
+        roots = [ROOT.parent, Path("/opt"), home / "Applications", home / ".local" / "opt", home / ".local" / "bin", home / "bin",
+                 home / "Downloads", home / "Desktop"]      # ~/.local/bin and ~/bin: a photocraft-*.AppImage put there
     found = []
     for root in roots:
         try:

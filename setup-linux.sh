@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up the bridge on Linux (Linux counterpart of setup-windows.bat): finds a Python 3.11+ with tkinter and venv, makes
+# Sets up the bridge on Linux (Linux counterpart of setup-windows.bat): finds a Python 3.10+ with tkinter and venv, makes
 # .venv, installs the packages and writes the menu entry "PhotoCraft AI". It never installs system packages: when
 # something is missing it prints the command for your distribution and stops.
 #
@@ -37,12 +37,12 @@ clipboard_hint() {
     esac
 }
 
-# Prints the first interpreter that is Python 3.11+ with tkinter, venv and ensurepip; nothing if there is none.
+# Prints the first interpreter that is Python 3.10+ (3.10 = Ubuntu 22.04, Mint 21; it gets tomli) with tkinter, venv and ensurepip; nothing if there is none.
 pick_python() {
     local c
-    for c in "${PYTHON:-}" python3.13 python3.12 python3.11 python3.14 python3 python; do
+    for c in "${PYTHON:-}" python3.13 python3.12 python3.11 python3.14 python3 python3.10 python; do
         [ -n "$c" ] && command -v "$c" >/dev/null 2>&1 || continue
-        if "$c" -c 'import sys, tkinter, venv, ensurepip; sys.exit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+        if "$c" -c 'import sys, tkinter, venv, ensurepip; sys.exit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1; then
             command -v "$c"
             return 0
         fi
@@ -54,7 +54,7 @@ pick_python() {
 diagnose() {
     local c=python3
     command -v "$c" >/dev/null 2>&1 || { echo "python3 is not installed."; return; }
-    "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null || echo "python3 is older than 3.11."
+    "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null || echo "python3 is older than 3.10."
     "$c" -c 'import tkinter' 2>/dev/null || echo "python3 has no tkinter."
     "$c" -c 'import venv, ensurepip' 2>/dev/null || echo "python3 has no venv/ensurepip."
 }
@@ -95,12 +95,12 @@ main() {
     echo "Setup of the bridge: 1 Python, 2 virtual environment, 3 packages, 4 clipboard helpers, 5 menu entry."
     [ "$check" = 1 ] && echo "(--check: nothing is changed, the steps only say what they would do.)"
 
-    step 1 "Python 3.11+ with tkinter and venv"
+    step 1 "Python 3.10+ with tkinter and venv"
     if ! py="$(pick_python)"; then
-        echo "No Python 3.11+ with tkinter and venv found."
+        echo "No Python 3.10+ with tkinter and venv found."
         diagnose
         hint="$(install_hint "$os_id" "$os_like")"
-        if [ -n "$hint" ]; then echo "Install it with:  $hint"; else echo "Install Python 3.11+ with tkinter and venv from your distribution, then run this again."; fi
+        if [ -n "$hint" ]; then echo "Install it with:  $hint"; else echo "Install Python 3.10+ with tkinter and venv from your distribution, then run this again."; fi
         exit 1
     fi
     echo "Using Python: $py"
@@ -128,6 +128,11 @@ main() {
         echo "Would install them into the virtual environment with pip."
     else
         "$venv/bin/python" -m pip install $PACKAGES || { echo "pip install failed. Check the messages above."; exit 1; }
+        # Python 3.10 has no tomllib (config.toml): tomli is the same reader as a package
+        if ! "$venv/bin/python" -c 'import tomllib' >/dev/null 2>&1; then
+            echo "Python 3.10: installing tomli"
+            "$venv/bin/python" -m pip install tomli || { echo "pip install failed. Check the messages above."; exit 1; }
+        fi
     fi
 
     step 4 "Clipboard helpers (optional)"

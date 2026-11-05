@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import socket
 
-from . import comfyaddr
+from . import comfyaddr, photocraft
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
@@ -15,6 +15,17 @@ COMFY_WATCH_MS = 1000   # how often the ComfyUI dot asks the server whether it i
 
 class StateMixin:
     # ---------- connections ----------
+
+    def _initial_comfy_state(self):
+        """The dot and its text show the real state from the first picture: one short question before the window appears
+        (0.5 s at most; a refused local connection answers at once), not green or red by assumption and corrected later
+        (tester 5.11.). The watcher below keeps it current."""
+        if os.environ.get("PCCOMFY_NO_WATCH"):
+            return
+        ok = comfyaddr.probe(self.comfy.url, 0.5)[0]
+        self._comfy_up = ok
+        self.v_conn.set("ComfyUI connected" if ok else "ComfyUI not connected")
+        set_dot(self.lbl_dot, ok)
 
     def _watch_comfy(self):
         """The dot at the bottom left follows ComfyUI while the window is open: every COMFY_WATCH_MS a short question on a fresh
@@ -76,6 +87,7 @@ class StateMixin:
             try:
                 self.pc.close()
                 self.pc.ping()
+                info["pc_version"] = getattr(self.pc, "version", lambda: None)()
                 if not winlink.available():
                     # seen at the start: the Linux watcher need not wait for its first probe (5 s), so PhotoCraft
                     # closed within the first seconds still closes the window
@@ -128,6 +140,10 @@ class StateMixin:
             if first:
                 self.v_model.set(first.key)
                 self._on_model()
+        note = photocraft.version_note(info.get("pc_version"))
+        if note and not getattr(self, "_pc_note_shown", False):
+            self._pc_note_shown = True            # once per start
+            self._status(note)
         if info.get("err"):
             self._status(info["err"], error=True)
 

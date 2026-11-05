@@ -16,6 +16,29 @@ import socket
 from pathlib import Path
 
 
+TESTED_VERSION = "0.20.2"      # the newest PhotoCraft this plugin was checked with live (raise it after a live check; tools/update_readme_version.py)
+
+
+def _version_tuple(s) -> tuple | None:
+    """"0.20.2" -> (0, 20, 2); None when it does not look like a version (a suffix such as "-beta" is cut off)."""
+    parts = str(s or "").strip().lstrip("vV").split("-", 1)[0].split(".")
+    try:
+        return tuple(int(p) for p in parts) if parts and all(p.isdigit() for p in parts) else None
+    except ValueError:
+        return None
+
+
+def version_note(current, tested: str = TESTED_VERSION) -> str | None:
+    """A hint when the running PhotoCraft differs from the tested one; None when equal or unknown (never blocks anything)."""
+    cur, tst = _version_tuple(current), _version_tuple(tested)
+    if not cur or not tst or cur == tst:
+        return None
+    if cur > tst:
+        return (f"PhotoCraft {current} is newer than {tested}, the newest this plugin was tested with. "
+                "It will probably work; if something fails, please report it.")
+    return f"PhotoCraft {current} is older than {tested}, the version this plugin was tested with. Updating PhotoCraft is recommended."
+
+
 class PhotoCraftError(RuntimeError):
     pass
 
@@ -153,6 +176,15 @@ class PhotoCraft:
 
     def activate(self, index: int) -> None:
         self.execute("document.activate", {"document": index})
+
+    def version(self) -> str | None:
+        """The running PhotoCraft's version ("0.20.2") from `updates.status`; None when it does not say (older or headless builds)."""
+        try:
+            res = self.execute("updates.status")
+            v = res.get("currentVersion") if isinstance(res, dict) else None
+            return str(v) if v else None
+        except PhotoCraftError:
+            return None
 
     def ping(self) -> dict:
         s = self.session()
