@@ -429,7 +429,7 @@ def main():
     # BiRefNet and the preview decoders stand once, under "Additional models", with what they are for (user 30.10.)
     extra = {d["name"]: d for d in file_rows(app) if d.get("use")}
     assert set(extra) == {n for n, f in manifest.FILES.items() if f.kind in ("bg_removal", "preview")}, set(extra)
-    assert extra["birefnet.safetensors"]["use"] == "Cut out in Multi Image Edit: Flux 3, Flux 2, Qwen, Fibo"
+    assert extra["birefnet.safetensors"]["use"] == "Remove background (scissors), Cut out in Multi Image Edit: Flux 3, Flux 2, Qwen, Fibo"
     assert extra["taef2_decoder.pth"]["use"] == "Live preview: Flux 3, Flux 2, Fibo, MOSS"
     assert sum(d["name"] == "taef2_decoder.pth" for d in file_rows(app)) == 1          # not again under each model
     assert "Additional models (used by several models)" in rows_text(app)
@@ -469,6 +469,25 @@ def main():
     app._link_reset()                                     # Reset: the links of the start (none here)
     assert cfgmod.model_map() == {} and app.b_link_reset["state"] == "disabled"
     assert app.b_link_undo["state"] == "disabled"        # Undo takes back relinks only, not the reset
+    assert app.b_link_default["state"] == "disabled"     # no link: nothing to reset to the default models
+    app._link_models("flux2-vae.safetensors", "my_vae.safetensors")
+    assert app.b_link_default["state"] == "normal"
+    app._link_default()                                   # Reset to default models: all links gone, Undo brings them back
+    assert cfgmod.model_map() == {} and app.b_link_default["state"] == "disabled" and app.b_link_undo["state"] == "normal"
+    app._link_undo()
+    assert cfgmod.model_map() == {"flux2-vae.safetensors": "my_vae.safetensors"}
+    app._link_default()
+    app._link_undo()
+    app._link_default()
+    app._map_undo.clear()
+    # GGUF weights (user 5.11.): under the main model's weights of Krea 2, Flux 2 and Fibo one line with a link to the Hugging Face page
+    rows = app._settings_rows()
+    pages = [r[1] for r in rows if r[0] == "gguf"]
+    assert sorted(pages) == sorted(manifest.GGUF_PAGES.values()), pages
+    assert all(u.startswith("https://huggingface.co/") for u in manifest.GGUF_PAGES.values()) and set(manifest.GGUF_PAGES) <= {m.key for m in models.MODELS}
+    for i, r in enumerate(rows):          # the line follows a main model file (kind unet), nothing else
+        if r[0] == "gguf":
+            assert rows[i - 1][0] == "file" and manifest.FILES[rows[i - 1][1]["name"]].kind == "unet", rows[i - 1]
     app._link_models("flux2-vae.safetensors", "my_vae.safetensors")
     assert cfgmod.model_map() == {"flux2-vae.safetensors": "my_vae.safetensors"}
     assert "/vae/flux2-vae.safetensors  (your file: my_vae.safetensors)" in rows_text(app)

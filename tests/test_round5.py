@@ -74,13 +74,12 @@ def main():
     pick("fibo", "refine")           # Fibo Refine runs as a whole-image edit
     assert lm
 
-    # Expand image: Sharpen, Match colours, LLM enhancement and the prompt writer are gone
+    # Expand image: Sharpen, LLM enhancement and the prompt writer are gone
     sharp = [rec(w, "grid_remove") for w in app._sharp_widgets]
-    match = [rec(w, "grid_remove") for w in app._match_widgets]
     app.f_enh.winfo_manager = lambda: "pack"       # the stub reports no geometry manager: say it is shown
     enh = rec(app.f_enh, "pack_forget")
     pick("fibo", "outpaint")
-    assert all(sharp) and all(match) and enh
+    assert all(sharp) and enh
     assert app._request().sharpen == 0.0 and app._request().enhance is False
     # no LLM row either where the prompt is fixed or ready-made: Remove, Refine, Upscale (user 30.10.)
     # ... and where the workflow has no text model (Edit, Fill, Multi Image Edit of Flux / Qwen): hidden, not greyed out
@@ -90,6 +89,11 @@ def main():
         pick(key, mode)
         app.v_enhance.set(True)
         assert enh and app._request().enhance is False, (key, mode)
+    for key, mode in (("fibo", "inpaint"), ("qwen", "inpaint"), ("fibo", "remove"), ("qwen", "remove")):    # no Sharpen result in Fill and Remove (user 5.11.)
+        sharp = [rec(w, "grid_remove") for w in app._sharp_widgets]
+        pick(key, mode)
+        app.v_sharpen.set(0.4)
+        assert all(sharp) and app._request().sharpen == 0.0, (key, mode)
     pick("fibo", "outpaint")
     app.v_sharpen.set(0.4)
     assert app._request().sharpen == 0.0                       # not applied in Expand ...
@@ -109,12 +113,8 @@ def main():
     app._on_mode()
     assert app.v_workflow.get() == "fibo2-edit.json" and app._request().enhance is False
     app.v_enhance.set(False)
-    # Match colours only in Fill (the Reference mode is gone: reference slots replace it)
-    for mode, shown in (("inpaint", True), ("outpaint", False), ("edit", False)):
-        grid = [rec(w, "grid") for w in app._match_widgets]
-        gone = [rec(w, "grid_remove") for w in app._match_widgets]
-        pick("fibo", mode)
-        assert (all(grid) and not any(gone)) if shown else (all(gone) and not any(grid)), mode
+    # Match colours is gone completely (user 5.11.): no slider, no value, no request field
+    assert not hasattr(app, "_match_widgets") and not hasattr(app, "v_match") and not hasattr(app._request(), "match")
 
     # The LoRA box: shown where the workflow has a LoRA of its own, hidden (not greyed out) where not
     shown, hidden = rec(app.cb_turbo, "grid"), rec(app.cb_turbo, "grid_remove")

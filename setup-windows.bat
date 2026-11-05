@@ -21,6 +21,8 @@ if defined CHECK echo (/check: nothing is changed, the steps only say what they 
 echo.
 echo [1/4] Python 3.11 or newer with tkinter
 set "PYEXE="
+rem Tested with Python 3.13 and 3.14 (3.14 brings Tk 9). The versions we know come first: 3.13, 3.12, 3.11, then 3.14; then any other.
+for %%V in (-3.13 -3.12 -3.11 -3.14) do call :tryv %%V
 for %%P in (py python "%USERPROFILE%\miniconda3\python.exe") do call :try "%%~P"
 if not defined PYEXE goto :nopython
 echo Using Python: %PYEXE%
@@ -84,6 +86,13 @@ if defined NOMENU (
     echo Setup done. Start PhotoCraft with the desktop shortcut "PhotoCraft AI".
 )
 pause
+exit /b 0
+
+:tryv
+if defined PYEXE exit /b 0
+set "CAND="
+for /f "usebackq delims=" %%I in (`py %~1 -c "import tkinter, sys; print(sys.executable)" 2^>nul`) do set "CAND=%%I"
+if defined CAND set "PYEXE=%CAND%"
 exit /b 0
 
 :try

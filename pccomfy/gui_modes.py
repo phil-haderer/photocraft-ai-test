@@ -39,17 +39,13 @@ class ModeMixin:
             self.f_lm.pack_forget()
         else:
             self._pack_post(self.f_lm)                 # the last row of the finishing options
-        for w in self._match_widgets:      # pulling colours back only makes sense where a new area meets the old picture
-            if mode == "inpaint":
-                w.grid()
-            else:
-                w.grid_remove()
+        no_sharp = expand or mode in NO_SHARPEN_MODES      # Expand, Fill and Remove: no Sharpen result (user 5.11.)
         for w in self._sharp_widgets:
-            if expand:
+            if no_sharp:
                 w.grid_remove()
             else:
                 w.grid()
-        if expand:        # the frame would keep its height with nothing in it: a gap above Context (live finding 28.10.)
+        if no_sharp:        # the frame would keep its height with nothing in it: a gap above Context (live finding 28.10.)
             self.f_sharp.pack_forget()
         else:
             self._pack_post(self.f_sharp)
@@ -257,9 +253,9 @@ class ModeMixin:
         spec = m.modes[mode]
         wf = self.v_workflow.get()
         keep = wf in m.workflows() and wf == spec.workflow
-        # the colour pull-back and the sharpening belong to the model's mode, they do not travel to the next tab
+        # the sharpening belongs to the model's mode, it does not travel to the next tab
         # (sharpen: user 28.10., a function without its own value starts at 0 %)
-        s = {"match": 0.0, "sharpen": 0.0, **spec.settings}
+        s = {"sharpen": 0.0, **spec.settings}
         # a mode without a Context of its own starts at the function's default, not at what the tab before had
         # (Fibo Fill showed 0.4 after Qwen and 0.2 after Reset)
         s.setdefault("context", FILL_CONTEXT if mode == "inpaint" else self._ctx_default)
@@ -449,7 +445,6 @@ class ModeMixin:
         self.v_ref_mp.set(REF_MP)
         self.v_denoise.set(1.0)       # as a new window has it; the workflow's own value and the function's rule follow below
         self.v_sharpen.set(0.0)
-        self.v_match.set(0.0)
         self.v_feather.set(2.0)
         self.v_density.set(100)
         self.v_live.set(True)
@@ -484,14 +479,13 @@ class ModeMixin:
         self._on_workflow()
         self._mode_denoise()
         self._on_sharpen()
-        self._on_match()
         self._on_feather()
         self._on_density()
         self._fit_height()
         self._status("Reset to the startup settings.")
 
     def _pack_post(self, frame):
-        """Show one of the finishing rows in its place: Mix source/new, Sharpen and Match colours, Context, Edge feather, Layer mask."""
+        """Show one of the finishing rows in its place: Mix source/new, Sharpen, Context, Edge feather, Layer mask."""
         shown = (lambda f: bool(f.winfo_manager())) if hasattr(frame, "winfo_manager") else (lambda f: False)
         if shown(frame):
             return
@@ -546,9 +540,6 @@ class ModeMixin:
                 self.toggle_feather_preview(show=False)
         if on != shown and getattr(self, "_sized", False):
             self._fit_height()
-
-    def _on_match(self, _value=None):
-        self.lbl_match.configure(text=f"{round(float(self.v_match.get()) * 100)} %")
 
     def _on_sharpen(self, _value=None):
         self.lbl_sharpen.configure(text=f"{round(float(self.v_sharpen.get()) * 100)} %")

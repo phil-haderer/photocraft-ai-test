@@ -295,7 +295,7 @@ class ThemeMixin:
         return (img(FG), "selected", img(ON_ACCENT), "disabled", img(DISABLED))
 
     def _slider_row(self, frame):
-        """Sharpen, Match colours, Edge feather and Mix source/new share one layout: the label takes the room on the left,
+        """Sharpen, Edge feather and Mix source/new share one layout: the label takes the room on the left,
         the slider (SLIDER_W) and its value box sit on the right, so all bars are equally long and end at the same place
         (the LoRA sliders beside their checkboxes too)."""
         frame.columnconfigure(0, weight=1)

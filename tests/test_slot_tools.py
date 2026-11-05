@@ -53,6 +53,30 @@ def main():
     b.comfy.output_images = lambda hist, node_id=None: [pic]
     assert b.remove_background(Image.new("RGB", (40, 30))).size == (15, 15)
 
+    # the footer's scissors (user 5.11.): the visible picture without its background as a new layer on top, full canvas size,
+    # not cropped to the subject; the layers below stay (the snapshot for Undo is best effort, the fake PhotoCraft has none)
+    class FullComfy(T.FakeComfy):
+        def output_images(self, hist, node_id=None):
+            im = Image.new("RGBA", self.last_size, (255, 0, 0, 0))
+            im.paste((0, 255, 0, 255), (10, 5, 25, 20))
+            return [im]
+
+        def upload_image(self, image, name):
+            self.last_size = image.size
+            return super().upload_image(image, name)
+
+    pc, _, b = T.make(tempfile.mkdtemp(), with_sel=False)
+    b.comfy = FullComfy()
+    doc = pc.docs[0]
+    before, old_ids = len(doc.layers), {l["id"] for l in doc.layers}
+    msgs = []
+    res = b.remove_background_layer(lambda f, m, **kw: msgs.append(m))
+    assert len(doc.layers) == before + 1 and res["size"] == [T.W, T.H]
+    assert "Background removed" in msgs
+    top = next(l for l in doc.layers if l["id"] not in old_ids)["img"]
+    assert top.size == (T.W, T.H)
+    assert top.mode == "RGBA" and top.getpixel((0, 0))[3] == 0 and top.getpixel((12, 8)) == (0, 255, 0, 255)
+
     # Qwen 3.5 9B describes a picture (describe-image.json): the question defaults to the workflow's own, a typed one replaces it
     d = workflows.load_template(workflows.DESCRIBE_WORKFLOW)
     assert links_ok(d) and bridge.has_tag(d, "image") and bridge.has_tag(d, "prompt") and workflows.writer_name(d) == "Qwen 3.5 9B"

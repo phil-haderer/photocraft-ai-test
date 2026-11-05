@@ -18,7 +18,7 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.1 · ComfyUI version: 0.42.0
 ## Install on Windows
 
 1. **Get the parts**: Windows 10/11 with an NVIDIA card (16 GB VRAM), [Python 3.11+](https://www.python.org/downloads/windows/)
-   (tick "tcl/tk" and "Add python.exe to PATH"), PhotoCraft 0.20.1, and ComfyUI 0.42 or newer.
+   (tested with 3.13 and 3.14; tick "tcl/tk" and "Add python.exe to PATH"; if several versions are installed, the setup prefers 3.13, 3.12, 3.11 and takes 3.14 last), PhotoCraft 0.20.1, and ComfyUI 0.42 or newer.
 2. **Install the plugin**: *Code › Download ZIP* and unpack it (or `git clone` the repository), then double-click **`setup-windows.bat`**. It also creates the
    desktop shortcut **PhotoCraft AI** (it looks for `photocraft.exe` itself and asks once if it can't find it). The script shows its four steps as it goes; `setup-windows.bat /check` only looks and changes nothing.
 3. **Start it**: start ComfyUI, close PhotoCraft, then double-click **PhotoCraft AI** on your desktop. PhotoCraft opens,
@@ -31,6 +31,7 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.1 · ComfyUI version: 0.42.0
    (Flux 3 Upscale uses its *Color Match* node). Install it from the ComfyUI Manager or the link, then restart ComfyUI. If you already have it,
    nothing changes. Without it only Flux 3 Upscale cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes.
 6. In the plugin window switch on **Easy Mode**, pick a function, type a prompt, press **Generate** (Ctrl+Enter).
+   GGUF files work too (link them with the chain symbol in the gear window; needs [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)).
 
 Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested
 settings. Multi Image Edit is not part of Easy Mode: switch it off to use it and to get all settings. 
@@ -42,7 +43,7 @@ Download all models via the settings tabs to get the full experience!
 The plugin also runs on Linux (X11 and Wayland). It opens as a normal window next to PhotoCraft; unlike on Windows it is not
 attached to the PhotoCraft window.
 
-1. **Get the parts**: an NVIDIA card (16 GB VRAM), the current PhotoCraft, ComfyUI 0.42 or newer, and your distribution's Python 3.11+
+1. **Get the parts**: an NVIDIA card (16 GB VRAM), the current PhotoCraft, ComfyUI 0.42 or newer, and your distribution's Python 3.11+ (tested with 3.13 and 3.14)
    with tkinter and venv (Debian/Ubuntu: `sudo apt install python3 python3-tk python3-venv`; Fedora: `sudo dnf install python3 python3-tkinter`;
    Arch: `sudo pacman -S python tk`). Use the distribution's Python, not one from uv or pyenv: only its Tk draws the Inter font.
    Optional: `wl-clipboard` (Wayland) or `xclip` (X11) to paste pictures from the clipboard.
@@ -62,7 +63,7 @@ You pick a **function** at the top, type a prompt and press **Generate**. The pl
 to ComfyUI and puts the result back into PhotoCraft as a new layer in a group, with a soft layer mask where that makes sense.
 
 More settings in the window: **variants** (generates several results as layers in one group), prompt history, prompt templates,
-Enhance prompt with LLM, live preview. Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), add custom LoRAs, sharpen, match colours.**
+Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**Remove background**) cuts the subject out of the visible picture and adds it as a new layer with a transparent background; it needs the optional `birefnet.safetensors` (gear window › Models › Additional). Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), add custom LoRAs, sharpen.**
 
 
 | Function | What it does |

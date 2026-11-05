@@ -101,7 +101,7 @@ def main():
     assert app.v_workflow.get() == "flux3-klein-edit.json" and app.v_res.get() == 1536
     app.v_model.set("flux2")
     app._on_model()
-    assert app.v_res.get() == 1024 and app.v_match.get() == 0.0
+    assert app.v_res.get() == 1024
     assert len(app.rb_tabs) == 6 and app.f_tabs is not None
 
     # Flux 3: upscale brings its workflow, 1.5 and the placeholder; edit takes the placeholder away again
@@ -273,14 +273,14 @@ def main():
     assert models.ranking_text("edit").startswith("Ranking: 1. Flux 3, 2. Qwen, 3. Flux 2, 4. Fibo") and models.ranking_text("img2img") == ""   # all functions are ranked since 1.11.
     assert "Ranking" not in app.tt_modes["remove"].text and all("Ranking" not in t.text for t in app.tt_modes.values())
     assert all(k in models.SHORT for k in models.BY_KEY) and all(k in models.BY_KEY for r in models.RANKING.values() for k in r)
-    # Fibo Refine starts with Sharpen 10 % (user 30.10.), Fibo Text to image with 20 % (user 28.10.); the box shows the percent
-    for mode, want in (("refine", 0.1), ("txt2img", 0.2)):
-        app.v_sharpen.set(0.0)
+    # Fibo Refine starts with Sharpen 10 % (user 30.10.), Fibo Text to image with 0 % (user 5.11.; 20 % before); the box shows the percent
+    for mode, want in (("refine", 0.1), ("txt2img", 0.0)):
+        app.v_sharpen.set(0.5)
         app.v_model.set("fibo")
         app.v_mode.set(mode)
         app._on_model()
         assert app.v_sharpen.get() == want and app.lbl_sharpen.cget("text") == f"{round(want * 100)} %", (mode, app.v_sharpen.get())
-        app.v_sharpen.set(0.0)
+        app.v_sharpen.set(0.5)
         app.reset_settings()
         assert app.v_sharpen.get() == want and app.lbl_sharpen.cget("text") == f"{round(want * 100)} %", (mode, "reset")
     # Fibo: text to image has its own workflow (no image inputs), Refine runs as a whole-image edit with a ready prompt

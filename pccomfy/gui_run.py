@@ -42,7 +42,7 @@ class RunMixin:
                        enhance=bool(self.v_enhance.get()) and self._llm_row_wanted(),
                        turbo=bool(self.v_turbo.get()), scale=self._scale(),
                        lora_strength=(round(float(self.v_lora_str.get()), 2) if self._has_lora_switch() else None),
-                       stage_on=bool(self.v_stage.get()) or not self._stage_label(), stages_off=self._stages_off(), stage_strengths=self._stage_strengths(), sampler_override=self._sampler_override(), doc_tag=self._doc_tag(), loras=[tuple(x) for x in self._loras()], sharpen=0.0 if self.v_mode.get() == "outpaint" else round(float(self.v_sharpen.get()), 2), match=round(float(self.v_match.get()), 2), detail=round(float(self.v_detail.get()), 2) if self.v_mode.get() in SCALE_MODES else 1.0,
+                       stage_on=bool(self.v_stage.get()) or not self._stage_label(), stages_off=self._stages_off(), stage_strengths=self._stage_strengths(), sampler_override=self._sampler_override(), doc_tag=self._doc_tag(), loras=[tuple(x) for x in self._loras()], sharpen=0.0 if self.v_mode.get() in NO_SHARPEN_MODES else round(float(self.v_sharpen.get()), 2), detail=round(float(self.v_detail.get()), 2) if self.v_mode.get() in SCALE_MODES else 1.0,
                        layer_mask=layer_mask_key(self.v_lmask.get()),
                        feather_pct=round(float(self.v_feather.get()) * 2) / 2,
                        mask_density=min(100, max(0, int(self.v_density.get()))),
@@ -331,6 +331,56 @@ class RunMixin:
         """The icon beside the seed field: the next run uses the seed of the last one (same settings, same picture)."""
         if getattr(self, "_last_seed", None) is not None:
             self.v_seed.set(self._last_seed)
+
+    def cut_background(self):
+        """The scissors in the footer (user 5.11.): the visible picture without its background, as a new layer on top
+        (Bridge.remove_background_layer, ComfyUI's BiRefNet). Runs like a generation: progress bar, Cancel, Undo afterwards."""
+        if self.worker and self.worker.is_alive():
+            return
+        if not self._cutout_available():
+            self._status(CUTOUT_MISSING, error=True)
+            return
+        self._running = True
+        self.b_go.configure(state="disabled")
+        self.w_variants.configure(state="disabled")
+        self.b_undo.configure(state="disabled")
+        self.b_redo.configure(state="disabled")
+        self.b_stop.configure(state="normal")
+        self.bridge.reset_cancel_all()
+        self._reset_progress()
+
+        def progress(f, msg, phase="", phase_fraction=-1.0, elapsed=0.0):
+            if phase == "image":        # BiRefNet is no image model run: say what happens (user 5.11.), not "<model> is generating"
+                phase, msg = "stage", "Removing background"
+            self.events.put(("progress", (f, msg, phase, phase_fraction, elapsed)))
+
+        def work():
+            t_start = time.monotonic()
+            try:
+                self.bridge.remove_background_layer(progress)
+                self.events.put(("done", f"Done · background removed, new layer on top · {duration_text(time.monotonic() - t_start)}"))
+            except Cancelled:
+                self.events.put(("done", "Cancelled."))
+            except (BridgeError, ComfyError, PhotoCraftError, ValueError, OSError) as e:
+                self.events.put(("done", f"Error: {e}"))
+            except Exception as e:
+                self.events.put(("done", f"Unexpected error: {type(e).__name__}: {e}"))
+        self.worker = threading.Thread(target=work, daemon=True)
+        self.worker.start()
+
+    def _cutout_available(self) -> bool:
+        """False only when ComfyUI was read and has no birefnet.safetensors; not read yet (or not reachable): the click tries."""
+        inv = getattr(self, "inv", None)
+        return inv is None or inv.has("birefnet.safetensors")
+
+    def _update_cut_button(self):
+        """The scissors is greyed out while the BiRefNet file is missing; its tooltip then names the file."""
+        b = getattr(self, "b_cut", None)
+        if b is None:
+            return
+        ok = self._cutout_available()
+        b.configure(state="normal" if ok else "disabled")
+        self.tt_cut.text = CUTOUT_TIP if ok else CUTOUT_TIP + "\n\n" + CUTOUT_MISSING
 
     def stop(self):
         """Cancel: the run, or the text model while it describes a picture (the LLM and Describe buttons, the slots' Describe)."""

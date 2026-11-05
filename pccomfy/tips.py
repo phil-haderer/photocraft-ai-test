@@ -12,7 +12,6 @@ TIPS = (
     "Flux 3 Multi Image Edit with BBOX: draw a rectangular selection, put a reference in slot 1 and name the object from the reference image in the prompt, e.g. \"wine glass\". It is placed exactly in your rectangle.",
     "Edge feather softens the seam, in % of the selection's shorter side. It shows up with the soft layer mask (Fill, Remove); 0 = hard edge.",
     "\"Show feather\" paints the blend area red in PhotoCraft (Quick Mask). Click it again, or Generate, to get your selection back.",
-    "Match colours (Fill Selection only) pulls the new area's saturation back toward its surroundings. 0 = off.",
     "Qwen fills small selections badly. Use a larger selection, or try Fibo 2.0 Edit Turbo.",
     "Right-click the chosen model chip and pick \"Set as my settings…\": the current sliders, sampler, steps and LoRAs become your start for this function and model, and \"Reset page\" returns to them. Shift-click \"Reset page\" for the standard settings.",
     "Right-click a model chip and tick \"Favourite for ...\": Easy Mode then uses this model first for that function. \"Reset favourite models\" (gear window, Other settings) forgets all favourites: Easy Mode and the functions use the default ranking again.",

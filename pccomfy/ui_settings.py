@@ -26,6 +26,8 @@ EMPTY_TEXT = {"choose": "Choose a model", "none_linked": "Link your models in th
 STATE_TEXT = {"ready": "is ready.", "partial": "is not yet available", "missing": "is not yet available"}      # after the model name (user 1.11.)
 HINT_SAME = "same size and header as "          # behind a file in the chain list (user 3.11.)
 HINT_INCOMPLETE = "incomplete? shorter than its header says"
+GGUF_ALT = "Alternatively:"
+GGUF_LINK = "Download GGUF-weights"      # under the weights of a main model (user 5.11.)
 PROBABLE_FILE = "This is probably the right file: "      # under a missing file, when a renamed copy of it is in the models folder (user 3.11.)
 HINT_EXPLAIN = "Marked files have the same size and safetensors header as a file this plugin expects."
 DOT_RED = "#e5484d"                   # the dot in front of a model that is not available (nothing in front of a ready one)
@@ -186,6 +188,7 @@ class SettingsMixin(DownloadMixin):
         self.comfy.name_fixer = inv.apply_names if inv is not None else None    # a linked or differently written file name is renamed when a graph is queued
         self._update_tabs()
         self._apply_start_state()
+        self._update_cut_button()
         try:
             self._update_mode_radios()
         except (AttributeError, tk.TclError):      # the window is still being built
@@ -467,8 +470,11 @@ class SettingsMixin(DownloadMixin):
                 needed = [x for x in row["files"] if x[2] == "required"]
                 extra = [x for x in row["files"] if x[2] != "required"]
                 rows.append(("head", "Standard settings need these weights:"))
-                for f, found, level in needed:
+                last_unet = max((i for i, x in enumerate(needed) if x[0].kind == "unet"), default=-1)
+                for i, (f, found, level) in enumerate(needed):
                     rows.append(("file", self._file_data(f, found, level)))
+                    if i == last_unet and row["key"] in manifest.GGUF_PAGES:      # under the main model's weights (user 5.11.)
+                        rows.append(("gguf", manifest.GGUF_PAGES[row["key"]]))
                 for c in row["status"].nodes:
                     pack = manifest.node_pack(c)
                     rows.append(("node", c, pack[0] if pack else "", pack[1] if pack else ""))
@@ -781,6 +787,10 @@ class SettingsMixin(DownloadMixin):
         ent = ttk.Entry(row, textvariable=self.v_comfy_url, width=30)
         ent.pack(side="left")
         ent.bind("<Return>", lambda e: self._comfy_address_check())
+        # The settings window has no title bar (overrideredirect): Windows does not always make it the active window when the
+        # mouse goes into it, so the field got no keyboard (user 5.11.: "the cursor cannot be placed", also after Refresh). A click
+        # into the field takes the keyboard (focus -force), after Tk's own focus change.
+        ent.bind("<ButtonPress-1>", lambda e: ent.after_idle(self._force_focus, ent), add="+")
         b = ttk.Button(row, text="Refresh", image=self._icon("refresh", px=SET_ICON_PX), compound="left", style="SetSmall.TButton",
                        command=self._comfy_address_check)
         b.pack(side="left", padx=(8, 0))
@@ -795,6 +805,14 @@ class SettingsMixin(DownloadMixin):
         self.lbl_comfy_note.pack(anchor="w", pady=(4, 0))
         self._comfy_seq = 0
         self._comfy_address_check(apply=False)          # shows at once whether the address in use answers
+
+    @staticmethod
+    def _force_focus(widget):
+        try:
+            if widget.winfo_exists():
+                widget.focus_force()
+        except tk.TclError:
+            pass
 
     def _comfy_address_show(self, mark: str, msg: str, style: str, note: str = ""):
         try:
@@ -1149,6 +1167,15 @@ class SettingsMixin(DownloadMixin):
                     extra.append((f["note"], "muted"))
                 for text, style in extra:
                     label(line(), text, style, padx=(36, 0), wrap=self._px(60))
+            elif kind == "gguf":
+                box = line()
+                label(box, GGUF_ALT, "muted", padx=(36, 4), pady=(0, 2))
+                b = ttk.Button(box, text=GGUF_LINK, style="Link.TButton", command=lambda u=row[1]: webbrowser.open(u))
+                b.pack(side="left", pady=(0, 2))
+                b.copy_text = row[1]                      # right-click: Copy link
+                Tooltip(b, "Opens the Hugging Face page of the GGUF files in your browser (smaller files for little VRAM). "
+                           "Put the file in ComfyUI's models/unet folder, restart ComfyUI and link it with the chain symbol; "
+                           "needs the ComfyUI-GGUF node pack.")
             elif kind == "node":
                 _k, cls, pack, url = row
                 box = line()
@@ -1175,6 +1202,9 @@ class SettingsMixin(DownloadMixin):
                 self.b_link_undo = ttk.Button(box, text="Undo", command=self._link_undo, style="SetSmall.TButton")
                 self.b_link_undo.pack(side="right", padx=(0, 6), pady=(2, 2))
                 Tooltip(self.b_link_undo, "Takes back the last change of the links.")
+                self.b_link_default = ttk.Button(box, text="Reset to default models", command=self._link_default, style="SetSmall.TButton")
+                self.b_link_default.pack(side="right", padx=(0, 6), pady=(2, 2))
+                Tooltip(self.b_link_default, "Removes all links: every model uses its own standard file again (Undo brings the links back).")
                 label(box, row[1], "head", pady=(2, 2))
                 self._link_buttons()
             elif kind == "line":
@@ -1258,6 +1288,7 @@ class SettingsMixin(DownloadMixin):
         try:
             self.b_link_undo.configure(state="normal" if self._map_undo else "disabled")
             self.b_link_reset.configure(state="normal" if cfgmod.model_map() != self._map_start else "disabled")
+            self.b_link_default.configure(state="normal" if cfgmod.model_map() else "disabled")
         except (AttributeError, tk.TclError):
             pass
 
@@ -1299,6 +1330,14 @@ class SettingsMixin(DownloadMixin):
         if self._map_undo:
             cfgmod.set_model_map(self._map_undo.pop())
             self._after_link_change("Undone: the links are as before the last change.")
+
+    def _link_default(self):
+        """"Reset to default models" (user 5.11.): all links removed, every model uses its own standard file again."""
+        before = cfgmod.model_map()
+        if before:
+            self._map_undo.append(before)
+            cfgmod.set_model_map({})
+            self._after_link_change("All links are removed: the models use their standard files again.")
 
     def _link_reset(self):
         if cfgmod.model_map() != self._map_start:

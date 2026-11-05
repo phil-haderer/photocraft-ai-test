@@ -128,6 +128,23 @@ def window_tests(u_comfy, u_other):
     assert app.lbl_comfy_mark["text"] == "✓" and "ComfyUI found" in app.lbl_comfy_msg["text"]
     assert app.comfy.url == u_comfy and cfgmod.get_setting("comfyui_url") == u_comfy and app.bridge.comfy is app.comfy
     assert comfyaddr.is_local(app.comfy.url) and app.lbl_comfy_note["text"] == ""
+    # a click into the field takes the keyboard (the borderless settings window is not always made the active one by Windows)
+    from tkinter import ttk
+    def find_entry(w):
+        for c in w.winfo_children():
+            if isinstance(c, ttk.Entry):
+                return c
+            r = find_entry(c)
+            if r is not None:
+                return r
+    forced = []
+    app._force_focus = lambda w: forced.append(w)
+    ent = find_entry(app._settings_win)
+    ent.event_generate("<ButtonPress-1>", x=3, y=3)
+    for _ in range(5):
+        app.root.update()
+    assert forced and forced[0] is ent, "a click into the address field must force the keyboard focus to it"
+    del app._force_focus
     app._comfy_address_reset()                      # the field gets the default back and is checked (what answers there depends on the PC)
     assert app.v_comfy_url.get() == comfyaddr.DEFAULT_URL
     app.root.destroy()

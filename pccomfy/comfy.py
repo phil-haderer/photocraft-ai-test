@@ -292,7 +292,8 @@ class ComfyUI:
         gives then would look like "nothing is installed"."""
         self.system_stats()
         out = {
-            "unet": self._choices("UNETLoader", "unet_name"),
+            # the diffusion models, and the GGUF files of ComfyUI-GGUF's own loader (none when that pack is not installed)
+            "unet": list(dict.fromkeys(self._choices("UNETLoader", "unet_name") + self._choices("UnetLoaderGGUF", "unet_name"))),
             "clip": self._choices("CLIPLoader", "clip_name"),
             "vae": self._choices("VAELoader", "vae_name"),
             "lora": self._choices("LoraLoaderModelOnly", "lora_name"),

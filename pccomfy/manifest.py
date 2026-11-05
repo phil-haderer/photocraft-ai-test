@@ -27,7 +27,7 @@ KINDS = {
     "upscale_model": ("UpscaleModelLoader", "model_name", "upscale_models"),               # 4x UltraSharp in Flux 3 Upscale
 }
 # helpers several models share, listed apart in the settings window as "Additional models" (user 30.10.), with their use
-ADDITIONAL_KINDS = {"bg_removal": "Cut out in Multi Image Edit", "preview": "Live preview"}
+ADDITIONAL_KINDS = {"bg_removal": "Remove background (scissors), Cut out in Multi Image Edit", "preview": "Live preview"}
 KIND_LABEL = {"unet": "Diffusion model", "clip": "Text encoder", "vae": "VAE", "lora": "LoRA", "preview": "Preview decoder",
               "bg_removal": "Background removal", "upscale_model": "Upscale model"}
 
@@ -133,7 +133,7 @@ _LIST += [
     File("4x-UltraSharpV2.safetensors", "upscale_model", _HF + "Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.safetensors",
          "Flux 3 Upscale, switch \"4x UltraSharp\" (on by default)", size=139792588),
     File("birefnet.safetensors", "bg_removal", _HF + "Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors",
-         "optional: \"Cut out\" in the reference slots; licence: MIT", size=444473596),
+         "optional: \"Cut out\" in the reference slots and the footer scissors (Remove background); licence: MIT", size=444473596),
 ]
 _TAESD = "https://raw.githubusercontent.com/madebyollin/taesd/main/"      # not github.com: its certificate chain fails in Windows Python
 _LIVE = "optional: sharper live preview (without it ComfyUI shows coarse colours); "
@@ -336,6 +336,15 @@ def describe_line(model_key: str, has) -> str:
         return head + " It is also used instead when the text model of another model is missing."
     return head + f" If it is missing, {short(DESCRIBE_FALLBACK)} is used instead."
 
+
+# GGUF weights as an alternative to the main model file (user 5.11.): only a link to the Hugging Face page, shown under the
+# model's weights in the settings window. GGUF files link like any other file (the chain symbol) and need ComfyUI-GGUF.
+# model key -> page. The files tested by the user: Krea 2 Q3_K_M (vantagewithai), Fibo Q5_K_M (Abiray), Flux 2 Klein Q4_K_M.
+GGUF_PAGES = {
+    "krea2": "https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF",
+    "fibo": "https://huggingface.co/Abiray/Fibo-2.0-edit-turbo-GGUF",
+    "flux2": "https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF",
+}
 
 # node class prefix -> (pack, where to get it). Only what the shipped workflows use.
 NODE_PACKS = (

@@ -26,6 +26,13 @@ def norm(name: str) -> str:
     return name.replace("\\", "/").strip().lower()
 
 
+GGUF_LOADER = "UnetLoaderGGUF"          # the loader node of the ComfyUI-GGUF pack (city96)
+
+
+def is_gguf(name) -> bool:
+    return isinstance(name, str) and name.lower().endswith(".gguf")
+
+
 def resolve(name: str, available: list[str], mapping: dict | None = None, aliases: tuple = ()) -> str | None:
     """The name ComfyUI lists for ``name``, or None. Tries, in this order: the user's own mapping (name -> local file),
     an exact match, a match ignoring case and ``\\`` / ``/``, an alias, and a unique match on the bare file name
@@ -122,6 +129,9 @@ class Inventory:
                 val = (node.get("inputs") or {}).get(fld)
                 if isinstance(val, str) and resolve(val, self.lists[kind], self.mapping) is None and (kind, val) not in files:
                     files.append((kind, val))
+                real = resolve(val, self.lists[kind], self.mapping) if kind == "unet" and isinstance(val, str) else None
+                if is_gguf(real) and self.nodes is not None and GGUF_LOADER not in self.nodes and GGUF_LOADER not in classes:
+                    classes.append(GGUF_LOADER)         # a linked GGUF needs the ComfyUI-GGUF pack
             if self.nodes is not None and cls and cls not in self.nodes and cls not in classes:
                 classes.append(cls)
         return files, classes
@@ -145,6 +155,11 @@ class Inventory:
                 if real is not None and real != val:
                     inputs[fld] = real
                     changed += 1
+                if kind == "unet" and is_gguf(inputs.get(fld)):       # a GGUF file: ComfyUI-GGUF's loader instead of UNETLoader
+                    node["class_type"] = GGUF_LOADER
+                    inputs.pop("weight_dtype", None)
+                    changed += 1
+                    break
             if node.get("class_type") == "AUSBOSS_NODES_LoraLoader":     # its LoRAs are a JSON list (Flux 3 Restore LoRA)
                 inputs = node.get("inputs") or {}
                 try:

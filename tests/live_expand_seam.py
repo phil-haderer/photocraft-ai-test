@@ -39,7 +39,7 @@ from pccomfy.comfy import ComfyUI  # noqa: E402
 
 BASE = cfgmod.CONFIG_DIR / "expand-seam-test"
 MARGINS = {"right": (0, 0, 0.35, 0), "leftbottom": (0.25, 0, 0, 0.25)}     # left, top, right, bottom: share of the picture
-MODELS = {"krea2": ("krea2-turbo-inpaint.json", 1024, 0.0), "moss": ("moss-image-inpaint.json", 1216, 0.5)}   # workflow, base res., match
+MODELS = {"krea2": ("krea2-turbo-inpaint.json", 1024), "moss": ("moss-image-inpaint.json", 1216)}   # workflow, base res.
 VARIANTS = {"A": "as today (overlap 48)", "B": "wide (overlap 128)", "C": "wide + seam correction",
             "D": "wide + seam correction + weak second run on the border"}
 OVERLAP = {"A": 48, "B": 128}
@@ -82,8 +82,8 @@ class Runner:
         self.out = out
 
     def expand(self, model, c, keep, mask, prompt, seed, denoise=1.0, seam=False):
-        """One Expand run as the bridge does it (crop around the mask, model, colour match, scale back, layer mask)."""
-        wf_name, base, match = MODELS[model]
+        """One Expand run as the bridge does it (crop around the mask, model, scale back, layer mask)."""
+        wf_name, base = MODELS[model]
         wf = str(ROOT / "workflows" / wf_name)
         W, H = c.size
         mult = workflows.size_multiple(workflows.load_template(wf))
@@ -101,8 +101,6 @@ class Runner:
         hist = self.b._wait(self.b.comfy.queue(graph), graph, wf, 0, 1, "", lambda *a, **k: None)
         rgb = self.b.comfy.output_images(hist, out_node)[0].convert("RGB")
         small = mask.crop(region.pil()).resize(rgb.size, Image.BILINEAR)
-        if match > 0:
-            rgb = imaging.match_saturation(rgb, crop, small.point(lambda v: 255 if v > 127 else 0), match)
         if seam:
             rgb = imaging.seam_correct(rgb, crop, small)
         full = imaging.to_rgb(c).copy() if denoise < 1.0 else c.convert("RGB").copy()

@@ -48,7 +48,7 @@ STAGE_AFTER_S = 2.0       # a step other than sampling gets its own word in the 
 STAGE_LABELS = (          # (class name prefix, word); the first match wins
     ("SeedVR2", "Restoring detail"),
     ("VAEEncode", "Encoding"), ("VAEDecode", "Decoding"),
-    ("UNETLoader", "Loading models"), ("CLIPLoader", "Loading models"), ("VAELoader", "Loading models"),
+    ("UNETLoader", "Loading models"), ("UnetLoaderGGUF", "Loading models"), ("CLIPLoader", "Loading models"), ("VAELoader", "Loading models"),
     ("CheckpointLoader", "Loading models"), ("LoraLoader", "Loading models"), ("AUSBOSS_NODES_LoraLoader", "Loading models"),
     ("AUSBOSS_NODES_TiledUpscale", "Cutting tiles"),
 )
@@ -109,7 +109,6 @@ class Request:
     ref_mp: float = 2.0
     refs: list = field(default_factory=list)     # Multi Image Edit: the reference images (PIL, RGB or RGBA); image 1 is the picture, these are 2, 3 ...
     loras: list = field(default_factory=list)   # extra LoRAs [(file name, strength), ...] chained in front of the samplers
-    match: float = 0.0                   # 0..1: pull colours that are louder than the surroundings back towards them (Fill / Expand / Reference)
     sharpen: float = 0.0                 # 0..1: a light sharpening of the result (high-pass style, like KJNodes' Image Sharpen)
     seam: bool = False                   # Fill / Remove / Expand: seam correction as an A/B test, each result twice
     #                                      ("[seam fix]" on top, "[raw]" hidden below it; imaging.seam_correct)
@@ -841,9 +840,6 @@ class Bridge:
         # the soft mask's density in PhotoCraft (the slider; every function starts at 100 % since the Fill mask test
         # round 30.10.); 100 % = the mask as it is, nothing to set
         density = int(req.mask_density) if (layer_mask is not None and req.mask_density < 100) else None
-        sel_small = None   # the new area in the size the model drew it, for "match colours"
-        if req.match > 0 and req.mode in ("inpaint", "outpaint") and mask is not None and results and results[0][1]:
-            sel_small = mask.crop(region.pil()).resize(results[0][1][0].size, Image.NEAREST)
         outside_small = None   # BBOX: the part of the picture beyond the layer mask, in the size the model drew it (colour reference)
         if obj_box is not None and results and results[0][1]:
             far = imaging.box_margin_mask(obj_box, (W, H), BBOX_MARGIN + 0.1, 0.0)
@@ -871,8 +867,6 @@ class Bridge:
             for n, g in enumerate(reversed(range(len(items)))):
                 label, i, raw, count = items[g]
                 rgb = raw.convert("RGB")
-                if req.match > 0 and sel_small is not None:
-                    rgb = imaging.match_saturation(rgb, crop_plain, sel_small, req.match)
                 if outside_small is not None:     # BBOX: Flux 3 redraws the whole picture with slightly different colours
                     rgb = imaging.match_outside(rgb, crop_plain, outside_small)
                 # A/B: the raw result first (it ends up hidden below), then the corrected one on top of it;
@@ -1031,9 +1025,11 @@ class Bridge:
 
     # ---------- cut-out (reference slots) ----------
 
-    def remove_background(self, im: Image.Image, progress: Progress | None = None, workflow: str | Path | None = None) -> Image.Image:
+    def remove_background(self, im: Image.Image, progress: Progress | None = None, workflow: str | Path | None = None,
+                          crop: bool = True) -> Image.Image:
         """The picture with its background cut away (RGBA), made by ComfyUI's own BiRefNet nodes (birefnet-remove-bg.json,
-        model `birefnet.safetensors` in models/background_removal). Used by the reference slots: it needs no PhotoCraft."""
+        model `birefnet.safetensors` in models/background_removal). Used by the reference slots: it needs no PhotoCraft.
+        `crop`: the result ends at the subject (slots); the footer's Remove background keeps the full size (crop=False)."""
         progress = progress or (lambda f, m, **kw: None)
         self._cancel.clear()
         wf = Path(workflow) if workflow else workflows.BIREFNET_WORKFLOW
@@ -1044,7 +1040,42 @@ class Bridge:
         hist = self._queue_wait(graph, wf, progress)
         out = self.comfy.output_images(hist, out_node)[0]
         progress(1.0, "Background removed")
-        return imaging.crop_to_alpha(out.convert("RGBA"))      # the picture ends at the subject's outermost pixels (user 1.11.)
+        out = out.convert("RGBA")
+        return imaging.crop_to_alpha(out) if crop else out      # the picture ends at the subject's outermost pixels (user 1.11.)
+
+    def remove_background_layer(self, progress: Progress | None = None) -> dict:
+        """The footer's scissors (user 5.11.): the visible picture of the active document without its background, as a new
+        layer on top (full canvas size, transparent where the background was). The layers below stay as they are; one
+        snapshot makes Undo possible like after a run."""
+        progress = progress or (lambda f, m, **kw: None)
+        try:
+            pc = self.pc.connect()
+            sess = pc.session()
+            orig = sess.get("active")
+            if orig is None:
+                raise BridgeError("Open a document in PhotoCraft first.")
+            tag = uuid.uuid4().hex[:8]
+            progress(0.02, "Reading the picture", phase="prepare")
+            img, _ = self._export(orig, tag, need_mask=False)
+            cut = self.remove_background(img, progress, crop=False)
+            if cut.size != img.size:
+                raise BridgeError(f"The cut-out has another size than the picture ({cut.size} against {img.size}).")
+            progress(0.95, "Placing the layer", phase="place")
+            self._snapshot(sess["documents"][orig]["name"])
+            above = None        # a group on top would take the copy into itself (see _run): out of it, above it
+            try:
+                top = pc.document()["layers"][0]
+                self._try("layer.select", {"layer": top["id"]})
+                above = top["id"] if top.get("kind") == "Group" else None
+            except (KeyError, IndexError, TypeError, PhotoCraftError):
+                pass
+            layer = self._import(orig, cut, imaging.Box(0, 0, img.width, img.height), "hard", "Background removed", tag, 0, above=above)
+            progress(1.0, "Background removed", phase="place")
+            return {"layer": layer, "size": list(img.size)}
+        except PhotoCraftError as e:
+            raise BridgeError(str(e)) from None
+        finally:
+            self._cleanup()
 
     def describe_image(self, im: Image.Image, progress: Progress | None = None, question: str = "",
                        workflow: str | Path | None = None, clip: str = "", seed: int | None = None) -> str:

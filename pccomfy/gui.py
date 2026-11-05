@@ -112,7 +112,6 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.v_easy = tk.BooleanVar(value=self._easy)
         self.v_model = tk.StringVar(value=g("model", ""))   # the tab; "" = a workflow of your own (everything enabled)
         self.v_sharpen = tk.DoubleVar(value=g("sharpen", 0.0))
-        self.v_match = tk.DoubleVar(value=g("match", 0.0))
         self.v_cmp_res = tk.StringVar(value="")
         self.v_cmp_ctx = tk.StringVar(value="")
         self.v_stage = tk.BooleanVar(value=g("stage_on", True))
@@ -251,7 +250,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.f_adv = ttk.Frame(r)
         self.adv_body = ttk.Frame(self.f_adv)
         self.adv_body.columnconfigure(1, weight=1)
-        # the finishing options at the top of "Advanced settings": Sharpen, Match colours, Edge feather, Layer mask
+        # the finishing options at the top of "Advanced settings": Sharpen, Edge feather, Layer mask
         self.f_post = ttk.Frame(self.adv_body)
         self.f_post.grid(row=0, column=0, columnspan=2, sticky="ew")
         # Workflow is not shown: the model tabs choose the workflow and its settings (the widgets stay, the code
@@ -414,16 +413,6 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         Tooltip(self.w_sharpen, "Sharpens the finished result a little. 0 = off.")
         self._on_sharpen()
         self._sharp_widgets = (lb_sharp, self.w_sharpen, self.lbl_sharpen)   # hidden in Expand image
-        lb_match = ttk.Label(self.f_sharp, text="Match colours", style="Muted.TLabel")
-        lb_match.grid(row=1, column=0, sticky="w", pady=(2, 0))
-        self.w_match = Slider(self.f_sharp, scale=self.ui, from_=0.0, to=1.0, variable=self.v_match, command=self._on_match,
-                              length=self._px(SLIDER_W))
-        self.w_match.grid(row=1, column=1, sticky="e", padx=8, pady=(2, 0))
-        self.lbl_match = ValueBox(self.f_sharp, self.w_match, self._on_match, factor=100)
-        self.lbl_match.grid(row=1, column=2, sticky="e", pady=(2, 0))
-        self._match_widgets = (lb_match, self.w_match, self.lbl_match)   # shown only where the function can use them
-        Tooltip(self.w_match, "Pulls the new area's saturation back towards its surroundings. 0 = off.")
-        self._on_match()
         self.f_neg = ttk.Frame(r)
         self.f_neg.pack(fill="x")     # no negative prompt in the window (user 2.11.): an empty frame, only the others are packed after it
         self.f_enh.pack(fill="x", padx=10, pady=(6, 0))     # the LLM row: directly under the negative prompt (user 30.10.)
@@ -543,7 +532,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
             Tooltip(lb, tips[lbl])
             Tooltip(sp, tips[lbl])
         # Context: a slider like the others (0 to 1 in steps of 0.05, shown as 0 to 100 % in steps of 5 %, user 29.10.),
-        # between Match colours and Edge feather (the user's order, 28.10.); shown for Fill, Remove and Expand only (see
+        # between Sharpen and Edge feather (the user's order, 28.10.); shown for Fill, Remove and Expand only (see
         # _update_availability)
         fc = ttk.Frame(self.f_post)
         self.f_ctx = fc
@@ -673,6 +662,9 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.b_copy_canvas = ttk.Button(foot, image=self._icon("copy", px=FOOT_BTN_PX), style="Link.TButton", command=self.copy_canvas)
         self.b_copy_canvas.pack(side="right", padx=(6, 0))
         Tooltip(self.b_copy_canvas, "Copy canvas to clipboard: the visible layers of the picture in PhotoCraft as one image.")
+        self.b_cut = ttk.Button(foot, image=self._icon("cut", px=FOOT_BTN_PX), style="Link.TButton", command=self.cut_background)
+        self.b_cut.pack(side="right", padx=(6, 0))     # the scissors: left of the clock (user 5.11.)
+        self.tt_cut = Tooltip(self.b_cut, CUTOUT_TIP)
         self.b_history = ttk.Button(foot, image=self._icon("clock", px=FOOT_BTN_PX), style="Link.TButton", command=self._history_menu)
         self.b_history.pack(side="right", padx=(6, 0))
         Tooltip(self.b_history, "Last runs: click one to load all its settings with a new seed. Nothing starts by itself.")

@@ -327,6 +327,34 @@ def test_rows_sorted_by_kind():
         assert all(v == sorted(v, key=("required", "optional").index) for v in levels.values()), r["key"]
 
 
+def test_gguf_loader():
+    """A GGUF file linked for a model's file (the chain in the gear window): the graph gets ComfyUI-GGUF's loader (user 5.11.)."""
+    lists = full_lists()
+    lists["unet"] = lists["unet"] + ["krea2_turbo-Q3_K_M.gguf"]
+    mapping = {"krea2_turbo_int8_convrot.safetensors": "krea2_turbo-Q3_K_M.gguf"}
+    nodes = {"UNETLoader", "UnetLoaderGGUF", "VAELoader"}
+    g = {"1": {"class_type": "UNETLoader", "inputs": {"unet_name": "krea2_turbo_int8_convrot.safetensors", "weight_dtype": "default"}},
+         "2": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux3-image-klein-int8-convrot.safetensors", "weight_dtype": "default"}}}
+    inv = inventory.Inventory(lists, nodes=nodes, mapping=mapping)
+    assert inv.has("krea2_turbo_int8_convrot.safetensors")           # the linked GGUF counts as the file
+    assert inv.apply_names(g) == 2
+    assert g["1"] == {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "krea2_turbo-Q3_K_M.gguf"}}, g["1"]
+    assert g["2"]["class_type"] == "UNETLoader" and g["2"]["inputs"]["weight_dtype"] == "default"      # a normal file is left alone
+    assert inv.apply_names(g) == 0
+    # without the ComfyUI-GGUF pack the loader class is reported missing
+    g2 = {"1": {"class_type": "UNETLoader", "inputs": {"unet_name": "krea2_turbo_int8_convrot.safetensors"}}}
+    files, classes = inventory.Inventory(lists, nodes={"UNETLoader"}, mapping=mapping).check_workflow(g2)
+    assert not files and classes == ["UnetLoaderGGUF"], (files, classes)
+    # reading ComfyUI: the GGUF loader's own list is added to the diffusion models (no duplicates)
+    class C(FakeComfy):
+        def _json(self, path, payload=None):
+            if path.endswith("/UnetLoaderGGUF"):
+                return {"UnetLoaderGGUF": {"input": {"required": {"unet_name": [["krea2_turbo-Q3_K_M.gguf", "flux-2-klein-9b-Q4_K_M.gguf"], {}]}}}}
+            return super()._json(path, payload)
+    raw = C({**full_lists(), "unet": ["a.safetensors"]}).inventory_raw()
+    assert raw["unet"] == ["a.safetensors", "krea2_turbo-Q3_K_M.gguf", "flux-2-klein-9b-Q4_K_M.gguf"], raw["unet"]
+
+
 def main():
     test_manifest()
     test_checksums()
@@ -337,6 +365,7 @@ def main():
     test_rows_sorted_by_kind()
     test_graph_names()
     test_comfy_reading()
+    test_gguf_loader()
     test_settings()
     print("ok")
 
