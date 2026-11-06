@@ -45,7 +45,7 @@ def main():
     app.w_feather.configure(state="normal")
     app.v_feather.set(0)
     app._on_feather()
-    assert app.lbl_feather.cget("text") == "hard edge"
+    assert app.lbl_feather.cget("text") == "hard"
     app.lbl_feather.configure(text="hard3 edge")        # a digit typed into "hard edge"
     app.lbl_feather._commit()
     assert app.v_feather.get() == 3

@@ -41,7 +41,7 @@ def main():
     assert not any(n["class_type"] == "TextGenerate" for n in off.values()) and links_ok(off)
     assert next(n for n in off.values() if n["class_type"] == "CLIPTextEncode")["inputs"]["text"] == "a fox"
     assert workflows.writer_name(workflows.load_template(ROOT / "workflows" / "moss-image-t2i.json")) == "Qwen 3.5 9B"
-    assert workflows.writer_name(workflows.load_template(ROOT / "workflows" / "fibo2-edit.json")) == "Qwen 3.5 9B"
+    assert workflows.writer_name(workflows.load_template(ROOT / "workflows" / "fibo2-edit.json")) == "Qwen3-VL 4B"      # the smallest text encoder writes Fibo's prompt (user 6.11.)
     # Qwen text to image has a workflow of its own (no input picture) with the MOSS text model as prompt enhancer
     q = workflows.load_template(ROOT / "workflows" / "qwen-image-21-t2i.json")
     assert links_ok(q) and not bridge.has_tag(q, "image") and bridge.has_tag(q, "latent") and workflows.writer_name(q) == "Qwen 3.5 9B"

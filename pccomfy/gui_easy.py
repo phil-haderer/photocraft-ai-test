@@ -108,6 +108,7 @@ class EasyMixin:
         for w in (self.f_neg, self.f_enh, self.f_opts, self.f_adv, self.b_describe, self.f_models, self.b_llm, self.f_pchoice,
                   self.b_reset):
             w.pack_forget()
+        self.f_opts.grid_forget()          # the switch box may sit in the Advanced settings (gui_lora._opts_in_advanced)
         self._update_styles_button()     # the Styles button stays (user 1.11.), now beside the bin
         self._update_std_switch()
         mode = self.v_mode.get()
@@ -125,12 +126,10 @@ class EasyMixin:
         self.f_models.pack(fill="x", pady=(6, 0))
         for w in (self.f_scale, self.f_opts, self.f_enh):
             w.pack_forget()
+        self.f_opts.grid_forget()
         self.f_neg.pack(fill="x", before=self.sep_status)      # empty: no negative prompt in the window (user 2.11.)
         self.f_adv.pack(fill="x", padx=10, pady=4, before=self.sep_status)
-        if self._styles_shown:           # LLM goes between the bin and the Styles button again
-            self.b_llm.pack(side="right", padx=(0, 6), before=self.b_styles)
-        else:
-            self.b_llm.pack(side="right", padx=(0, 6))
+        self.b_llm.pack(side="left", padx=(0, 6), before=self.b_styles if self._styles_shown else self.b_clear)     # row: Describe Canvas, Styles, Delete
         self._update_styles_button()
         self.f_pchoice.pack(side="left", padx=(10, 0))
         self._update_std_switch()
@@ -248,6 +247,7 @@ class EasyMixin:
                     pass
         frame.bind("<Configure>", follow)
 
+        label(em.TAB_HEAD, "head", pady=(0, 4))      # a headline like "Linked files" (user 6.11.)
         label(em.TAB_INFO, pady=(0, 8))
         if self.inv is None:
             label("ComfyUI could not be read. Start ComfyUI, then click the refresh arrow (⟳) at the bottom of the plugin.", "bad")
@@ -266,8 +266,6 @@ class EasyMixin:
                 label("Nothing left to download for now." + (" Restart ComfyUI and click the refresh arrow (⟳) to list what is loaded."
                                                             if any(f.name in self._dl_restart for f in missing) else ""), "muted", pady=(0, 6))
         states = {row["key"]: row["status"].state for row in self.inv.rows()}
-        if em.starter_ready(lambda k: states.get(k) == "ready"):
-            label(em.TAB_READY, "ok", pady=(0, 6))
         for row in self.inv.rows():
             if row["key"] not in em.STARTER_MODELS:
                 continue
@@ -287,7 +285,9 @@ class EasyMixin:
                 label(em.TAB_FLUX3_NOTE, "note", pady=(0, 2))
             for f in (f for f in missing if any(f is x for x, _fd, _lv in row["files"])):
                 self._easy_file_row(box, f)
-        label(em.TAB_MORE, "muted", pady=(16, 0))
+        if em.starter_ready(lambda k: states.get(k) == "ready"):      # below the models list (user 6.11.)
+            label(em.TAB_READY, "ok", pady=(16, 0))
+        label(em.TAB_MORE, "muted", pady=(2 if em.starter_ready(lambda k: states.get(k) == "ready") else 16, 0))
         names = [f.name for f in missing]
         if not any(n in self._dl for n in names):       # only while a download runs (user 2.11.)
             return

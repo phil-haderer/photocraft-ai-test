@@ -171,8 +171,8 @@ class TipsMixin:
 
         box = ttk.Frame(win)
         box.pack(fill="both", expand=True, padx=self._keep(14), pady=self._keep(12))
-        ttk.Label(box, text="Tip of the day", font=font(10, bold=True), foreground=ACCENT_TEXT).pack(anchor="w")
-        self._tip_label = ttk.Label(box, text=text, wraplength=self._px(POPUP_WRAP), justify="left", font=font(10))
+        ttk.Label(box, text="Tip of the day", font=font(10, bold=True), foreground="#ffffff").pack(anchor="w")      # H2, white (user 6.11.)
+        self._tip_label = ttk.Label(box, text=text, wraplength=self._px(POPUP_WRAP), justify="left", font=font(9))
         self._tip_label.pack(anchor="w", pady=(self._keep(8), self._keep(12)))
         row = ttk.Frame(box)
         row.pack(fill="x")

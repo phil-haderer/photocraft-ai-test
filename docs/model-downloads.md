@@ -24,7 +24,6 @@ answers "401" until then.
 | qwen3vl_8b_int8_convrot.safetensors | text_encoders | 9.4 GB | [Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors) (also Qwen3-VL) | Apache 2.0 | no |
 | qwen3.5_9b_w4a8_gptq.safetensors | text_encoders | 7.3 GB | [Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_w4a8_gptq.safetensors) | Apache 2.0 | no |
 | qwen3.5_9b_int8_convrot.safetensors | text_encoders | 9.7 GB | [Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_int8_convrot.safetensors) | Apache 2.0 | no |
-| qwen3vl_4b_fp8_scaled.safetensors | text_encoders | 5.2 GB | [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_fp8_scaled.safetensors) (also Qwen3-VL) | Apache 2.0 | no |
 | flux2-vae.safetensors | vae | 336 MB | [Comfy-Org/Flux-2-Dev](https://huggingface.co/Comfy-Org/Flux-2-Dev/resolve/main/split_files/vae/flux2-vae.safetensors) | repo: FLUX dev non-commercial | no |
 | flux2-vae_small.safetensors | vae | 250 MB | [Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/vae/flux2-vae_small.safetensors) | Apache 2.0 | no |
 | qwen_image_2.1_vae_bf16.safetensors | vae | 676 MB | [Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors) | Qwen research licence | no |

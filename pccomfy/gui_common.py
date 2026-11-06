@@ -244,9 +244,14 @@ def icon_image(root, kind: str, color: str):
     return img
 
 
-def conn_status(parent, name: str = "ComfyUI"):
-    """'ComfyUI' and a dot after it (footer and settings window): returns (frame, dot); set_dot colours the dot."""
+def conn_status(parent, name: str = "ComfyUI", dot_first: bool = False):
+    """'ComfyUI' and a dot after it (settings window), or in front of it (footer, user 6.11.): returns (frame, dot); set_dot colours the dot."""
     f = ttk.Frame(parent)
+    if dot_first:
+        dot = ttk.Label(f, text="●", style="ConnBad.TLabel")
+        dot.pack(side="left", padx=(0, 3))
+        ttk.Label(f, text=name, style="Muted.TLabel").pack(side="left")
+        return f, dot
     ttk.Label(f, text=name, style="Muted.TLabel").pack(side="left")
     dot = ttk.Label(f, text="●", style="ConnBad.TLabel")
     dot.pack(side="left", padx=(3, 0))
@@ -512,7 +517,7 @@ class Slider(tk.Canvas):
         return "break"
 
 
-VALUE_W = 9        # characters of a slider's value box: "hard edge" fits, so every slider row has the same length
+VALUE_W = 6        # characters of a slider's value box: "100 %" and "hard" fit, so every slider row has the same length (was 9 until 6.11.)
 SLIDER_W = 140     # px (before the display scaling) of every slider: all of them sit in one column on the right
 
 
@@ -745,7 +750,7 @@ CUTOUT_TIP = ("Remove background: cuts the subject out of the visible picture an
 CUTOUT_MISSING = "birefnet.safetensors is missing (optional file): download it in the gear window, Models, Additional."
 NO_SHARPEN_MODES = ("outpaint", "inpaint", "remove")   # no "Sharpen result" slider and none applied: Expand, Fill, Remove (user 28.10. / 5.11.)
 NO_LLM_MODES = ("outpaint", "remove") + SCALE_MODES   # no "Enhance prompt with LLM" row: fixed or ready-made prompts (user 30.10.)
-LLM_TIP = "Describes the picture in PhotoCraft and adds the text to the end of your prompt. Ctrl+Z undoes it."   # the Describe Canvas button (user 3.11.)
+LLM_TIP = "Describe Canvas: describes the picture in PhotoCraft and adds the text to the end of your prompt. Ctrl+Z undoes it."   # the Describe Canvas button (user 3.11.)
 STYLES_TIP = "Style prompts"
 V10_WORKFLOW = "moss-image-inpaint-v10.json"      # MOSS Fill as published (MOSS Inpainting v10), test switch next to Prompt
 V10_TIP = ("Test: runs MOSS Inpainting v10 as published instead of the edit LoRA. Its graph crops around the selection "
@@ -804,7 +809,7 @@ def sweep_requests(req: Request, res_list: list, ctx_list: list) -> list[Request
 
 
 PREVIEW_MAX_H = 210  # the live preview is at most this high before the display scaling, landscape too (a tall picture gets narrower; user 30.10.: 300 was too high, now 70 %)
-MIN_W = 380  # the window's fixed width (it cannot be resized; the height follows the content)
+MIN_W = 333  # the window's fixed width (it cannot be resized; the height follows the content); 380 until 6.11. (now: the model chips, 3 columns of "Fibo 2.0 Edit Turbo", need 555 px at 175 %)
 
 
 __all__ = [

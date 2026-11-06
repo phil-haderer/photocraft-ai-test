@@ -139,6 +139,12 @@ def main():
             assert bool(app.lbl_canvas.winfo_manager()) is (mode == "txt2img"), (model, mode)
             assert str(app.cb_native.cget("text")) == "Original size, up to"
             assert str(app.lbl_canvas.cget("text")) == "Use canvas size up to"
+            # font like the other Advanced settings (Muted, 9 pt), and the box only as wide as "x.x" (user 6.11.)
+            assert str(app.cb_native.cget("style")) == "Muted.TCheckbutton" and str(app.lbl_canvas.cget("style")) == "Muted.TLabel"
+            assert int(app.w_native_mp.cget("width")) == 3
+            # "Custom LoRAs" (no colon) is the last block of the Advanced settings (user 6.11.)
+            last = int(app.f_xl.grid_info()["row"])
+            assert all(int(w.grid_info()["row"]) < last for w in app.adv_body.grid_slaves() if w is not app.f_xl)
             assert all(("canvas" in t.text) == (mode == "txt2img") for t in app.tt_native), (model, mode)
     # "Send reference images in original size, up to N MP" (Multi Image Edit): on at every start with 2 MP for all models, the MP box follows the tick
     for model in ("flux3", "flux2", "qwen", "fibo"):
@@ -147,7 +153,7 @@ def main():
         app._on_model()
         settle(app)
         assert app.v_ref_native.get() is True and float(app.v_ref_mp.get()) == 2.0, (model, app.v_ref_native.get(), app.v_ref_mp.get())
-        assert str(app.w_refpx.cget("state")) == "normal" and str(app.cb_refsize.cget("text")) == "Send reference images in original size, up to"
+        assert str(app.w_refpx.cget("state")) == "normal" and str(app.cb_refsize.cget("text")) == "Send ref. images in original size, up to"
         app.v_ref_native.set(False)
         assert str(app.w_refpx.cget("state")) == "disabled"
         app.v_ref_native.set(True)

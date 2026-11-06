@@ -63,6 +63,14 @@ def main():
     hints = st._link_hints(real.name, ["renamed.safetensors", "samesize-junk.safetensors", "ghost.safetensors"])
     assert hints == {"renamed.safetensors": ui_settings.HINT_SAME + real.name}, hints
     assert "ghost.safetensors" not in hints                     # a file that is not in the models folder: no hint
+    # in the menu the hint stays only for a file that equals ANOTHER manifest file; a copy of the expected one is left out
+    # (the line "This is probably the right file" says it), "incomplete?" always stays
+    other = manifest.File("test-other-vae.safetensors", "vae", size=size)
+    manifest.FILES[other.name] = other
+    assert st._menu_hints(real.name, {"renamed.safetensors": ui_settings.HINT_SAME + real.name}) == {}
+    assert st._menu_hints(other.name, {"renamed.safetensors": ui_settings.HINT_SAME + real.name}) == {"renamed.safetensors": ui_settings.HINT_SAME + real.name}
+    assert st._menu_hints(real.name, {"h.safetensors": ui_settings.HINT_INCOMPLETE}) == {"h.safetensors": ui_settings.HINT_INCOMPLETE}
+    del manifest.FILES[other.name]
 
     # a half-finished copy says so
     make(base / "vae" / "half.safetensors", {"w": ("F16", [2], 4)}, cut=2)

@@ -100,11 +100,9 @@ _LIST = [
          "licence: Apache 2.0", size=7343591088),
     File("qwen3.5_9b_int8_convrot.safetensors", "clip", _MOSS + "text_encoders/qwen3.5_9b_int8_convrot.safetensors",
          "licence: Apache 2.0", size=9748121532),
-    File("qwen3vl_4b_fp8_scaled.safetensors", "clip", _KREA2 + "text_encoders/qwen3vl_4b_fp8_scaled.safetensors",
-         "also in Comfy-Org/Qwen3-VL", size=5242467968),
     # VAEs
     File("flux2-vae.safetensors", "vae", _HF + "Comfy-Org/Flux-2-Dev/resolve/main/split_files/vae/flux2-vae.safetensors",
-         "the copies in the Klein, MOSS and Fibo repos differ by a few bytes (file header) and work too", size=336213556),
+         "", size=336213556),      # no note (user 6.11.): it is the one link for Flux 2, Flux 3 and Fibo; a copy from another repo is found by the "same size and header" hint
     File("flux2-vae_small.safetensors", "vae", _MOSS + "vae/flux2-vae_small.safetensors", "licence: Apache 2.0", size=249521340),
     File("qwen_image_2.1_vae_bf16.safetensors", "vae", _QWEN21 + "vae/qwen_image_2.1_vae_bf16.safetensors",
          "licence: Qwen research licence", size=675509688),
@@ -162,7 +160,6 @@ _SHA256 = {
     'qwen3vl_8b_int8_convrot.safetensors': "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f",
     'qwen3.5_9b_w4a8_gptq.safetensors': "4cc6a1543ad2061806da46f35f90cadb4801dcba246c44782cf42ec0feb6407c",
     'qwen3.5_9b_int8_convrot.safetensors': "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a",
-    'qwen3vl_4b_fp8_scaled.safetensors': "54bd5144df0bbc25dd6ccadfcb826b521445a1b06ae5a42570bdd2974ca87094",
     'flux2-vae.safetensors': "d64f3a68e1cc4f9f4e29b6e0da38a0204fe9a49f2d4053f0ec1fa1ca02f9c4b5",
     'flux2-vae_small.safetensors': "d8d52ba036475f5fb07c8b435e176d3d97ebfa82f0d1a1c317f9cc1e25bd013b",
     'qwen_image_2.1_vae_bf16.safetensors': "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9",
@@ -201,7 +198,7 @@ _ULTRA = ("Flux 2\\ultra_real_v4.safetensors",)
 _UPSAMPLER = "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"
 _TAEF2 = "taef2_decoder.pth"           # live preview of the Flux 2 latent: Flux 2, Flux 3, Fibo, MOSS
 DESCRIBE_FALLBACK = "qwen3.5_9b_int8_convrot.safetensors"     # the LLM button and "Describe" in the reference slots (user 30.10.)
-_CUT = ModeSpec(optional=("birefnet.safetensors", DESCRIBE_FALLBACK))     # Multi Image Edit: "Cut out" and "Describe" in the reference slots
+_CUT_OWN_LLM = ModeSpec(optional=("birefnet.safetensors",))     # the same without the 9B fallback, for every model: the 9B fallback is no longer listed anywhere (Fibo, Flux 3 and Qwen 6.11., Flux 2 6.11. evening)
 
 TABS: dict[str, TabSpec] = {
     "flux3": TabSpec(
@@ -215,18 +212,18 @@ TABS: dict[str, TabSpec] = {
             "upscale": ModeSpec(requires=("Flux 3\\flux-3-image-klein-restore.safetensors", "4x-UltraSharpV2.safetensors"),
                                 optional=("seedvr2_3b_int8_convrot.safetensors", "seedvr2_ema_vae_fp16.safetensors")),
             "refine": ModeSpec(),   # the edit graph with the picture rescaled to its own size: no files of its own
-            "multi_edit": _CUT,
+            "multi_edit": _CUT_OWN_LLM,      # no 9B fallback file in the list (user 6.11.)
         },
-        optional=(_TAEF2, DESCRIBE_FALLBACK)),
+        optional=(_TAEF2,)),
     "flux2": TabSpec(
         required=("flux-2-klein-9b_int8_convrot.safetensors", "qwen_3_8b_fp8mixed.safetensors", _UPS),
         modes={
-            "txt2img": ModeSpec(optional=(_UPSAMPLER,)),
+            "txt2img": ModeSpec(optional=("qwen3vl_4b_int8_convrot.safetensors",)),      # the prompt writer: Qwen3-VL 4B (user 6.11.; the Flux 3 upsampler before)
             "upscale": ModeSpec(requires=_ULTRA),
             "refine": ModeSpec(requires=_ULTRA),
-            "multi_edit": _CUT,
+            "multi_edit": _CUT_OWN_LLM,      # no 9B fallback file in the list (user 6.11.)
         },
-        optional=(_TAEF2, DESCRIBE_FALLBACK)),
+        optional=(_TAEF2,)),
     "qwen": TabSpec(
         required=("qwen_image_2.1_int8_convrot.safetensors", "qwen_image_2.1_vae_bf16.safetensors"),
         modes={
@@ -234,24 +231,24 @@ TABS: dict[str, TabSpec] = {
             "edit": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
             "inpaint": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
             "outpaint": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
-            "multi_edit": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",), optional=_CUT.optional),   # runs the edit graph
+            "multi_edit": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",), optional=_CUT_OWN_LLM.optional),   # runs the edit graph; no 9B fallback file in the list (user 6.11.)
             "remove": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
             "upscale": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
             "refine": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
         },
-        optional=("qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors", "taeqi2_1_decoder.pth", DESCRIBE_FALLBACK)),
+        optional=("qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors", "taeqi2_1_decoder.pth")),      # no 9B int8 fallback in the list (user 6.11.): Describe uses the w4a8 writer of Qwen Text to image
     "fibo": TabSpec(
         required=("fibo2_edit_turbo_int8_convrot.safetensors", "qwen3vl_4b_int8_convrot.safetensors", _UPS),
-        modes={"multi_edit": _CUT},
-        optional=(DESCRIBE_FALLBACK, _TAEF2)),      # the prompt writer (LLM prompt enhancement) and the LLM button
+        modes={"multi_edit": _CUT_OWN_LLM},      # Fibo describes with its own 4B writer (user 6.11.): the 9B file is not listed
+        optional=(_TAEF2,)),
     "krea2": TabSpec(
-        required=("krea2_turbo_int8_convrot.safetensors", "qwen3vl_4b_fp8_scaled.safetensors", "qwen_image_vae.safetensors"),
-        optional=("lighttaew2_1.safetensors", DESCRIBE_FALLBACK)),          # live preview of the Wan 2.1 latent
+        required=("krea2_turbo_int8_convrot.safetensors", "qwen3vl_4b_int8_convrot.safetensors", "qwen_image_vae.safetensors"),
+        optional=("lighttaew2_1.safetensors",)),          # live preview of the Wan 2.1 latent; its own 4B writer describes (6.11.)
     "moss": TabSpec(
         required=("moss_image_sft_int8_convrot.safetensors", "qwen3.5_9b_w4a8_gptq.safetensors", "flux2-vae_small.safetensors"),
         # Text to image starts with the UltraReal LoRA on: a file the start values use is required (user 30.10.)
         modes={"txt2img": ModeSpec(requires=("Moss\\lenovo_moss.safetensors",))},
-        optional=("Moss\\lora_dmd2.safetensors", _TAEF2, DESCRIBE_FALLBACK)),
+        optional=("Moss\\lora_dmd2.safetensors", _TAEF2)),      # its own required 9B writer describes (6.11.)
 }
 
 
@@ -303,12 +300,12 @@ def mode_nodes(key: str, mode: str) -> tuple:
 # The "LLM" button under the prompt describes the picture with the text model the chosen model already uses (user 30.10.),
 # so nobody downloads another one. Image input checked live 30.10. for all of these. The last one is the fallback.
 DESCRIBE_WRITERS = {
-    "fibo": (DESCRIBE_FALLBACK,),
+    "fibo": ("qwen3vl_4b_int8_convrot.safetensors",),     # the prompt writer of Fibo 2 too (user 6.11.)
     "qwen": ("qwen3.5_9b_w4a8_gptq.safetensors",),
     "moss": ("qwen3.5_9b_w4a8_gptq.safetensors",),
-    "flux2": ("qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",),
+    "flux2": ("qwen3vl_4b_int8_convrot.safetensors",),     # the Flux 2 prompt writer too (user 6.11.)
     "flux3": ("qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",),
-    "krea2": ("qwen3vl_4b_fp8_scaled.safetensors",),
+    "krea2": ("qwen3vl_4b_int8_convrot.safetensors",),     # the same file as Fibo and Flux 3 (user 6.11.; Krea 2 used the fp8 file before)
 }
 
 
@@ -322,8 +319,35 @@ DESCRIBE_NAMES = {            # short names for the line in the settings
     "qwen3.5_9b_int8_convrot.safetensors": "Qwen 3.5 9B int8 ConvRot",
     "qwen3.5_9b_w4a8_gptq.safetensors": "Qwen 3.5 9B w4a8 GPTQ",
     "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors": "Flux 3 prompt upsampler (Qwen 3.5 9B)",
-    "qwen3vl_4b_fp8_scaled.safetensors": "Qwen3-VL 4B fp8",
+    "qwen3vl_4b_int8_convrot.safetensors": "Qwen3-VL 4B int8 ConvRot",
 }
+
+
+# What the optional files are for, as a short phrase for the heading "Needed for additional features (...)" (user 6.11.)
+FEATURE_USE = {
+    "taef2_decoder.pth": "live preview",
+    "taeqi2_1_decoder.pth": "live preview",
+    "lighttaew2_1.safetensors": "live preview",
+    DESCRIBE_FALLBACK: "LLM button, Describe",
+    "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors": "LLM prompt enhancement",
+    "qwen3.5_9b_w4a8_gptq.safetensors": "LLM prompt enhancement",
+    "qwen3vl_4b_int8_convrot.safetensors": "LLM prompt enhancement, Describe",
+    "birefnet.safetensors": "Cut out, remove background",
+    "qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors": "Turbo LoRA",
+    "Moss\\lora_dmd2.safetensors": "Turbo LoRA",
+    "seedvr2_3b_int8_convrot.safetensors": "SeedVR2 pre-cleaning",
+    "seedvr2_ema_vae_fp16.safetensors": "SeedVR2 pre-cleaning",
+}
+
+
+def feature_uses(names) -> str:
+    """The distinct purposes of these optional files, in order, joined with commas ("live preview, LLM button, Describe")."""
+    out: list[str] = []
+    for n in names:
+        for part in FEATURE_USE.get(n, "").split(", "):
+            if part and part not in out:
+                out.append(part)
+    return ", ".join(out)
 
 
 def describe_line(model_key: str, has) -> str:

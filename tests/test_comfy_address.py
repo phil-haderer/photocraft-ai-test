@@ -128,6 +128,15 @@ def window_tests(u_comfy, u_other):
     assert app.lbl_comfy_mark["text"] == "✓" and "ComfyUI found" in app.lbl_comfy_msg["text"]
     assert app.comfy.url == u_comfy and cfgmod.get_setting("comfyui_url") == u_comfy and app.bridge.comfy is app.comfy
     assert comfyaddr.is_local(app.comfy.url) and app.lbl_comfy_note["text"] == ""
+    # the address that answered is kept in a history (newest first, no doubles) and is the drop-down list of the field (user 6.11.)
+    assert app._url_history()[0] == u_comfy and list(app.cb_comfy_url.cget("values")) == app._url_history()
+    app._url_remember("http://10.0.0.5:8188")
+    app._url_remember(u_comfy)
+    assert app._url_history()[:2] == [u_comfy, "http://10.0.0.5:8188"] and app._url_history().count(u_comfy) == 1
+    for i in range(15):
+        app._url_remember(f"http://10.0.1.{i}:8188")
+    assert len(app._url_history()) == app.URL_HISTORY_MAX
+    assert not app.lbl_comfy_note.winfo_manager(), "no empty line while the note has no text"
     # a click into the field takes the keyboard (the borderless settings window is not always made the active one by Windows)
     from tkinter import ttk
     def find_entry(w):

@@ -30,7 +30,7 @@ class ListPopup:
         self.rows = []
         for text, command, kind in rows:
             lb = tk.Label(inner, text=text, anchor="w", bg=PANEL, fg=MUTED if kind in ("action", "disabled") else FG,
-                          font=font(10), padx=px(10), pady=px(3), cursor="arrow" if kind == "disabled" else "hand2")
+                          font=font(9), padx=px(10), pady=px(3), cursor="arrow" if kind == "disabled" else "hand2")
             lb.pack(fill="x")
             self.rows.append(lb)
             if kind != "disabled":

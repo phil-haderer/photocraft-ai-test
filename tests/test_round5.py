@@ -223,7 +223,7 @@ def main():
     # Flux 2 text to image with the Flux 3 prompt upsampler (the checkbox switches it off)
     from pccomfy import bridge as _b
     f2 = workflows.load_template(t.ROOT / "workflows" / "flux2-klein-t2i.json")
-    assert not _b.mask_is_used(f2) and not _b.has_tag(f2, "image") and workflows.writer_name(f2) == "Qwen 3.5 9B"
+    assert not _b.mask_is_used(f2) and not _b.has_tag(f2, "image") and workflows.writer_name(f2) == "Qwen3-VL 4B"
     on, out = workflows.apply_template(f2, workflows.GenParams(prompt="a fox", seed=3, width=1024, height=768, batch=2), None, None)
     assert next(n for n in on.values() if n["class_type"] == "TextGenerate")["inputs"]["prompt"] == "a fox"
     lat = next(n for n in on.values() if n["class_type"] == "EmptyFlux2LatentImage")["inputs"]
@@ -308,13 +308,24 @@ def main():
 
     # the Upscale factor sits under the LLM row (the negative prompt when that row is hidden), above the LoRA box
     scale_pack = rec(app.f_scale, "pack")
-    pick("flux3", "upscale")
+    pick("flux2", "upscale")
     assert scale_pack and scale_pack[-1][1].get("after") is app._below_prompt(), scale_pack
     packs2 = rec(app.f_opts, "pack")
     app.f_scale.winfo_manager = lambda: "pack"
     app.f_opts.winfo_manager = lambda: ""
     app._update_options_box(True, [])
     assert packs2[-1][1].get("after") is app.f_scale
+    # SeedVR2 (Flux 3 Upscale) and the Turbo LoRA (every Qwen function) sit in the Advanced settings, the rest under the prompt (user 6.11.)
+    for model, mode, adv in (("flux3", "upscale", True), ("qwen", "edit", True), ("qwen", "txt2img", True), ("flux3", "edit", False), ("flux2", "upscale", False), ("moss", "txt2img", False)):
+        pick(model, mode)
+        assert app._opts_in_advanced() is adv, (model, mode)
+    grids = rec(app.f_opts, "grid")
+    lifts = rec(app.f_opts, "lift")
+    pick("qwen", "edit")
+    app.f_opts.winfo_manager = lambda: ""
+    app._update_options_box(True, [])
+    assert grids and grids[-1][1].get("in_") is app.adv_body and grids[-1][1].get("row") == 4, grids
+    assert lifts, "the switch box must be lifted above the Advanced settings (it is no child of adv_body: else it is hidden there)"
 
     # Remove Selection with the name of the object (Flux Klein): the instruction names it; runs.jsonl says what was sent
     import tempfile
@@ -367,7 +378,7 @@ def main():
     app.v_feather.set(4)
     app.lbl_feather.configure(text="hard edge")
     app.lbl_feather._commit()
-    assert app.v_feather.get() == 0 and app.lbl_feather.cget("text") == "hard edge"
+    assert app.v_feather.get() == 0 and app.lbl_feather.cget("text") == "hard"
     app.w_sharpen.configure(state="disabled")
     assert app.lbl_sharpen["state"] == "disabled"           # greyed out with its slider
     app.lbl_sharpen.configure(text="50")

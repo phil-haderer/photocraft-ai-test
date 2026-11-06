@@ -54,6 +54,18 @@ def main():
     pick("qwen", "multi_edit")
     assert log[-1] == "on"
 
+    # the drop-down of the slots (user 6.11.): open at every start; closed it hides the body (slots, size line) and keeps the head
+    body = []
+    app.f_refbody.pack = lambda *a, **k: body.append("on")
+    app.f_refbody.pack_forget = lambda: body.append("off")
+    assert app.v_refs_open.get()
+    app._toggle_refs()
+    assert not app.v_refs_open.get() and body[-1] == "off"
+    app._refs_redraw()                  # a redraw while closed keeps it closed
+    assert body[-1] == "off"
+    app._toggle_refs()
+    assert app.v_refs_open.get() and body[-1] == "on"
+
     # Paste button / Ctrl+V
     img = Image.new("RGB", (40, 30), "red")
     orig = clipboard.read_image
@@ -138,7 +150,7 @@ def main():
     app.lbl_refmsg.pack = lambda *a, **k: packs.append("on")
     app.lbl_refmsg.pack_forget = lambda: packs.append("off")
     app._refs_redraw()
-    assert app.lbl_refmax["text"] == f"Max. images: {app.refslots.max_refs}"
+    assert app.btn_refs["text"] == f"Reference images (max. {app.refslots.max_refs})"
     app._refs_say("x")
     app._refs_say("")
     assert packs[-2:] == ["on", "off"]
@@ -381,13 +393,13 @@ def main():
     pick("flux3", "multi_edit")
     assert seen[0:1] == ["box on"] and app._request().bbox is False and app._hint_text.startswith("Example:")
     assert not hasattr(app, "lbl_refbbox")          # no tip under the slots any more (user 3.11.)
-    assert app.refslots.max_refs == 3 and app.lbl_refmax["text"] == "Max. images: 3"      # Flux 3 with BBOX off: its usual three
+    assert app.refslots.max_refs == 3 and app.btn_refs["text"] == "Reference images (max. 3)"      # Flux 3 with BBOX off: its usual three
     assert not app.lbl_refs.winfo_manager()                                              # no "Reference images (n/n)" header
     app.v_bbox.set(True)
     app._refs_bbox_changed()
-    assert app.refslots.max_refs == 1 and app.lbl_refmax["text"] == "Max. images: 1"      # BBOX ticked: one reference image
+    assert app.refslots.max_refs == 1 and app.btn_refs["text"] == "Reference images (max. 1)"      # BBOX ticked: one reference image
     assert app._request().bbox is True and app._hint_text == refslots.BBOX_TIP     # BBOX ticked: its tip under the prompt instead
-    assert "name the object from the reference image in the prompt" in refslots.BBOX_TIP
+    assert "name the object from the reference image" in refslots.BBOX_TIP
     assert app._request().layer_mask == "soft"      # BBOX: the margin mask, whatever the mode's start value (live finding 30.10.: "none" gave a whole new picture)
     pick("flux3", "edit")
     assert seen[-1] == "box off" and app._hint_text == gui.models.EDIT_TIP

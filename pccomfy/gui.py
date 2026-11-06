@@ -224,7 +224,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
             self.tt_tabs[m.key] = ChipTooltip(rb, m.tip)
             self.rb_tabs[m.key] = rb
         self.m_chip = tk.Menu(self.root, tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT,
-                              activeforeground="#1b1b1b", selectcolor=FG, bd=0, font=font(10))
+                              activeforeground="#1b1b1b", selectcolor=FG, bd=0, font=font(9))
         self.v_chip_fav = tk.BooleanVar(value=False)
 
         # everything under the tabs: hidden while no model is chosen (ui_settings.py). It sits in a Canvas, so it can scroll
@@ -344,19 +344,21 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
 
         self.sep_prompt = ttk.Frame(r, style="Sep.TFrame", height=1)     # a light line above "Prompt"
         self.sep_prompt.pack(fill="x", padx=10, pady=(6, 4))
-        self.f_ptop = ttk.Frame(r)      # "Prompt" and, where a mode has ready-made prompts, radio buttons that fill the field
+        # the icon row over the field (user 6.11.: no heading "Prompt", the field says it), from the left: Describe Canvas, Styles
+        # (only where a mode has styles), Delete; then, where a mode has ready-made prompts, radio buttons that fill the field
+        self.f_ptop = ttk.Frame(r)
         self.f_ptop.pack(fill="x", padx=10)
-        ttk.Label(self.f_ptop, text="Prompt").pack(side="left")
-        self._icons["clear"] = self._icon("trash", px=SMALL_ICON_PX)
-        self.b_clear = ttk.Button(self.f_ptop, image=self._icons["clear"], style="Link.TButton", command=self._clear_prompt)   # flat: the row keeps its height
-        self.b_clear.pack(side="right")
-        Tooltip(self.b_clear, "Delete the prompt (Ctrl+Z in the field brings it back).")
-        # "Describe Canvas" left of the bin (user 30.10., named "LLM" until 3.11.): the model's own text model describes the
+        # "Describe Canvas" (user 30.10., named "LLM" until 3.11., an icon since 6.11.): the model's own text model describes the
         # picture, the text is added to the prompt
-        self.b_llm = ttk.Button(self.f_ptop, text="Describe Canvas", style="Llm.TButton", command=self.describe_canvas)
-        self.b_llm.pack(side="right", padx=(0, 6))
+        self._icons["llm"] = self._icon("describe", px=SMALL_ICON_PX)
+        self.b_llm = ttk.Button(self.f_ptop, image=self._icons["llm"], style="Link.TButton", command=self.describe_canvas)
+        self.b_llm.pack(side="left", padx=(0, 6))
         self.tt_llm = Tooltip(self.b_llm, LLM_TIP)
-        # "Styles" left of "LLM" (user 1.11.): style prompts (styles.json) for the modes that have them, now Text to image; shown by
+        self._icons["clear"] = self._icon("trash", px=round(SMALL_ICON_PX * 0.9))      # 90 % of the other icons of the row (user 6.11.)
+        self.b_clear = ttk.Button(self.f_ptop, image=self._icons["clear"], style="Link.TButton", command=self._clear_prompt)   # flat: the row keeps its height
+        self.b_clear.pack(side="left")
+        Tooltip(self.b_clear, "Delete the prompt (Ctrl+Z in the field brings it back).")
+        # "Styles" between "Describe Canvas" and the bin (user 1.11.): style prompts (styles.json) for the modes that have them, now Text to image; shown by
         # _update_styles_button. A click on an entry replaces the prompt
         self._icons["styles"] = self._icon("palette", px=SMALL_ICON_PX)
         self.b_styles = ttk.Button(self.f_ptop, image=self._icons["styles"], style="Link.TButton", command=self._styles_menu)
@@ -379,6 +381,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         except (TypeError, ValueError):
             lines = PROMPT_LINES
         self.t_prompt = self._text(self.f_prompt, lines)
+        self._build_prompt_placeholder()
         # fills its frame: with fill="x" only it was centred in a frame that still had the old height while the grip was
         # dragged, so its top edge jumped by half a line
         self.t_prompt.pack(side="left", fill="both", expand=True)
@@ -425,13 +428,13 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.t_neg.insert("1.0", self.state.get("negative", d["negative"]))
 
         self.f_xl = ttk.Frame(self.adv_body)       # extra LoRAs: a search box with a drop-down and a strength each (under Advanced)
-        self.f_xl.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        self.f_xl.grid(row=9, column=0, columnspan=2, sticky="ew", pady=(6, 0))     # the very last row of the Advanced settings (user 6.11.)
         self.all_loras: list[str] = []
         self.lora_rows: list[dict] = []
         head = ttk.Frame(self.f_xl)
         head.pack(fill="x")
-        ttk.Label(head, text="Custom LoRAs:", style="Muted.TLabel").pack(side="left")
-        self.b_addlora = ttk.Button(head, text="Add", image=self._icon("plus", MUTED), compound="left", style="Link.TButton",
+        ttk.Label(head, text="Custom LoRAs", style="Muted.TLabel").pack(side="left")
+        self.b_addlora = ttk.Button(head, text="Add", image=self._icon("plus", MUTED, px=round(ICON_PX * 0.85)), compound="left", style="Link.TButton",   # 85 % of the usual icon (user 6.11.)
                                     command=self._add_lora_row)
         self.b_addlora.pack(side="right")
         Tooltip(self.b_addlora, "Adds an extra LoRA (strength 0 to 1.5).")
@@ -467,10 +470,10 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         sm.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(6, 0))
         sm.columnconfigure((1, 3), weight=1)
         ttk.Label(sm, text="Sampler", style="Muted.TLabel").grid(row=0, column=0, sticky="w")
-        self.cb_sampler = ttk.Combobox(sm, textvariable=self.v_sampler, width=10)
+        self.cb_sampler = ttk.Combobox(sm, textvariable=self.v_sampler, width=8)
         self.cb_sampler.grid(row=0, column=1, sticky="ew", padx=6)
         ttk.Label(sm, text="Scheduler", style="Muted.TLabel").grid(row=0, column=2, sticky="w")
-        self.cb_sched = ttk.Combobox(sm, textvariable=self.v_scheduler, width=9)
+        self.cb_sched = ttk.Combobox(sm, textvariable=self.v_scheduler, width=7)
         self.cb_sched.grid(row=0, column=3, sticky="ew", padx=6)
         self.recipe_widgets += [self.cb_sampler, self.cb_sched]
 
@@ -500,7 +503,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.f_scale.columnconfigure(0, weight=1)
         self.f_detail = ttk.Frame(self.f_post)      # Upscale and Refine: under Advanced settings, above "Sharpen result" (user 28.10.)
         self._slider_row(self.f_detail)
-        ttk.Label(self.f_detail, text="Mix Source/New Image", style="Muted.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(self.f_detail, text="Mix Source/New", style="Muted.TLabel").grid(row=0, column=0, sticky="w")
         self.w_detail = Slider(self.f_detail, scale=self.ui, from_=0.0, to=1.0, variable=self.v_detail, command=self._on_detail,
                                length=self._px(SLIDER_W))
         self.w_detail.grid(row=0, column=1, sticky="e", padx=8)
@@ -573,10 +576,11 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         # 1 MP, and comes back without being scaled up (user 4.11.); not for Upscale and Refine, which always work at full size
         nf = self.f_native = ttk.Frame(self.f_post)
         nf.pack(fill="x", pady=(2, 0))
-        self.cb_native = ttk.Checkbutton(nf, text="Original size, up to", variable=self.v_native)
+        # both texts in the font of the other Advanced settings (Muted, 9 pt), the box only as wide as "x.x" (user 6.11.)
+        self.cb_native = ttk.Checkbutton(nf, text="Original size, up to", variable=self.v_native, style="Muted.TCheckbutton")
         self.cb_native.pack(side="left")
-        self.lbl_canvas = ttk.Label(nf, text="Use canvas size up to")      # Text to image: no switch, it always uses the canvas size
-        self.w_native_mp = self._spin(nf, self.v_native_mp, 1, NATIVE_MAX_MP, 0.5, 5)
+        self.lbl_canvas = ttk.Label(nf, text="Use canvas size up to", style="Muted.TLabel")      # Text to image: no switch, it always uses the canvas size
+        self.w_native_mp = self._spin(nf, self.v_native_mp, 1, NATIVE_MAX_MP, 0.5, 3)
         self.w_native_mp.pack(side="left", padx=6)
         self.lbl_native = ttk.Label(nf, text="MP", style="Muted.TLabel")
         self.lbl_native.pack(side="left")
@@ -596,13 +600,13 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.w_variants.pack(side="left", fill="y", padx=(1, 0))
         Tooltip(self.w_variants, "Variants: how many pictures one Generate makes (1 to 8).")
         self.m_variants = tk.Menu(self.root, tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT,
-                                  activeforeground="#1b1b1b", selectcolor=FG, bd=0, font=font(10))
+                                  activeforeground="#1b1b1b", selectcolor=FG, bd=0, font=font(9))
         for n in range(1, 9):
             self.m_variants.add_radiobutton(label=str(n), value=n, variable=self.v_variants)
         self.v_variants.trace_add("write", lambda *a: self._show_variants())
         self._show_variants()
         self.b_stop = ttk.Button(bf, text="Cancel", width=9, command=self.stop, state="disabled")
-        self.b_stop.pack(side="left", fill="y", padx=(6, 0))
+        self.b_stop.pack(side="left", fill="y", padx=(1, 0))      # as close as Generate and the variants (user 6.11.)
         Tooltip(self.b_stop, "Cancel the run (Esc or Ctrl+Alt+Enter). With several variants it ends only the one that is running.")
         # "Cancel all" shows up only while several runs follow one another (variants of Upscale / Refine, a comparison)
         self.b_stop_all = ttk.Button(bf, text="Cancel all", style="Fit.TButton", command=self.stop_all)
@@ -642,14 +646,14 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.lbl_status.pack(side="left", fill="x", expand=True)
         foot = self.f_foot = ttk.Frame(self.root)
         foot.pack(fill="x", side="bottom", padx=10, pady=6)
-        self.lbl_conn, self.lbl_dot = conn_status(foot)        # "ComfyUI ●": green = connected, red = not
+        self.lbl_conn, self.lbl_dot = conn_status(foot, dot_first=True)        # "● ComfyUI": green = connected, red = not (the dot in front, user 6.11.)
         self.lbl_conn.pack(side="left")
         # Refresh = a flat circle arrow beside the dot, Reset = the small button "Reset page" (user 30.10.)
         b_refresh = self.b_refresh = ttk.Button(foot, image=self._icon("refresh", px=GEAR_PX), style="Link.TButton",
                                                 command=self.refresh)
         b_refresh.pack(side="left", padx=FOOT_REFRESH_PADX)
         Tooltip(b_refresh, "Refresh: reads PhotoCraft's and ComfyUI's state again: connection, installed LoRAs, samplers, text models, workflows.")
-        b_reset = self.b_reset = ttk.Button(foot, text="Reset page", style="Small.TButton", command=self._reset_click)
+        b_reset = self.b_reset = ttk.Button(foot, text="Reset page", style="Narrow.TButton", command=self._reset_click)
         b_reset.bind("<ButtonPress-1>", lambda e: setattr(self, "_shift_down", bool(e.state & 0x1)), add="+")     # Shift + click: the standard settings
         b_reset.pack(side="left", padx=FOOT_RESET_PADX)
         Tooltip(b_reset, "Back to the starting settings of the chosen model and function (the ones you saved with a right-click on the model, else the standard ones). Other models and functions keep what they have. Shift + click: always the standard ones, ignoring what you saved.")

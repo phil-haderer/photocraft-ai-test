@@ -26,8 +26,8 @@ class Inv:
 
 
 def manifest_checks():
-    assert manifest.describe_writers("fibo") == ("qwen3.5_9b_int8_convrot.safetensors",)
-    assert manifest.describe_writers("krea2") == ("qwen3vl_4b_fp8_scaled.safetensors", "qwen3.5_9b_int8_convrot.safetensors")
+    assert manifest.describe_writers("fibo") == ("qwen3vl_4b_int8_convrot.safetensors", "qwen3.5_9b_int8_convrot.safetensors")
+    assert manifest.describe_writers("krea2") == ("qwen3vl_4b_int8_convrot.safetensors", "qwen3.5_9b_int8_convrot.safetensors")
     for m in models.MODELS:
         names = manifest.describe_writers(m.key)
         assert names and names[-1] == "qwen3.5_9b_int8_convrot.safetensors", m.key
@@ -35,14 +35,15 @@ def manifest_checks():
 
 
 def settings_checks():
-    # the fallback is listed (optional) in every model's tab, so it can be downloaded from any of them
-    assert set(manifest.used_by(manifest.DESCRIBE_FALLBACK)) == set(manifest.TABS), manifest.used_by(manifest.DESCRIBE_FALLBACK)
+    # the fallback is listed (optional) in the tabs of models whose own writer is optional; Fibo, Krea 2 and MOSS have theirs
+    # as a required file, so the 9B file is not listed there (user 6.11.); Qwen drops it by choice (it lists the w4a8 writer of Text to image)
+    assert manifest.used_by(manifest.DESCRIBE_FALLBACK) == [], manifest.used_by(manifest.DESCRIBE_FALLBACK)      # no tab lists it any more (Flux 2 the last, 6.11.)
     have = lambda n: n != "qwen3.5_9b_w4a8_gptq.safetensors"  # noqa: E731
     line = manifest.describe_line("qwen", have)
     assert "Qwen 3.5 9B w4a8 GPTQ (missing)" in line and "If it is missing, Qwen 3.5 9B int8 ConvRot is used instead." in line, line
     assert "Multi Image Edit" in line
     fibo = manifest.describe_line("fibo", lambda n: True)
-    assert "Qwen 3.5 9B int8 ConvRot." in fibo and "used instead when the text model of another model is missing" in fibo and "missing" not in fibo.replace("is missing", ""), fibo
+    assert "Qwen3-VL 4B int8 ConvRot." in fibo and "If it is missing, Qwen 3.5 9B int8 ConvRot is used instead." in fibo and "(missing)" not in fibo, fibo
 
 
 def bridge_checks():
@@ -126,6 +127,7 @@ def relink_checks():
 def main():
     relink_checks()
     manifest_checks()
+    settings_checks()
     bridge_checks()
     gui_checks()
     print("ALL OK (llm button)")

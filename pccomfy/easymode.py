@@ -48,11 +48,11 @@ MODE_MODEL_TIP = "Currently used for this mode: {model}."     # the tooltip of a
 NO_MODELS = "No models yet. Open the settings (gear) and get the starter models."
 STATUS_ON = "Easy mode on: the plugin picks the model and settings."
 TAB_TITLE = "Easy mode models"
-TAB_INFO = ("Easy mode is a reduced mode that offers the most important functions. Download the model weights of Flux 3 Klein "
-            "Edit and either Qwen 2.1 or Fibo 2.0 Edit Turbo to be able to use all functions in Easy mode.")
-TAB_READY = "You installed the necessary models for Easy mode - start creating now"
+TAB_HEAD = "Easy mode is a reduced mode that offers the most important functions with only 2 of the 3 models listed below."      # the headline of the tab (user 6.11.)
+TAB_INFO = "To use Easy mode, download the model weights of Flux 3 Klein Edit and either Qwen 2.1 or Fibo 2.0 Edit Turbo."
+TAB_READY = "You installed the necessary models for Easy mode - start creating now."      # below the models list, with TAB_MORE
 TAB_BUTTON = "Get the starter models"
-TAB_MORE = "Multi Image Edit is not in Easy Mode. Switch Easy Mode off to use it."
+TAB_MORE = "The only function that is not available in Easy mode is Multi Image Edit. Switch Easy mode off to use it."
 TAB_FLUX3_NOTE = "Flux 3 needs a free Hugging Face login once. The button opens its page."
 
 

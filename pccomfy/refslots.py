@@ -25,8 +25,7 @@ DEFAULT_BACKGROUND = (128, 128, 128)
 BBOX_MAX_REFS = 1       # with BBOX ticked the one reference image is the object for the box (user 3.11.)
 BBOX_LABEL = "Place ref. image in selection (BBOX)"
 BBOX_CHECK_TIP = "Your selection becomes a box named <obj_1> in the prompt. Without a selection the run is a normal Multi Image Edit."
-BBOX_TIP = ("Draw a rectangular selection on the canvas and simply name the object from the reference image in the prompt, "
-            "e.g. “wine glass”. It will be placed exactly where you want it.")   # under the prompt while BBOX is ticked (user 3.11.)
+BBOX_TIP = "Draw a rectangle selection and name the object from the reference image, e.g. “wine glass”. It lands in the box."   # under the prompt while BBOX is ticked (user 3.11.)
 
 
 # ---- rewriting the image names in the prompt when the model changes ----
@@ -316,7 +315,7 @@ class RefSlotsMixin:
     the Paste or Add file icon of the next free slot. Each filled slot has a bar of icons: Remove, Cut out (BiRefNet in
     ComfyUI), Describe and (with a description) Copy text."""
 
-    SLOT = 108         # px (before the display scaling): every slot is the same size, whatever the model
+    SLOT = 97          # px (before the display scaling): every slot is the same size, whatever the model; 90 % of the former 108 (user 6.11.)
     ICON_PX = 19       # size of the slot icons (vector line icons, icons.py) before the display scaling (80 % of the first 24): the ONE place to change it
     PER_ROW = 3        # slots per row
     BAR_ICONS = 5      # the most icons one bar holds (the slot is as tall as that needs)
@@ -377,7 +376,7 @@ class RefSlotsMixin:
             return
         import tkinter as tk
         from tkinter import ttk
-        from .gui_common import ACCENT, BG, FG, Tooltip
+        from .gui_common import ACCENT, BG, FG, MUTED, Tooltip
         self.refslots = RefSlots()
         self._ref_photos: list = []
         self._ref_busy: set[int] = set()
@@ -386,12 +385,19 @@ class RefSlotsMixin:
         head = ttk.Frame(self.f_refs)
         head.pack(fill="x")
         self.lbl_refs = ttk.Label(head, text="Reference images", style="Muted.TLabel")     # not shown (user 3.11.): only "Max. images: n"
-        self.lbl_refmax = ttk.Label(head, text="", style="Muted.TLabel")      # always shown, on the line above the slots
-        self.lbl_refmax.pack(side="left")
+        # a drop-down like "Advanced settings" (user 6.11.): open at every start; closed it hides everything but this line
+        self.v_refs_open = tk.BooleanVar(value=True)
+        self.btn_refs = ttk.Button(head, command=self._toggle_refs, style="Link.TButton")
+        self.btn_refs.pack(side="left")
+        Tooltip(self.btn_refs, "Shows or hides the reference image slots.")
+        self.f_refbody = ttk.Frame(self.f_refs)      # everything under the head line: what the drop-down hides
+        head2 = ttk.Frame(self.f_refbody)       # the BBOX tick (Flux 3), at the left: a line of its own, the head line has no room for it
+        head2.pack(fill="x")
         # "Send reference images in original size": each image keeps its size up to a limit instead of the model's usual one (user 4.11.)
-        self.f_refsize = ttk.Frame(self.f_refs)
+        self.f_refsize = ttk.Frame(self.f_refbody)
         self.f_refsize.pack(fill="x", pady=(4, 0))
-        self.cb_refsize = ttk.Checkbutton(self.f_refsize, text="Send reference images in original size, up to", variable=self.v_ref_native)
+        self.cb_refsize = ttk.Checkbutton(self.f_refsize, text="Send ref. images in original size, up to", variable=self.v_ref_native,
+                                       style="Muted.TCheckbutton")
         self.cb_refsize.pack(side="left")
         self.w_refpx = self._spin(self.f_refsize, self.v_ref_mp, 1, REF_MAX_MP, 0.5, 5)
         self.w_refpx.pack(side="left", padx=6)
@@ -403,29 +409,30 @@ class RefSlotsMixin:
                        "megapixels. Never scaled up. Larger images take more VRAM and time.")
         self.v_ref_native.trace_add("write", lambda *a: self._refs_size_changed())
         self._refs_size_changed()
-        self.f_refgrid = ttk.Frame(self.f_refs)
+        self.f_refgrid = ttk.Frame(self.f_refbody)
         self.f_refgrid.pack(fill="x", pady=(4, 0))
-        self.lbl_refnames = ttk.Label(self.f_refs, text="", style="Muted.TLabel", wraplength=self._px(380 - 24), justify="left")
+        self.lbl_refnames = ttk.Label(self.f_refbody, text="", style="Muted.TLabel", wraplength=self._px(333 - 24), justify="left")
         self.lbl_refnames.pack(fill="x", pady=(4, 0))
         # spot XY: the last description (Describe, or a click on a described picture), white, with a copy icon on its right;
         # only packed while it shows one
-        self.f_refxy = ttk.Frame(self.f_refs)
+        self.f_refxy = ttk.Frame(self.f_refbody)
         self.b_refcopy = tk.Label(self.f_refxy, image=self._refs_icon("copy", FG), bg=BG, bd=0, cursor="hand2")
         self.b_refcopy.pack(side="right", anchor="n", padx=(self._keep(6), 0))
         self.b_refcopy.bind("<Button-1>", lambda e: self._refs_copy_shown())
         self.b_refcopy.bind("<Enter>", lambda e: self.b_refcopy.configure(image=self._refs_icon("copy", ACCENT)), add="+")
         self.b_refcopy.bind("<Leave>", lambda e: self.b_refcopy.configure(image=self._refs_icon("copy", FG)), add="+")
         Tooltip(self.b_refcopy, "Copy text: puts this description on the clipboard.")
-        self.lbl_refdesc = ttk.Label(self.f_refxy, text="", wraplength=self._px(380 - 24 - self.ICON_PX - 6), justify="left")
+        self.lbl_refdesc = ttk.Label(self.f_refxy, text="", wraplength=self._px(333 - 24 - self.ICON_PX - 6), justify="left")
         self.lbl_refdesc.pack(side="left", fill="x", expand=True)
         self._ref_shown = None          # the slot item whose description spot XY shows
-        self.lbl_refmsg = ttk.Label(self.f_refs, text="", style="Hint.TLabel", wraplength=self._px(380 - 24), justify="left")   # only packed while it has text
+        self.lbl_refmsg = ttk.Label(self.f_refbody, text="", style="Hint.TLabel", wraplength=self._px(333 - 24), justify="left")   # only packed while it has text
         # BBOX next to "Prompt" (user 30.10.): the selection is the box <obj_1>; while it is ticked its tip is the one under the
         # prompt (user 3.11.: no tip under the slots)
         self.v_bbox = tk.BooleanVar(value=False)       # off at every start, like the other start values
-        self.cb_bbox = ttk.Checkbutton(head, text=BBOX_LABEL, variable=self.v_bbox, command=self._refs_bbox_changed)
+        self.cb_bbox = ttk.Checkbutton(head2, text=BBOX_LABEL, variable=self.v_bbox, command=self._refs_bbox_changed)
         Tooltip(self.cb_bbox, BBOX_CHECK_TIP)
         self._refs_dnd = self._refs_setup_dnd()
+        self._show_refs_body()
         try:
             self.root.bind("<Control-v>", self._refs_ctrl_v, add="+")
             self.root.bind("<Control-V>", self._refs_ctrl_v, add="+")
@@ -495,13 +502,31 @@ class RefSlotsMixin:
             return
         m = self._refs_model()
         if m.bbox:
-            self.cb_bbox.pack(side="left", padx=(self._keep(12), 0))
+            self.cb_bbox.pack(side="left")
         else:
             self.cb_bbox.pack_forget()
         self._refs_bbox_changed()
         self.refslots.set_model(self._refs_max(m), m.tag_style)
         self.f_refs.pack(fill="x", padx=10, pady=(6, 0), before=self.f_neg)
         self._refs_redraw()
+
+    def _show_refs_body(self):
+        """The drop-down of the reference slots: chevron and word on the head line, the rest shown or hidden."""
+        from .gui_common import MUTED
+        opened = bool(self.v_refs_open.get())
+        # "(max. n)" only while it is open (user 6.11.)
+        self.btn_refs.configure(text=f"Reference images (max. {self.refslots.max_refs})" if opened else "Reference images", compound="left",
+                                image=self._icon("chevron-down" if opened else "chevron-right", MUTED))
+        if opened:
+            self.f_refbody.pack(fill="x")
+        else:
+            self.f_refbody.pack_forget()
+
+    def _toggle_refs(self):
+        self.v_refs_open.set(not self.v_refs_open.get())
+        self._show_refs_body()
+        self._on_content_size()
+        self._fit_height()
 
     def _refs_redraw(self):
         import tkinter as tk
@@ -519,6 +544,7 @@ class RefSlotsMixin:
             self.f_refgrid.columnconfigure(c, minsize=s + self._px(3))
         n_used = len(rs.active)
         self.lbl_refs.configure(text=f"Reference images ({n_used}/{rs.max_refs})")
+        self._show_refs_body()
         for k in range(self._refs_visible()):
             cell = ttk.Frame(self.f_refgrid)
             cell.grid(row=k // per_row, column=k % per_row, sticky="n", padx=(0, self._keep(3)), pady=(0, self._keep(2)))
@@ -561,14 +587,15 @@ class RefSlotsMixin:
                     bar.append(("copy", "Copy text", "Puts the description on the clipboard.", lambda k=k: self._refs_copy_text(k), False))
                 self._refs_bar(box, bar, busy)
             else:
-                tk.Label(box, text="Drop a picture\nor Ctrl+V", fg=MUTED, bg=PANEL, bd=0,
-                         justify="center").pack(expand=True, side="left")
-                # the one empty slot takes the pictures: paste and add file sit in its bar
+                # the one empty slot takes the pictures: paste and add file sit in its bar; the bar comes first, so the
+                # hint is centred in the space left of it, at the bottom of the slot
                 self._refs_bar(box, [("paste", "Paste", "Takes the picture from the clipboard (Ctrl+V does the same when no text field has the focus).", self._refs_paste, False),
                                      ("file", "Add file", "Picks a picture file. Or drop files onto a slot.", self._refs_add_file, False)], False)
+                # centred in the whole slot (the icons sit at the top, the hint at the bottom)
+                tk.Label(box, text="Drop a picture\nor Ctrl+V", fg=MUTED, bg=PANEL, bd=0, justify="center"
+                         ).place(relx=0.5, rely=1.0, anchor="s", y=-self._px(4))
         self._refs_xy()                 # the description in spot XY follows its slot (new tag, removed picture)
         over = len(rs.overflow)
-        self.lbl_refmax.configure(text=f"Max. images: {rs.max_refs}")
         pic = rs.picture_tag()          # the picture in PhotoCraft has a tag too (user 29.10.: keep saying so)
         self.lbl_refnames.configure(text=("Dragging an image into the prompt box inserts its tag." +
                                           (f" Your picture in PhotoCraft is {pic}." if pic else "") if rs.active else
@@ -585,7 +612,7 @@ class RefSlotsMixin:
 
     def _refs_visible(self) -> int:
         """How many slots are shown: the filled ones and exactly one empty slot ("Drop a picture or Ctrl+V") while the model
-        takes more; no empty placeholders (the 380 px window grows a row at a time)."""
+        takes more; no empty placeholders (the 333 px window grows a row at a time)."""
         rs = self.refslots
         return min(rs.max_refs, len(rs.items) + 1)
 

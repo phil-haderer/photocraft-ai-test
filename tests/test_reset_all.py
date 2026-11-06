@@ -17,7 +17,7 @@ import test_gui_presets as t  # noqa: E402  (installs the Tk stub and a temporar
 from pccomfy import models  # noqa: E402
 
 gui, cfgmod = t.gui, t.cfgmod
-KEPT = {"v_neg_open", "v_adv_open", "v_ckpt", "v_top"}
+KEPT = {"v_neg_open", "v_adv_open", "v_refs_open", "v_ckpt", "v_top"}
 SHOWN = {"v_conn", "v_status", "v_pl", "v_pl_rest", "v_empty", "v_model", "v_mode", "v_workflow",
          "v_chip_fav", "v_easy", "v_easy_model"}   # display only / the tab (v_chip_fav: the tick in the right-click menu of a model chip; v_easy: the Easy Mode switch, not a setting)
 

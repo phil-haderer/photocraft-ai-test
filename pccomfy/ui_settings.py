@@ -26,17 +26,18 @@ EMPTY_TEXT = {"choose": "Choose a model", "none_linked": "Link your models in th
 STATE_TEXT = {"ready": "is ready.", "partial": "is not yet available", "missing": "is not yet available"}      # after the model name (user 1.11.)
 HINT_SAME = "same size and header as "          # behind a file in the chain list (user 3.11.)
 HINT_INCOMPLETE = "incomplete? shorter than its header says"
+RELINKED_HEAD = "Relinked models:"      # over the list of your own files that stand in for expected ones (user 6.11.)
 GGUF_ALT = "Alternatively:"
 GGUF_LINK = "Download GGUF-weights"      # under the weights of a main model (user 5.11.)
 PROBABLE_FILE = "This is probably the right file: "      # under a missing file, when a renamed copy of it is in the models folder (user 3.11.)
-HINT_EXPLAIN = "Marked files have the same size and safetensors header as a file this plugin expects."
+HINT_EXPLAIN = "Marked files have the same size and safetensors header as another file this plugin expects."
 DOT_RED = "#e5484d"                   # the dot in front of a model that is not available (nothing in front of a ready one)
 DOT_PAD = 4                            # px of room to the left of the dot (user 1.11.)
 SETTINGS_W, SETTINGS_H = 640, 700      # the settings window at first (before the display scaling; 16 % narrower since 2.11.); then the size it was closed at
 SET_ICON_PX = 16                       # the download and chain symbols next to a file
 SET_STYLES = {"head": "SetHead.TLabel", "ok": "SetOk.TLabel", "bad": "SetBad.TLabel", "note": "SetNote.TLabel",
               "muted": "SetMuted.TLabel", "green": "SetGreen.TLabel", "red": "SetRed.TLabel",
-              "head9": "SetHead9.TLabel", "warn": "SetWarn.TLabel"}
+              "head9": "SetHead9.TLabel", "warn": "SetWarn.TLabel", "hint": "SetHint.TLabel"}
 SET_MIN_W, SET_MIN_H = 480, 300        # the smallest the settings window can be dragged to
 
 
@@ -107,7 +108,7 @@ class ButtonTabs(ttk.Frame):
 
 
 ALL_FILES_BUTTON = "Download all model files"      # one model's whole package, the optional files too (user 3.11.)
-OPTIONAL_HEAD = "These models are only needed for additional features:"
+OPTIONAL_HEAD = "Needed for additional features"      # followed by " (what for)" built from manifest.FEATURE_USE (user 6.11.)
 NOT_ALL_WEIGHTS = ("You don't have all the necessary weights to run the standard settings of {name}. Download the files or try linking "
                    "your files manually if you are sure that you have them. The plugin reads ComfyUI's model lists, so files in "
                    "ComfyUI's models folders (and any extra paths it uses) are found automatically. New files show up after a "
@@ -147,7 +148,7 @@ class SettingsMixin(DownloadMixin):
         self.b_gear = ttk.Button(self.f_header, image=self._icon("gear", px=GEAR_HEAD_PX), style="Link.TButton", command=self.toggle_settings)
         self.b_gear.pack(side="right", padx=(0, 6))
         Tooltip(self.b_gear, "Settings: which model files ComfyUI has, links to get the missing ones, credits.")
-        style.configure("Empty.TLabel", foreground=MUTED, font=font(11))
+        style.configure("Empty.TLabel", foreground="#ffffff", font=font(10, bold=True))      # H2, white (user 6.11.)
         self.v_empty = tk.StringVar(value="")
         self.lbl_empty = ttk.Label(self.root, textvariable=self.v_empty, style="Empty.TLabel", anchor="center", justify="center",
                                    wraplength=self._px(MIN_W - 40))
@@ -451,7 +452,9 @@ class SettingsMixin(DownloadMixin):
         info += (" A model is offered in the plugin only when the files for its standard settings are there; a function whose "
                  "standard settings need a missing file is greyed out.")
         rows.append(("intro", info))
-        rows += [("line", f"{k}  →  {v}", "muted") for k, v in sorted(links.items())]
+        if links:       # a headline over the relinked models, in the font of the other headlines (user 6.11.)
+            rows.append(("head", RELINKED_HEAD))
+        rows += [("line", f"{k}  →  {v}", "hint") for k, v in sorted(links.items())]      # the blue of the tip under the prompt marks what you changed (user 6.11.)
         if self.inv is None:
             rows.append(("error", "ComfyUI could not be read.", (self._inv_error or "Not connected yet.")
                          + "\nStart ComfyUI, then click the refresh arrow (⟳) at the bottom of the plugin."))
@@ -480,7 +483,8 @@ class SettingsMixin(DownloadMixin):
                     rows.append(("node", c, pack[0] if pack else "", pack[1] if pack else ""))
                 if extra:       # the files of the extra features, apart from the ones the standard settings need (user 2.11.)
                     rows.append(("sep",))
-                    rows.append(("head", OPTIONAL_HEAD))
+                    uses = manifest.feature_uses(f.name for f, _fd, _lv in extra)
+                    rows.append(("head", OPTIONAL_HEAD + (f" ({uses})" if uses else "")))
                     for f, found, level in extra:
                         rows.append(("file", self._file_data(f, found, level)))
                 rows.append(("stop", [f.name for f, _fd, _lv in row["files"]]))
@@ -552,7 +556,6 @@ class SettingsMixin(DownloadMixin):
         add = lambda text, style="", url="": seg.append((text, style, url))  # noqa: E731
         add("Credits\n", "head")
         for name, what, url in manifest.CONTRIBUTORS:
-            add("    ", "")
             add(name, "link", url)
             add(f"  {what}\n", "muted")
         return seg
@@ -608,6 +611,13 @@ class SettingsMixin(DownloadMixin):
                 out[n] = HINT_SAME + by_size[size]
         return out
 
+    @staticmethod
+    def _menu_hints(expected: str, hints: dict[str, str]) -> dict[str, str]:
+        """The hints shown in the chain list: "same size and header as <file>" only for a file that equals ANOTHER file of the manifest
+        than the expected one (a warning against mixing them up); a copy of the expected file is already named under the missing
+        file ("This is probably the right file"). "incomplete?" always stays (user 6.11.)."""
+        return {n: h for n, h in hints.items() if h != HINT_SAME + expected}
+
     # ---------- the overlay window ----------
 
     def toggle_settings(self):
@@ -654,6 +664,8 @@ class SettingsMixin(DownloadMixin):
 
         # no ComfyUI dot and no Refresh here: the plugin's footer has both
 
+        self.sep_set_tabs = ttk.Frame(win, style="SepWhite.TFrame", height=1)      # a white line above the tabs All models / Other settings / Credits (user 6.11.)
+        self.sep_set_tabs.pack(fill="x", padx=10, pady=(4, 0))
         nb = ttk.Notebook(win)              # tab 1: the models; tab 2: credits
         nb.pack(fill="both", expand=True, padx=10, pady=(0, 8))
         tab_models, tab_other, tab_credits = ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb)
@@ -670,7 +682,7 @@ class SettingsMixin(DownloadMixin):
 
         # on top of "Models": the linked files (they hold for every model), below them one tab per model and "Additional"
         self.f_set_top = ttk.Frame(tab_models)
-        self.f_set_top.pack(fill="x", side="top")
+        self.f_set_top.pack(fill="x", side="top", padx=12, pady=(10, 0))      # the same margin as the tab Easy mode models (user 6.11.)
         self.f_set_top.bind("<Configure>", lambda e: self._settings_wrap("top", e.width), add="+")
         ttk.Frame(tab_models, style="SepWhite.TFrame", height=1).pack(fill="x", pady=(6, 0))      # white line above the model tabs (user 1.11.)
         self.nb_models = ButtonTabs(tab_models)
@@ -690,12 +702,15 @@ class SettingsMixin(DownloadMixin):
         """What the missing title bar leaves to us: a thin strip on top with the X (dragging it moves the window) and a grip
         in the lower right corner (dragging it resizes the window)."""
         tk.Frame(win, height=self._px(3), bg=ACCENT).pack(fill="x", side="top")      # the blue line on the top edge (user 2.11.)
-        bar = ttk.Frame(win)
-        bar.pack(fill="x", side="top")
-        title = ttk.Label(bar, text="Settings", foreground="#ffffff", font=font(13, bold=True))      # 80 % of the plugin's title (16)
-        title.pack(side="left", padx=(12, 0), pady=(2, 0))
+        # the header as the plugin's header (user 6.11.): the same height (as a function button), the same top margin, the title
+        # in the same size (H1: 12 pt, white, thin) and at the same distance from the left edge
+        bar = ttk.Frame(win, height=self._px(ICON_PX + 12))
+        bar.pack(fill="x", side="top", pady=(8, 0))
+        bar.pack_propagate(False)
+        title = ttk.Label(bar, text="Settings", foreground="#ffffff", font=font(12))
+        title.pack(side="left", padx=(12, 0))
         x = ttk.Button(bar, text="✕", style="Link.TButton", width=2, command=self._settings_close)
-        x.pack(side="right", padx=(0, 6), pady=(2, 0))
+        x.pack(side="right", padx=(0, 6))
         Tooltip(x, "Close the settings.")
         drag = {}
 
@@ -784,8 +799,11 @@ class SettingsMixin(DownloadMixin):
         row = ttk.Frame(box)
         row.pack(fill="x", pady=(4, 0))
         self.v_comfy_url = tk.StringVar(value=self.comfy.url)
-        ent = ttk.Entry(row, textvariable=self.v_comfy_url, width=30)
+        # a field with a drop-down list of the addresses that worked before, so one click brings an old one back (user 6.11.)
+        ent = ttk.Combobox(row, textvariable=self.v_comfy_url, values=self._url_history(), width=30)
+        self.cb_comfy_url = ent
         ent.pack(side="left")
+        ent.bind("<<ComboboxSelected>>", lambda e: self._comfy_address_check())
         ent.bind("<Return>", lambda e: self._comfy_address_check())
         # The settings window has no title bar (overrideredirect): Windows does not always make it the active window when the
         # mouse goes into it, so the field got no keyboard (user 5.11.: "the cursor cannot be placed", also after Refresh). A click
@@ -799,12 +817,29 @@ class SettingsMixin(DownloadMixin):
         self.lbl_comfy_mark.pack(side="left", padx=(8, 0))
         self.lbl_comfy_msg = ttk.Label(row, text="", style=SET_STYLES["muted"])
         self.lbl_comfy_msg.pack(side="left", padx=(4, 0))
-        reset = ttk.Button(row, text="Reset to default", style="Link.TButton", command=self._comfy_address_reset)
+        reset = ttk.Button(row, text="Reset to default", style="SetSmall.TButton", command=self._comfy_address_reset)      # a button like the others (user 6.11.)
         reset.pack(side="right")
+        Tooltip(reset, "Goes back to the standard address of ComfyUI on this PC.")
         self.lbl_comfy_note = ttk.Label(box, text="", style=SET_STYLES["muted"], justify="left", wraplength=self._px(520))
-        self.lbl_comfy_note.pack(anchor="w", pady=(4, 0))
-        self._comfy_seq = 0
+        self._comfy_seq = 0      # the note below is packed only while it has text (no empty line, user 6.11.)
         self._comfy_address_check(apply=False)          # shows at once whether the address in use answers
+
+    URL_HISTORY_MAX = 10
+
+    @staticmethod
+    def _url_history() -> list[str]:
+        """The addresses that worked before, the newest first (settings.json "comfyui_url_history")."""
+        v = cfgmod.get_setting("comfyui_url_history", [])
+        return [u for u in v if isinstance(u, str)] if isinstance(v, list) else []
+
+    def _url_remember(self, url: str):
+        """Puts an address that answered as ComfyUI at the top of the history (once, at most URL_HISTORY_MAX)."""
+        hist = [url] + [u for u in self._url_history() if u != url]
+        cfgmod.set_setting("comfyui_url_history", hist[:self.URL_HISTORY_MAX])
+        try:
+            self.cb_comfy_url.configure(values=self._url_history())
+        except (tk.TclError, AttributeError):
+            pass
 
     @staticmethod
     def _force_focus(widget):
@@ -819,6 +854,10 @@ class SettingsMixin(DownloadMixin):
             self.lbl_comfy_mark.configure(text=mark, style=SET_STYLES["green" if mark == "✓" else "red"])
             self.lbl_comfy_msg.configure(text=msg, style=SET_STYLES[style])
             self.lbl_comfy_note.configure(text=note, style=SET_STYLES["warn" if note.startswith("Unencrypted") else "muted"])
+            if note:
+                self.lbl_comfy_note.pack(anchor="w", pady=(4, 0))
+            else:
+                self.lbl_comfy_note.pack_forget()
         except (tk.TclError, AttributeError):
             pass
 
@@ -847,6 +886,8 @@ class SettingsMixin(DownloadMixin):
             self._comfy_address_show("✗", msg, "bad", note)
             return
         self._comfy_address_show("✓", msg, "muted", note)
+        if apply:
+            self._url_remember(url)
         if apply and url != self.comfy.url:
             cfgmod.set_setting("comfyui_url", None if url == comfyaddr.DEFAULT_URL else url)
             self.comfy.set_url(url)
@@ -911,8 +952,8 @@ class SettingsMixin(DownloadMixin):
         cv.pack(side="left", fill="both", expand=True)
         sb = ThinScrollbar(box, cv, self._px(6), BG, auto=True)
         rows = ttk.Frame(cv)
-        win_id = cv.create_window(0, 0, window=rows, anchor="nw")
-        cv.bind("<Configure>", lambda e: (cv.itemconfigure(win_id, width=e.width), self._settings_wrap(key, e.width)), add="+")
+        win_id = cv.create_window(self._px(12), 0, window=rows, anchor="nw")      # 12 px from the left edge like the Easy mode tab
+        cv.bind("<Configure>", lambda e: (cv.itemconfigure(win_id, width=max(1, e.width - self._px(12))), self._settings_wrap(key, e.width - self._px(12))), add="+")
         rows.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")), add="+")
         return {"page": box, "cv": cv, "sb": sb, "rows": rows}
 
@@ -942,7 +983,7 @@ class SettingsMixin(DownloadMixin):
         body.pack(fill="both", expand=True)
         sb = ttk.Scrollbar(body)
         sb.pack(side="right", fill="y")
-        t = tk.Text(body, wrap="word", bg=PANEL, fg=FG, relief="flat", borderwidth=0, padx=8, pady=6,
+        t = tk.Text(body, wrap="word", bg=PANEL, fg=FG, relief="flat", borderwidth=0, padx=12, pady=10,
                     font=font(10), yscrollcommand=sb.set, cursor="arrow")
         t.pack(side="left", fill="both", expand=True)
         sb.configure(command=t.yview)
@@ -1170,7 +1211,7 @@ class SettingsMixin(DownloadMixin):
             elif kind == "gguf":
                 box = line()
                 label(box, GGUF_ALT, "muted", padx=(36, 4), pady=(0, 2))
-                b = ttk.Button(box, text=GGUF_LINK, style="Link.TButton", command=lambda u=row[1]: webbrowser.open(u))
+                b = ttk.Button(box, text=GGUF_LINK, style="SetLink.TButton", command=lambda u=row[1]: webbrowser.open(u))
                 b.pack(side="left", pady=(0, 2))
                 b.copy_text = row[1]                      # right-click: Copy link
                 Tooltip(b, "Opens the Hugging Face page of the GGUF files in your browser (smaller files for little VRAM). "
@@ -1184,7 +1225,7 @@ class SettingsMixin(DownloadMixin):
                 label(box, "\u2717", "bad", padx=(8, 6))
                 label(box, f"node {cls}" + (f"   \u2192 {pack}" if pack else ""), "", wrap=self._px(120))
             elif kind == "head":
-                label(line(), row[1], "head", pady=(10, 2))
+                label(line(), row[1], "head", pady=(10, 2), wrap=self._px(60) if row[1].startswith(OPTIONAL_HEAD) else 0)
             elif kind == "stop":         # bottom right of every page: stops every running download of this page's files (user 2.11.)
                 names = list(row[1])
                 if not any(n in self._dl for n in names):         # only while a download of this page runs (user 2.11.)
@@ -1260,7 +1301,7 @@ class SettingsMixin(DownloadMixin):
         t.tag_configure("ok", foreground=DONE_GREEN)           # noqa: F405
         t.tag_configure("bad", foreground=ERROR_TEXT)          # noqa: F405
         t.tag_configure("note", foreground="#ffffff")
-        t.tag_configure("muted", foreground="#ffffff")      # white like the rest of the settings (user 1.11.)
+        t.tag_configure("muted", foreground=MUTED)      # the credits in the one grey (user 6.11.)
         n = 0
         for text, style, url in segments:
             tags = (style,) if style and style != "link" else ()
@@ -1299,8 +1340,9 @@ class SettingsMixin(DownloadMixin):
         if not cands and not mapped:
             self._status("ComfyUI lists no other file of this kind. Copy yours into its folder and restart ComfyUI.", error=True)
             return
-        hints = self._link_hints(expected, cands)
-        cands = sorted(cands, key=lambda n: not hints.get(n, "").startswith(HINT_SAME + expected))   # a match of the expected file first (sort is stable)
+        all_hints = self._link_hints(expected, cands)
+        cands = sorted(cands, key=lambda n: not all_hints.get(n, "").startswith(HINT_SAME + expected))   # a match of the expected file first (sort is stable)
+        hints = self._menu_hints(expected, all_hints)
         menu = tk.Menu(self._settings_win or self.root, tearoff=0)
         if any(h.startswith(HINT_SAME) for h in hints.values()):
             menu.add_command(label=HINT_EXPLAIN, state="disabled")

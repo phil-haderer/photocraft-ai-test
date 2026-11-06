@@ -58,7 +58,7 @@ class ThemeMixin:
         except Exception:
             pass
         s.configure(".", background=BG, foreground=FG, fieldbackground=PANEL, bordercolor="#454545",
-                    lightcolor=PANEL, darkcolor=PANEL, troughcolor=PANEL, focuscolor=ACCENT, font=font(10))
+                    lightcolor=PANEL, darkcolor=PANEL, troughcolor=PANEL, focuscolor=ACCENT, font=font(9))
         s.configure("TLabel", background=BG, foreground=FG)
         # a clicked button keeps no orange focus outline (user 30.10.): after the click the focus goes back to the window
         for cls in ("TButton", "TRadiobutton", "TCheckbutton"):
@@ -66,12 +66,16 @@ class ThemeMixin:
         self.root.bind_class("TLabel", "<Button-3>", self._copy_menu, add="+")        # every text and link: right-click copies it (user 3.11.)
         self.root.bind_class("TButton", "<Button-3>", self._copy_menu, add="+")       # a link symbol copies its address
         s.configure("Muted.TLabel", foreground=MUTED, font=font(9))
+        s.configure("Muted.TCheckbutton", foreground=MUTED, font=font(9))      # "Original size, up to": like the labels of the other Advanced settings
         # the rows of the settings window (ui_settings.py): a bold model line, green / red / orange marks, grey details
         # only the headings are bold; everything else in the window is one size smaller (user 31.10.)
         s.configure("SetHead.TLabel", foreground="#ffffff", font=font(10, bold=True))
         s.configure("SetText.TLabel", foreground="#ffffff", font=font(9))
         s.configure("SetText.TCheckbutton", font=font(9))
         s.configure("SetSmall.TButton", padding=(8, 2), width=0, font=font(9))      # Undo and Reset: small, not stretched
+        # a text link in the settings (the GGUF line): the size of the text round it, the blue of the links in "Credits" (user 6.11.)
+        s.configure("SetLink.TButton", background=BG, foreground=ACCENT_TEXT, padding=(0, 2), borderwidth=0, relief="flat", width=0, font=font(9))
+        s.map("SetLink.TButton", foreground=[("active", FG)], background=[("active", BG)])
         s.configure("TipOk.TButton", padding=(22, 7), width=0, font=font(11, bold=True))      # "OK" of the tip popup: easy to hit
         for name, colour in (("SetOk", "#ffffff"), ("SetBad", "#ffffff"), ("SetNote", "#ffffff"), ("SetMuted", "#ffffff")):      # all text in the settings is white (user 1.11.)
             s.configure(f"{name}.TLabel", foreground=colour, font=font(9))
@@ -99,17 +103,18 @@ class ThemeMixin:
         s.configure("TButton", background=PANEL, foreground=FG, padding=6)
         s.map("TButton", background=[("active", "#5f5f5f")])
         s.configure("Icon.TButton", padding=(6, 4))
-        s.configure("Tab.Toolbutton", background=PANEL, foreground=FG, padding=(8, 5), anchor="w", relief="flat",
-                    borderwidth=0, font=font(10))
+        s.configure("Tab.Toolbutton", background=PANEL, foreground=FG, padding=(4, 5), anchor="w", relief="flat",
+                    borderwidth=0, font=font(10))      # the function buttons: the text as big as Generate (10 pt, bold when chosen), the button itself unchanged (user 6.11.)
         s.map("Tab.Toolbutton", background=[("selected", ACCENT), ("active", "#5f5f5f")],
               foreground=[("selected", ON_ACCENT)], font=[("selected", font(10, bold=True))])
         # the model buttons of the settings window: the look of the function buttons, a size smaller, centred
         s.configure("Set.Tab.Toolbutton", padding=(8, 3), anchor="center", font=font(9))
         s.map("Set.Tab.Toolbutton", font=[("selected", font(9, bold=True))])
-        s.configure("Link.TButton", background=BG, foreground=MUTED, padding=(0, 2), borderwidth=0, relief="flat",
-                    width=0)   # as wide as its text: clam's minimum width would centre "Advanced" and push it right
+        s.configure("Link.TButton", background=BG, foreground=MUTED, padding=(0, 2), borderwidth=0, relief="flat", font=font(9),
+                    width=0)   # Body size, grey (the one grey), white when hovered; as wide as its text: clam's minimum width would centre "Advanced" and push it right
         s.map("Link.TButton", foreground=[("active", FG)], background=[("active", BG)])
         s.configure("Llm.TButton", padding=(4, 1), width=0, font=font(9))     # the "LLM" button at the prompt: short, not stretched
+        s.configure("Narrow.TButton", padding=(3, 2), width=0, font=font(9))     # "Reset page": as narrow as its text (user 6.11.), the footer is tight
         s.configure("Small.TButton", padding=(8, 2), font=font(9))   # "Show feather" beside the layer mask menu: a button in the size of the slider texts
         # small switches in the look of "Show feather", the chosen one filled orange like the functions (Upscale factor)
         s.configure("Small.Toolbutton", background=PANEL, foreground=FG, padding=(8, 2), font=font(9), anchor="center",
@@ -144,6 +149,7 @@ class ThemeMixin:
         s.configure("SepWhite.TFrame", background="#ffffff")       # the line above the model tabs of the settings window (user 1.11.)
         s.configure("SetGreen.TLabel", foreground=DONE_GREEN, font=font(10, bold=True))      # the tick behind a ready model
         s.configure("SetWarn.TLabel", foreground="#f5c542", font=font(9))      # a hint that is no error (unencrypted connection)
+        s.configure("SetHint.TLabel", foreground=HINT_TEXT, font=font(9))      # a highlight in the settings (relinked models): the blue of the prompt tip
         s.configure("SetRed.TLabel", foreground=ERROR_TEXT, font=font(10, bold=True))        # the X behind a model that is not yet available
         s.configure("SetHead9.TLabel", foreground="#ffffff", font=font(9, bold=True))        # "Covers these modes:", the same line height as the list
         s.configure("Done.TLabel", foreground=DONE_GREEN, font=font(10, bold=True))      # the word "Done"
@@ -327,7 +333,7 @@ class ThemeMixin:
         text = text.strip()
         if len(text) < 2:
             return None
-        menu = tk.Menu(self.root, tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground="#1b1b1b", bd=0, font=font(10))
+        menu = tk.Menu(self.root, tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground="#1b1b1b", bd=0, font=font(9))
 
         def copy():
             self.root.clipboard_clear()

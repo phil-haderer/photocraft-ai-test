@@ -315,7 +315,7 @@ class PromptMixin:
         self._style_texts: dict = {}        # (submenu, entry number) -> the style's text
         self._style_tip = None
         self._style_menus: list = []        # kept, so the submenus (and their names) stay alive
-        kw = dict(tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground="#1b1b1b", bd=0, font=font(10))
+        kw = dict(tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground="#1b1b1b", bd=0, font=font(9))
         for mode, groups in self._styles.items():
             top = tk.Menu(self.root, **kw)
             for g in groups:
@@ -343,6 +343,42 @@ class PromptMixin:
         if not want10:
             self.v_v10.set(False)
 
+    def _build_prompt_placeholder(self):
+        """The word "Prompt" in grey inside the empty field; it goes when the field has the focus or any text (user 6.11.)."""
+        from .gui_common import MUTED, PANEL
+        t = self.t_prompt
+        self._ph = tk.Label(t, text="Prompt", fg=MUTED, bg=PANEL, bd=0, font=font(10), cursor="xterm")
+        self._ph.bind("<Button-1>", lambda e: (t.focus_set(), "break")[1])
+        self._ph_on = False
+        t.bind("<FocusIn>", lambda e: self._prompt_placeholder(focused=True), add="+")
+        for ev in ("<FocusOut>", "<KeyRelease>"):
+            t.bind(ev, lambda e: self._prompt_placeholder(), add="+")
+        self._prompt_placeholder_poll()
+
+    def _prompt_placeholder(self, focused: bool | None = None):
+        t = self.t_prompt
+        try:
+            if focused is None:
+                focused = self.root.focus_get() is t
+            empty = not t.get("1.0", "end-1c")
+        except (tk.TclError, KeyError):
+            return
+        want = empty and not focused
+        if want and not self._ph_on:
+            self._ph.place(x=self._px(7), y=self._px(5))
+            self._ph_on = True
+        elif not want and self._ph_on:
+            self._ph.place_forget()
+            self._ph_on = False
+
+    def _prompt_placeholder_poll(self):
+        """Text set by the program (a style, Describe, history, a new function) does not fire a key event: look again now and then."""
+        self._prompt_placeholder()
+        try:
+            self.root.after(300, self._prompt_placeholder_poll)
+        except Exception:
+            pass
+
     def _update_styles_button(self):
         """The Styles button is there only in a mode that has styles (Text to image), also in Easy Mode (user 1.11.); it sits left
         of the LLM button, or left of the bin while Easy Mode hides the LLM button."""
@@ -351,7 +387,7 @@ class PromptMixin:
             return
         want = self.v_mode.get() in self.m_styles
         if want and not self._styles_shown:
-            b.pack(side="right", padx=(0, 6), after=self.b_llm if self.b_llm.winfo_manager() else self.b_clear)
+            b.pack(side="left", padx=(0, 6), before=self.b_clear)      # row: Describe Canvas, Styles, Delete
             self._styles_shown = True
         elif not want and self._styles_shown:
             b.pack_forget()

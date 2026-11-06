@@ -85,7 +85,7 @@ def window_tests():
     assert app.b_stop_all.winfo_manager() == "pack"
     assert app.b_stop_all.winfo_x() > app.b_stop.winfo_x()          # right of Cancel
     from tkinter import font as tkfont
-    assert app.b_stop_all.winfo_width() >= tkfont.Font(root=app.root, font=gui.font(10)).measure("Cancel all") + 10   # the whole text shows
+    assert app.b_stop_all.winfo_width() >= tkfont.Font(root=app.root, font=gui.font(9)).measure("Cancel all") + 10   # the whole text shows
     used = app.b_redo.winfo_x() + app.b_redo.winfo_width()
     assert used <= app.f_go.winfo_width(), (used, app.f_go.winfo_width())    # the row still fits the window with Undo and Redo
     calls = []

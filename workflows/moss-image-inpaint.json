@@ -41,8 +41,8 @@
   },
   "_meta": {
    "title": "pc:lora DMD2 speed LoRA",
-   "pc_lora_label": "DMD2 LoRA (8 steps)",
-   "pc_lora_tip": "DMD2 speed LoRA: 8 steps instead of 25. Off = full recipe (25 steps, CFG 2.5)."
+   "pc_lora_label": "Turbo LoRA",
+   "pc_lora_tip": "Turbo LoRA (the DMD2 speed LoRA of MOSS): 8 steps instead of 25. Off = full recipe (25 steps, CFG 2.5)."
   }
  },
  "5": {

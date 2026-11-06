@@ -48,7 +48,7 @@ def main():
     app._on_model()
     app.root.update()
     assert shown(app.b_styles) and shown(app.b_llm)
-    assert app.b_styles.winfo_x() < app.b_llm.winfo_x() < app.b_clear.winfo_x()
+    assert app.b_llm.winfo_x() < app.b_styles.winfo_x() < app.b_clear.winfo_x()
 
     # the menu: a submenu per group, an entry per style, names only
     top = app.m_styles["txt2img"]
@@ -129,7 +129,7 @@ def main():
     app.v_easy.set(False)
     app.toggle_easy()
     app.root.update()
-    assert shown(app.b_styles) and app.b_styles.winfo_x() < app.b_llm.winfo_x() < app.b_clear.winfo_x()
+    assert shown(app.b_styles) and app.b_llm.winfo_x() < app.b_styles.winfo_x() < app.b_clear.winfo_x()
     app.root.destroy()
     print("ALL OK (styles gui)")
 

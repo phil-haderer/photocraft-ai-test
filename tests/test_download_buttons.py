@@ -139,13 +139,13 @@ def main():
         assert rows[ULTRA]["browser"] and rows[ULTRA]["hint"].startswith("The disk symbol opens civitai.com") and "civitai.com" in rows[ULTRA]["hint"]
         assert "models" + chr(92) + "loras" + chr(92) + "Flux 2" in rows[ULTRA]["hint"] and "licence" in rows[UPS]["hint"]
         head = next(r for r in app._settings_rows() if r[0] == "model" and r[1] == "flux2")
-        assert head[5]["count"] == 1 and head[5]["site"] == 2      # the whole package, optional files too (user 3.11.): the same files the download below opens
+        assert head[5]["count"] == 1 and head[5]["site"] == 1      # the whole package, optional files too (user 3.11.): the same files the download below opens; Flux 2 has no gated file since its writer is the 4B (6.11.)
         asked = []
         t.mb.askokcancel = lambda title, msg, **k: asked.append(msg) or True
         opened.clear()
         fake_gate.set()
         app.download_missing("flux2")
-        assert sorted(opened) == sorted([manifest.FILES[ULTRA].url, manifest.FILES[UPS].url]), opened
+        assert sorted(opened) == sorted([manifest.FILES[ULTRA].url]), opened
         assert "open in your browser" in asked[0] and ULTRA in asked[0] and "flux2-vae.safetensors" in asked[0]
         drain(app, until=lambda: not app._dl)
         assert (mdir / "vae" / "flux2-vae.safetensors").exists()

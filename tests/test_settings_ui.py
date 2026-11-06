@@ -254,8 +254,11 @@ def test_page_layout_and_stop():
     rows = app._settings_rows()
     heads = [r[1] for r in rows if r[0] == "head"]
     assert "Needs these weights:" not in heads and heads.count("Standard settings need these weights:") == len(models.MODELS)
-    assert ui_settings.OPTIONAL_HEAD == "These models are only needed for additional features:" and ui_settings.OPTIONAL_HEAD in heads
-    i = rows.index(("head", ui_settings.OPTIONAL_HEAD))
+    assert ui_settings.OPTIONAL_HEAD == "Needed for additional features"
+    opt = [h for h in heads if h.startswith(ui_settings.OPTIONAL_HEAD)]
+    assert opt and all(h.endswith(")") and " (" in h for h in opt), opt        # with what for in brackets (user 6.11.)
+    assert any("LLM prompt enhancement" in h for h in opt) and any("Turbo LoRA" in h for h in opt)
+    i = rows.index(("head", opt[0]))
     assert rows[i - 1] == ("sep",)                                    # the line between needed and optional
     stops = [r for r in rows if r[0] == "stop"]
     assert len(stops) == len(models.MODELS) + 1 and rows[-1][0] == "stop"       # one per model page and one for "Additional"
@@ -312,7 +315,7 @@ def main():
     assert probe.b_gear["style"] == probe.b_clear["style"] == "Link.TButton" and ui_settings.GEAR_PX == 12 == round(0.6 * gui_theme.ICON_PX)
     # Refresh = a flat circle arrow in the gear's size, Reset = the small button "Reset page" (option A, user 29.10.)
     assert probe.b_refresh.image == probe._icon("refresh", px=ui_settings.GEAR_PX) and probe.b_refresh.text is None
-    assert probe.b_reset.text == "Reset page" and probe.b_refresh["style"] == "Link.TButton" and probe.b_reset["style"] == "Small.TButton"
+    assert probe.b_reset.text == "Reset page" and probe.b_refresh["style"] == "Link.TButton" and probe.b_reset["style"] == "Narrow.TButton"
     # the prompt field scrolls with the thin bar, shown by itself only while the text is longer than the field (29.10.)
     assert isinstance(probe.sb_prompt, gui.ThinScrollbar) and probe.sb_prompt.auto and probe.sb_prompt.canvas is probe.t_prompt
     del probe
@@ -485,6 +488,10 @@ def main():
     pages = [r[1] for r in rows if r[0] == "gguf"]
     assert sorted(pages) == sorted(manifest.GGUF_PAGES.values()), pages
     assert all(u.startswith("https://huggingface.co/") for u in manifest.GGUF_PAGES.values()) and set(manifest.GGUF_PAGES) <= {m.key for m in models.MODELS}
+    # the GGUF link has the font of the text round it (9 pt) and the blue of the Credits links, not the grey 10-pt icon-button look (user 6.11.)
+    from pathlib import Path as _P
+    assert 'text=GGUF_LINK, style="SetLink.TButton"' in _P(ui_settings.__file__).read_text(encoding="utf-8")
+    assert 'configure("SetLink.TButton"' in _P(gui_theme.__file__).read_text(encoding="utf-8")
     for i, r in enumerate(rows):          # the line follows a main model file (kind unet), nothing else
         if r[0] == "gguf":
             assert rows[i - 1][0] == "file" and manifest.FILES[rows[i - 1][1]["name"]].kind == "unet", rows[i - 1]
@@ -497,7 +504,13 @@ def main():
     assert g["1"]["inputs"]["vae_name"] == "my_vae.safetensors"
     assert "flux2-vae.safetensors  →  my_vae.safetensors" in rows_text(app)
     assert any(r[0] == "links" for r in app._settings_rows()) and not any("extra_model_paths" in str(r) for r in app._settings_rows())
+    # a headline "Relinked models:" stands directly over the list of relinked files (user 6.11.), and only while there is one
+    rws = app._settings_rows()
+    hi = rws.index(("head", "Relinked models:"))
+    assert rws[hi + 1][0] == "line" and rws[hi - 1][0] == "intro", rws[hi - 1:hi + 2]
+    assert rws[hi + 1][2] == "hint" and ui_settings.SET_STYLES["hint"] == "SetHint.TLabel"      # relinked models in the blue of the prompt tip (user 6.11.)
     app._link_models("flux2-vae.safetensors", "")         # "Unlink" in the list
+    assert ("head", "Relinked models:") not in app._settings_rows()
     assert cfgmod.model_map() == {} and app.rb_tabs["flux3"]["style"] == "Missing.Chip.Toolbutton"
     app._settings_close()
 

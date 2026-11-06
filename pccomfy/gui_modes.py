@@ -676,7 +676,7 @@ class ModeMixin:
 
     def _on_feather(self, _value=None):
         v = round(float(self.v_feather.get()) * 2) / 2
-        self.lbl_feather.configure(text="hard edge" if v <= 0 else f"{v:g} %")
+        self.lbl_feather.configure(text="hard" if v <= 0 else f"{v:g} %")
         self._refresh_feather_preview()
 
     def _wf_has_upscale(self, name: str) -> bool:

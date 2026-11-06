@@ -151,7 +151,7 @@ def main():
     t = texts(app._easy_tab)
     assert em.TAB_MORE in t and not any("(best)" in x or x.startswith("Multi Image Edit:") for x in t), t      # no ranking in the tab
     assert t.index(next(x for x in t if x.startswith(em.TAB_BUTTON))) < t.index(em.TAB_FLUX3_NOTE), t         # the button comes first
-    assert em.TAB_INFO in t and any(x.startswith(em.TAB_BUTTON) for x in t) and em.TAB_FLUX3_NOTE in t, t
+    assert em.TAB_HEAD in t and em.TAB_INFO in t and any(x.startswith(em.TAB_BUTTON) for x in t) and em.TAB_FLUX3_NOTE in t, t
     assert t.count("✗") == len(em.STARTER_MODELS) and "✓" not in t and em.TAB_READY not in t, t      # a red cross per missing model
     need = {f.name for f in app._starter_missing()}
     assert need and all(name in need for name in manifest.tab_required("fibo")) and all(name in need for name in manifest.tab_required("flux3"))

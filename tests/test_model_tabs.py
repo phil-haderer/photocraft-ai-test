@@ -68,7 +68,7 @@ def main():
     assert app.v_mode.get() == "txt2img" and app.v_workflow.get() == "moss-image-t2i.json" and app.v_res.get() == 1280
     assert app.v_enhance.get() is False and "Qwen 3.5 9B" in app.tt_enhance.text      # which text model writes the prompt (starts off)
     assert app.cb_enhance["text"] == "Enhance prompt with LLM" and "Qwen 3.5 9B" in app.tt_enhance.text   # name only in the tooltip
-    assert app.v_turbo.get() is False and app.cb_turbo["text"].startswith("DMD2") and app.v_lora_str.get() == 1.0   # DMD2 starts off (user 29.10.)
+    assert app.v_turbo.get() is False and app.cb_turbo["text"] == "Turbo LoRA" and app.v_lora_str.get() == 1.0   # DMD2 starts off (user 29.10.)
     assert list(models.MOSS.modes) == ["txt2img"]                                                       # Fill off (not good enough), Expand parked 29.10.
     assert [c["text"] for c in app.stage_cbs][:2] == ["UltraReal LoRA", "Skip-layer guidance (SLG)"]
     assert app.v_stage.get() and not app.v_stage2.get()      # Lenovo on, SLG off (user 29.10.)
@@ -132,7 +132,7 @@ def main():
     app.v_mode.set("inpaint")
     app._on_model()
     assert app.v_workflow.get() == "fibo2-edit.json" and app.v_enhance.get() is False
-    assert app.cb_enhance["text"] == "Enhance prompt with LLM" and "Qwen 3.5 9B" in app.tt_enhance.text   # name only in the tooltip
+    assert app.cb_enhance["text"] == "Enhance prompt with LLM" and "Qwen3-VL 4B" in app.tt_enhance.text   # name only in the tooltip (Fibo's writer is the smallest text encoder since 6.11.)
     app.v_enhance.set(True)
     app.v_mode.set("edit")
     app._on_mode()

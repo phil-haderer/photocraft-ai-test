@@ -75,7 +75,7 @@ QWEN_SMALL = "Small selections don't work well with Qwen."   # user 30.10.: smal
 REMOVE_NAME_TIP = "Name what to remove (e.g. “car”)."
 REMOVE_AGAIN = "If the first try doesn't work, try removing it a second time."   # idea of the user (28.10.), for all models since 3.11.
 REMOVE_TIP = REMOVE_NAME_TIP + " " + REMOVE_AGAIN
-MULTI_TIP = "Example: “Place the bag from {tag} on the table.” Cut out the object in the reference image before using it."   # {tag}: the model's name for reference image 1 (user 3.11.)
+MULTI_TIP = "Example: “Place the bag from {tag} on the table.” Cut out the object first."   # {tag}: the model's name for reference image 1 (user 3.11.)
 EDIT_TIP = "Describe the result: “Replace the laptop with a book.” or “Remove the sitting person.”"   # user 3.11., the same for every model
 # Krea 2 / MOSS Expand (wording chosen by the user 29.10.; A/B test docs/tests/krea-moss-expand-ab.md)
 EXPAND_DESCRIBE_TIP = ("This model needs a prompt: describe the surroundings only (place, light, style), not the main subject. "
@@ -199,7 +199,7 @@ KREA2 = Model(
     },
     requires=(
         "krea2_turbo_int8_convrot.safetensors",
-        "qwen3vl_4b_fp8_scaled.safetensors",
+        "qwen3vl_4b_int8_convrot.safetensors",
         "qwen_image_vae.safetensors",
     ))   # the model files this tab needs (details per mode: manifest.py)
 

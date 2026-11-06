@@ -179,15 +179,27 @@ class LoraMixin:
     def _on_lora_str(self, _value=None):
         self.lbl_lora_str.configure(text=f"{float(self.v_lora_str.get()):.2f}")
 
+    def _opts_in_advanced(self) -> bool:
+        """The switch box sits in the Advanced settings for Flux 3 Upscale (SeedVR2) and every function of Qwen 2.1 (Turbo LoRA)
+        (user 6.11.); the other workflows keep it under the prompt."""
+        m = self._model()
+        return bool(m is not None and (m.key == "qwen" or (m.key == "flux3" and self.v_mode.get() == "upscale")))
+
     def _update_options_box(self, has_lora: bool, stages: list):
-        """The box with the workflow's LoRA / stage switches is shown only when there is something in it."""
+        """The box with the workflow's LoRA / stage switches is shown only when there is something in it: under the prompt,
+        or (see _opts_in_advanced) in the Advanced settings, below Sampler and Scheduler."""
         want = bool(has_lora or stages)
-        shown = bool(self.f_opts.winfo_manager())
-        if want and not shown:
-            self.f_opts.pack(fill="x", padx=10, pady=4, after=self.f_scale if self.f_scale.winfo_manager() else self._below_prompt())
-        elif not want and shown:
+        place = ("adv" if self._opts_in_advanced() else "main") if want else ""
+        now = {"pack": "main", "grid": "adv"}.get(self.f_opts.winfo_manager(), "")      # read from Tk: Easy mode hides it with pack_forget
+        if place != now:
             self.f_opts.pack_forget()
-        if want != shown and getattr(self, "_sized", False):
+            self.f_opts.grid_forget()
+            if place == "main":
+                self.f_opts.pack(fill="x", padx=10, pady=4, after=self.f_scale if self.f_scale.winfo_manager() else self._below_prompt())
+            elif place == "adv":
+                self.f_opts.grid(in_=self.adv_body, row=4, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+                self.f_opts.lift()     # it is a child of the window body, not of adv_body: without this it hides behind the Advanced settings (blank line)
+        if place != now and getattr(self, "_sized", False):
             self._fit_height()
 
     def _lora_label(self) -> str:
