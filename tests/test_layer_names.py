@@ -30,7 +30,7 @@ def names(preset, run_no, variants=1):
 
 
 def main():
-    assert names("Qwen Image 2.1 Edit", 12) == ["Qwen Image 2.1 Edit #12"], names("Qwen Image 2.1 Edit", 12)
+    assert names("Qwen Image 2.1", 12) == ["Qwen Image 2.1 #12"], names("Qwen Image 2.1", 12)
     got = names("Fibo plain", 3, variants=2)
     assert sorted(got) == ["Fibo plain #3.1", "Fibo plain #3.2"], got
     tmp = tempfile.mkdtemp()

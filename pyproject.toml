@@ -1,6 +1,6 @@
 [project]
 name = "pccomfy"
-version = "0.21"
+version = "0.22"
 description = "PhotoCraft ↔ ComfyUI bridge: generative fill, outpaint, img2img and txt2img as layers"
 requires-python = ">=3.10"
 dependencies = ["pillow", "numpy", "tomli; python_version < '3.11'"]

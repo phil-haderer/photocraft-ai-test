@@ -18,7 +18,7 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.21.0 · ComfyUI version: 0.42.0
 ---
 
 - **Six function buttons:** Text to image, Expand, Fill, Remove, Edit and Upscale / Refine. Edit has three tabs under the prompt: Edit canvas, Multi image edit and (Flux 3 only) BBOX placement.
-- **Six models:** Flux 3 Klein, Flux 2 Klein, Qwen Image 2.1 Edit, Fibo 2.0 Edit Turbo, Krea 2 Turbo and MOSS Image.
+- **Six models:** Flux 3 Klein, Flux 2 Klein, Qwen Image 2.1, Fibo 2.0 Edit Turbo, Krea 2 Turbo and MOSS Image.
 - **Local:** the models run in ComfyUI on your own graphics card.
 
 > Unofficial community project, not affiliated with PhotoCraft, ArtCraft or Storyteller. PhotoCraft is in early alpha

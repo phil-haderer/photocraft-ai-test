@@ -107,7 +107,7 @@ FUNCTION_TIPS = {
 }
 
 QWEN = Model(
-    "qwen", "Qwen Image 2.1 Edit",
+    "qwen", "Qwen Image 2.1",
     "Qwen Image 2.1 Edit: instruction editor, best at Fill Selection, Remove Selection and Expand. Base res. 1024 works best.",
     {
         "txt2img": Mode("qwen-image-21-t2i.json", dict(native=True, base_res=1024, turbo=False, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),   # LLM off like the others (user 30.10.)
