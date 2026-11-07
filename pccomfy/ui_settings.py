@@ -493,7 +493,7 @@ class SettingsMixin(DownloadMixin):
             for f, found, use, keys in self.inv.additional_rows():
                 add_names.append(f.name)
                 rows.append(("file", {**self._file_data(f, found, "optional"),
-                                      "use": f"{use}: " + ", ".join(models.SHORT[k] for k in keys),
+                                      "use": manifest.ADDITIONAL_USE.get(f.name) or f"{use}: " + ", ".join(models.SHORT[k] for k in keys),
                                       "note": ""}))      # no licence line here (user 2.11.); the README lists the licences
             rows.append(("stop", add_names))
         return rows
@@ -658,6 +658,7 @@ class SettingsMixin(DownloadMixin):
         win.protocol("WM_DELETE_WINDOW", self._settings_close)
         win.bind("<Escape>", lambda e: self._settings_close())
         self._settings_win = win
+        self._set_anchor = self._root_xy()
         self._own_settings(win)
         self._settings_frame(win)
         win.after_idle(win.lift)           # without a title bar the window opened far behind the others (z-order 350 against 45)
@@ -705,7 +706,7 @@ class SettingsMixin(DownloadMixin):
         # the header as the plugin's header (user 6.11.): the same height (as a function button), the same top margin, the title
         # in the same size (H1: 12 pt, white, thin) and at the same distance from the left edge
         bar = ttk.Frame(win, height=self._px(ICON_PX + 12))
-        bar.pack(fill="x", side="top", pady=(8, 0))
+        bar.pack(fill="x", side="top", pady=(max(0, 8 - self._px(3)), 0))      # the blue line above is 3 px: the title stays level with the plugin's title (user 7.11.)
         bar.pack_propagate(False)
         title = ttk.Label(bar, text="Settings", foreground="#ffffff", font=font(12))
         title.pack(side="left", padx=(12, 0))
@@ -1001,6 +1002,28 @@ class SettingsMixin(DownloadMixin):
             if top and owner and api.owner_of(top) != owner:
                 api.set_owner(top, owner)
         except Exception:
+            pass
+
+    def _root_xy(self):
+        try:
+            return self.root.winfo_x(), self.root.winfo_y()
+        except tk.TclError:
+            return None
+
+    def _settings_follow(self, e=None):
+        """The settings window moves with the plugin (user 7.11.): dragged by its header, or moved with PhotoCraft's window."""
+        if e is not None and e.widget is not self.root:
+            return
+        win = self._settings_win
+        if win is None:
+            return
+        now, was = self._root_xy(), getattr(self, "_set_anchor", None)
+        if now is None or was is None or now == was or min(now) < -10000:      # a minimised window reports -32000
+            return
+        self._set_anchor = now
+        try:
+            win.geometry(f"+{win.winfo_x() + now[0] - was[0]}+{win.winfo_y() + now[1] - was[1]}")
+        except tk.TclError:
             pass
 
     def _settings_close(self):

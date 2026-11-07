@@ -405,6 +405,20 @@ def main():
     app.open_settings()
     text = rows_text(app)
     assert "ComfyUI could not be read." in text and "No connection to ComfyUI" in text
+    # the settings window moves with the plugin (user 7.11.): by the distance the plugin moved; a minimised plugin (-32000) changes nothing
+    win = app._settings_win
+    moves = []
+    win.winfo_x, win.winfo_y, win.geometry = (lambda: 500), (lambda: 40), (lambda spec=None: moves.append(spec) or "")
+    app._set_anchor = (100, 50)
+    app._root_xy = lambda: (130, 45)
+    app._settings_follow()
+    assert moves == ["+530+35"] and app._set_anchor == (130, 45)
+    app._settings_follow()
+    assert moves == ["+530+35"]
+    app._root_xy = lambda: (-32000, -32000)
+    app._settings_follow()
+    assert moves == ["+530+35"] and app._set_anchor == (130, 45)
+    del app._root_xy
     app._settings_close()
     # the gear toggles: a click opens the window, the next one closes it (user 28.10.)
     assert app.b_gear["command"] == app.toggle_settings and app._settings_win is None
@@ -432,7 +446,9 @@ def main():
     # BiRefNet and the preview decoders stand once, under "Additional models", with what they are for (user 30.10.)
     extra = {d["name"]: d for d in file_rows(app) if d.get("use")}
     assert set(extra) == {n for n, f in manifest.FILES.items() if f.kind in ("bg_removal", "preview")}, set(extra)
-    assert extra["birefnet.safetensors"]["use"] == "Remove background (scissors), Cut out in Multi Image Edit: Flux 3, Flux 2, Qwen, Fibo"
+    # the scissors work with every model: the two cut-out files name no models (user 6.11.)
+    assert extra["birefnet.safetensors"]["use"] == "Remove background (scissors), Cut out in Multi Image Edit"
+    assert extra["rmbg-2.0.safetensors"]["use"] == "Remove background (scissors), second model"
     assert extra["taef2_decoder.pth"]["use"] == "Live preview: Flux 3, Flux 2, Fibo, MOSS"
     assert sum(d["name"] == "taef2_decoder.pth" for d in file_rows(app)) == 1          # not again under each model
     assert "Additional models (used by several models)" in rows_text(app)

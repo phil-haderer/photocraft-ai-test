@@ -101,6 +101,8 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.v_blur = tk.IntVar(value=g("mask_blur", d["mask_blur"]))
         self.v_overlap = tk.IntVar(value=g("overlap", d["overlap"]))
         self.v_scale = tk.StringVar(value=scale_text(g("scale", 1.5)))
+        self.v_fac = tk.StringVar(value=scale_text(g("scale", 1.5)))     # the factor buttons: "none" (Refine) or the factor; follows v_scale and the mode
+        self.v_fn = tk.StringVar(value="")        # the merged function button "Upscale / Refine" (standard mode): "scale" while one of the two is chosen
         self.v_top = tk.BooleanVar(value=True)      # the window always belongs to PhotoCraft (no switch any more)
         self.v_feather = tk.DoubleVar(value=2.0)    # the function's own value is set after the build (see below)
         self.v_density = tk.IntVar(value=100)       # the same
@@ -158,6 +160,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.root.protocol("WM_DELETE_WINDOW", self._quit)
         self.root.bind("<Destroy>", self._on_destroy, add="+")
         self.root.bind("<Configure>", self._remember_pos, add="+")
+        self.root.bind("<Configure>", self._settings_follow, add="+")      # the settings window moves with the plugin (user 7.11.)
 
     def _build(self, d):
         r = self.root
@@ -194,6 +197,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.tt_min = Tooltip(self.b_min, "Minimise: only this header stays. Click again to show the plugin.")
         # left of it comes the gear (ui_settings.py, user 4.11.); the clock and Copy canvas sit at the right end of the footer
         self._history_popup = None
+        self._cut_popup = None
         for w in (self.f_header, self.f_logo, *self.lbl_title):      # a double click on the header does the same (user 29.10., option C)
             w.bind("<Double-Button-1>", lambda e: self.toggle_minimize(), add="+")
         self.f_tabs = ttk.Frame(r)
@@ -209,6 +213,9 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
                                  image=self._function_icon(key), compound="left", command=self._on_mode)
             self.rb_modes[key] = rb
             self.tt_modes[key] = ChipTooltip(rb, MODE_TIPS[key])
+        # standard mode: ONE button for Upscale and Refine (PLAN.md 2, user 6.11.); Easy Mode keeps the two (rb_modes["upscale"], ["refine"])
+        self.rb_scale_fn = ttk.Radiobutton(f_fn, text=SCALE_FN_LABEL, value="scale", variable=self.v_fn, style="Tab.Toolbutton",
+                                           image=self._function_icon("refine"), compound="left", command=self._on_scale_fn)
         f_md = self.f_models = ttk.Frame(self.f_tabs)
         f_md.pack(fill="x", pady=(6, 0))
         cols = 3
@@ -253,7 +260,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.adv_body.columnconfigure(1, weight=1)
         # the finishing options at the top of "Advanced settings": Sharpen, Edge feather, Layer mask
         self.f_post = ttk.Frame(self.adv_body)
-        self.f_post.grid(row=0, column=0, columnspan=2, sticky="ew")
+        self.f_post.grid(row=1, column=0, columnspan=2, sticky="ew")      # row 0: a stage marked advanced (skip-layer guidance)
         # Workflow is not shown: the model tabs choose the workflow and its settings (the widgets stay, the code
         # behind them is the same)
         self.cb_workflow = ttk.Combobox(self.adv_body, textvariable=self.v_workflow, state="readonly", width=8)
@@ -305,6 +312,11 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
             Tooltip(sc, "LoRA strength (0 = off, 1 = full).")
             sf.grid_remove()
             self.stage_scales.append((sf, sc, lb))
+        # a stage marked "advanced" (MOSS' skip-layer guidance, user 7.11.) shows its checkbox at the top of the Advanced settings: a twin of
+        # the one above (same variable), made when the workflow has such a stage (gui_modes._show_stage_cbs)
+        self.stage_adv_cbs = [ttk.Checkbutton(self.adv_body, text="Stage", variable=var, command=lambda i=i: self._on_stage(i))
+                              for i, var in enumerate(self.stage_vars)]
+        self.stage_adv_tips = [Tooltip(cb, STAGE_TIP) for cb in self.stage_adv_cbs]
         self.cb_stage = self.stage_cbs[0]
         for cb in self.stage_cbs:
             cb.grid_remove()
@@ -367,7 +379,6 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self._build_styles_menus()
         self.f_pchoice = ttk.Frame(self.f_ptop)
         self.f_pchoice.pack(side="left", padx=(10, 0))
-        self.v_pchoice = tk.StringVar(value="")
         self._pchoice_key = None
         # "v10 graph" next to "Prompt" (user 1.11., A/B test): MOSS Fill and Expand as the published Inpainting v10 graph does it
         self.v_v10 = tk.BooleanVar(value=False)
@@ -496,11 +507,22 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         f_sw.grid(row=0, column=1, sticky="e")
         self.rb_scale = {}
         for i, f in enumerate(("1.5", "2", "3", "4")):
-            rb = ttk.Radiobutton(f_sw, text=f"{f}x", value=scale_text(f), variable=self.v_scale, style="Small.Toolbutton", command=self._on_scale_pick)
+            rb = ttk.Radiobutton(f_sw, text=f"{f}x", value=scale_text(f), variable=self.v_fac, style="Small.Toolbutton", command=self._on_factor)
             rb.pack(side="left", padx=(0 if i == 0 else 4, 0))
             Tooltip(rb, scale_tip)
             self.rb_scale[scale_text(f)] = rb
+        # the Refine row under it (user 6.11.): the ready-made prompts of the model (Default, Neutral ...) are the Refine modes; one
+        # choice over both rows (v_fac): a factor runs Upscale, a Refine button runs Refine (same size, new layer)
+        refine_tip = "Refine keeps the size and redraws fine detail, as a new layer."
+        lb2 = ttk.Label(self.f_scale, text="Refine")
+        lb2.grid(row=1, column=0, sticky="w", pady=(4, 0))
+        Tooltip(lb2, refine_tip)
+        self.f_refine = ttk.Frame(self.f_scale)
+        self.f_refine.grid(row=1, column=1, sticky="e", pady=(4, 0))
+        self.rb_refine = {}             # label -> button, built by _update_prompt_choices for the model
+        self._rpick = ""                # the Refine button that was chosen ("" = the first one)
         self.f_scale.columnconfigure(0, weight=1)
+        self.v_scale.trace_add("write", lambda *x: self._sync_fac())     # presets, Reset and a tab change set the factor too
         self.f_detail = ttk.Frame(self.f_post)      # Upscale and Refine: under Advanced settings, above "Sharpen result" (user 28.10.)
         self._slider_row(self.f_detail)
         ttk.Label(self.f_detail, text="Mix Source/New", style="Muted.TLabel").grid(row=0, column=0, sticky="w")
@@ -667,7 +689,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.b_copy_canvas = ttk.Button(foot, image=self._icon("copy", px=FOOT_BTN_PX), style="Link.TButton", command=self.copy_canvas)
         self.b_copy_canvas.pack(side="right", padx=(6, 0))
         Tooltip(self.b_copy_canvas, "Copy canvas to clipboard: the visible layers of the picture in PhotoCraft as one image.")
-        self.b_cut = ttk.Button(foot, image=self._icon("cut", px=FOOT_BTN_PX), style="Link.TButton", command=self.cut_background)
+        self.b_cut = ttk.Button(foot, image=self._icon("cut", px=FOOT_BTN_PX), style="Link.TButton", command=self._cutout_menu)
         self.b_cut.pack(side="right", padx=(6, 0))     # the scissors: left of the clock (user 5.11.)
         self.tt_cut = Tooltip(self.b_cut, CUTOUT_TIP)
         self.b_history = ttk.Button(foot, image=self._icon("clock", px=FOOT_BTN_PX), style="Link.TButton", command=self._history_menu)

@@ -619,6 +619,19 @@ class Bridge:
             kw["ws"] = ws
         return self.comfy.wait(prompt_id, on_progress=on, cancelled=self._cancel.is_set, **kw)
 
+    @staticmethod
+    def _auto_stages(req: Request, wf: str, mp: float) -> Request:
+        """A stage with `auto_on_above_mp` (pc_stage_off) is switched on when the result is larger than that, and the stages it
+        excludes are switched off: the result is too big for one pass (Fibo Upscale: Tiles above 3 MP, without the model stage)."""
+        info = workflows.stage_info(workflows.load_template(wf))
+        auto = next((st for st in info if st["auto_mp"] and mp > st["auto_mp"]), None)
+        if auto is None:
+            return req
+        stage_on = req.stage_on and (not info or info[0]["id"] == auto["id"] or info[0]["id"] not in auto["excludes"])
+        off = {str(x) for x in req.stages_off} - {auto["id"]}
+        off |= {st["id"] for st in info[1:] if st["id"] in auto["excludes"]}
+        return dataclasses.replace(req, stage_on=stage_on, stages_off=sorted(off))
+
     def _run(self, req: Request, p: workflows.GenParams, tag: str, progress: Progress, seq: tuple | None = None) -> dict:
         """seq = (k, n): this is variant k (from 0) of n that run one after the other (_run_sequence)."""
         pc = self.pc.connect()
@@ -643,7 +656,7 @@ class Bridge:
             doc = pc.document()
 
         W, H = doc["width"], doc["height"]
-        has_sel = bool(doc.get("hasSelection")) and req.mode not in ("edit", "txt2img", "refine")   # these work on the whole canvas, a selection is ignored (Refine since 1.11., user)
+        has_sel = bool(doc.get("hasSelection")) and req.mode not in ("edit", "txt2img", "refine", "upscale")   # these work on the whole canvas, a selection is ignored (Refine since 1.11., Upscale since 6.11., user)
         if req.mode == "inpaint" and not has_sel:
             raise BridgeError("Select the area to fill first (e.g. Lasso or Rectangular Marquee).")
         wf_paths = workflows.resolve(req.workflow) if req.workflow else [None]
@@ -715,6 +728,8 @@ class Bridge:
                 raise BridgeError(f"The result would be {mp:.0f} megapixels ({region.w * factor:.0f}×{region.h * factor:.0f}); "
                                   f"the limit is {MAX_RESULT_MP:.0f}. Select a smaller area or use a smaller factor.")
             p.extra["megapixels"] = mp
+            if req.mode == "upscale" and wf_paths[0]:
+                req = self._auto_stages(req, wf_paths[0], mp)       # a stage that takes over above a size (Fibo: Tiles above 3 MP)
         elif full:
             gw, gh = region.w, region.h
         elif req.full_size:
@@ -1026,13 +1041,15 @@ class Bridge:
     # ---------- cut-out (reference slots) ----------
 
     def remove_background(self, im: Image.Image, progress: Progress | None = None, workflow: str | Path | None = None,
-                          crop: bool = True) -> Image.Image:
-        """The picture with its background cut away (RGBA), made by ComfyUI's own BiRefNet nodes (birefnet-remove-bg.json,
-        model `birefnet.safetensors` in models/background_removal). Used by the reference slots: it needs no PhotoCraft.
+                          crop: bool = True, model: str = "birefnet") -> Image.Image:
+        """The picture with its background cut away (RGBA), made by ComfyUI's own background-removal nodes (birefnet-remove-bg.json,
+        model `birefnet.safetensors`, or rmbg2-remove-bg.json with `rmbg-2.0.safetensors`, both in models/background_removal;
+        `model` is a key of workflows.CUTOUT_MODELS, an explicit `workflow` wins). Used by the reference slots: it needs no PhotoCraft.
+        The edge colours are cleaned (imaging.defringe: no bright rim from the old background, 6.11.).
         `crop`: the result ends at the subject (slots); the footer's Remove background keeps the full size (crop=False)."""
         progress = progress or (lambda f, m, **kw: None)
         self._cancel.clear()
-        wf = Path(workflow) if workflow else workflows.BIREFNET_WORKFLOW
+        wf = Path(workflow) if workflow else workflows.cutout_model(model)[3]
         tpl = workflows.load_template(wf)
         name = self.comfy.upload_image(im.convert("RGB") if im.mode not in ("RGB", "RGBA") else im, f"pcc-{uuid.uuid4().hex[:8]}-cut.png")
         graph, out_node = workflows.apply_template(tpl, workflows.GenParams(), name, None)
@@ -1040,14 +1057,20 @@ class Bridge:
         hist = self._queue_wait(graph, wf, progress)
         out = self.comfy.output_images(hist, out_node)[0]
         progress(1.0, "Background removed")
-        out = out.convert("RGBA")
+        out = imaging.defringe(out.convert("RGBA"))
         return imaging.crop_to_alpha(out) if crop else out      # the picture ends at the subject's outermost pixels (user 1.11.)
 
-    def remove_background_layer(self, progress: Progress | None = None) -> dict:
+    def remove_background_layer(self, progress: Progress | None = None, models: tuple = ("birefnet",)) -> dict:
         """The footer's scissors (user 5.11.): the visible picture of the active document without its background, as a new
         layer on top (full canvas size, transparent where the background was). The layers below stay as they are; one
-        snapshot makes Undo possible like after a run."""
+        snapshot makes Undo possible like after a run. `models`: keys of workflows.CUTOUT_MODELS; with several ("Both",
+        6.11.) one layer per model, the first lowest, each named "Background removed (<model>)", all under the one snapshot."""
         progress = progress or (lambda f, m, **kw: None)
+        models = tuple(models)
+        if not models:
+            raise BridgeError("No cut-out model chosen.")
+        for key in models:
+            workflows.cutout_model(key)       # an unknown key fails before anything is sent
         try:
             pc = self.pc.connect()
             sess = pc.session()
@@ -1057,10 +1080,18 @@ class Bridge:
             tag = uuid.uuid4().hex[:8]
             progress(0.02, "Reading the picture", phase="prepare")
             img, _ = self._export(orig, tag, need_mask=False)
-            cut = self.remove_background(img, progress, crop=False)
-            if cut.size != img.size:
-                raise BridgeError(f"The cut-out has another size than the picture ({cut.size} against {img.size}).")
-            progress(0.95, "Placing the layer", phase="place")
+            n = len(models)
+            cuts = []
+            for i, key in enumerate(models):
+                _, label, _, _ = workflows.cutout_model(key)
+
+                def part(f, m, i=i, **kw):      # one bar over all models: model i of n
+                    progress(min(0.9, (i + f) / n * 0.9), m, **kw)
+                cut = self.remove_background(img, part, crop=False, model=key)
+                if cut.size != img.size:
+                    raise BridgeError(f"The cut-out has another size than the picture ({cut.size} against {img.size}).")
+                cuts.append((label, cut))
+            progress(0.95, "Placing the layer" if n == 1 else "Placing the layers", phase="place")
             self._snapshot(sess["documents"][orig]["name"])
             above = None        # a group on top would take the copy into itself (see _run): out of it, above it
             try:
@@ -1069,9 +1100,13 @@ class Bridge:
                 above = top["id"] if top.get("kind") == "Group" else None
             except (KeyError, IndexError, TypeError, PhotoCraftError):
                 pass
-            layer = self._import(orig, cut, imaging.Box(0, 0, img.width, img.height), "hard", "Background removed", tag, 0, above=above)
+            layers = []
+            for i, (label, cut) in enumerate(cuts):
+                layers.append(self._import(orig, cut, imaging.Box(0, 0, img.width, img.height), "hard",
+                                           f"Background removed ({label})", tag, i, first=(i == 0),
+                                           above=(layers[-1] if layers and above is not None else above)))   # each one above the one before
             progress(1.0, "Background removed", phase="place")
-            return {"layer": layer, "size": list(img.size)}
+            return {"layer": layers[-1], "layers": layers, "size": list(img.size)}
         except PhotoCraftError as e:
             raise BridgeError(str(e)) from None
         finally:

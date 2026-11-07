@@ -15,7 +15,7 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.2 · ComfyUI version: 0.42.0
 
 ---
 
-- **Eight functions:** Text to image, Expand, Fill, Remove, Edit Canvas, Multi Image Edit, Upscale and Refine.
+- **Seven function buttons:** Text to image, Expand, Fill, Remove, Edit Canvas, Multi Image Edit and Upscale / Refine.
 - **Six models:** Flux 3 Klein, Flux 2 Klein, Qwen 2.1 Edit, Fibo 2.0 Edit Turbo, Krea 2 Turbo and MOSS Image.
 - **Local:** the models run in ComfyUI on your own graphics card.
 - **Easy Mode:** only the function buttons and the prompt; the plugin picks the best installed model.
@@ -111,8 +111,7 @@ to ComfyUI and puts the result back into PhotoCraft as a new layer in a group, w
 | **Remove Selection** | Select an object, with a little margin around it; it is removed and the background filled in. |
 | **Edit Canvas** | Changes the whole picture from your text ("make it night"). |
 | **Multi Image Edit** | Edits the picture with reference images (drop or paste images into the slots). |
-| **Upscale (new file)** | Enlarges the picture or selection into a new document, up to 24 MP. |
-| **Refine (same size)** | Cleans up the picture or selection at the same size, as a new layer. |
+| **Upscale / Refine** | Pick a factor (1.5x to 4x) in the row "Upscale factor": the whole picture is enlarged into a new document, up to 24 MP. Or pick a button in the row "Refine" (Default; with Flux 2 also Neutral and Studio portrait; with Flux 3 also Restore): the picture is cleaned up at the same size, as a new layer. A selection is ignored. |
 
 <details>
 <summary>Which model offers which function</summary>
@@ -124,13 +123,13 @@ to ComfyUI and puts the result back into PhotoCraft as a new layer in a group, w
 | Expand image | ✓ | ✓ | ✓ | ✓ | | |
 | Edit Canvas | ✓ | ✓ | ✓ | ✓ | | |
 | Multi Image Edit | ✓ | ✓ | ✓ | ✓ | | |
-| Upscale (new file) | ✓ | ✓ | ✓ | | | |
+| Upscale (new file) | ✓ | ✓ | ✓ | ✓ (up to 2x) | | |
 | Refine (same size) | ✓ | ✓ | ✓ | ✓ | | |
 | Text to image | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 </details>
 
-More in the window: **variants** (several results as layers in one group), prompt history, prompt templates, Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**Remove background**) cuts the subject out of the visible picture and adds it as a new layer with a transparent background; it needs the optional `birefnet.safetensors` (gear window ▸ Models ▸ Additional). Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), custom LoRAs, sharpen.**
+More in the window: **variants** (several results as layers in one group), prompt history, prompt templates, Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**Remove background**) opens a small menu: **BiRefNet**, **RMBG-2.0** or **Both** (two layers, RMBG-2.0 on top). The subject is cut out of the visible picture and added as a new layer with a transparent background, and the edge colours are cleaned so no light rim shows on a dark background. It needs the optional `birefnet.safetensors` and/or `rmbg-2.0.safetensors` (gear window ▸ Models ▸ Additional); RMBG-2.0 is for non-commercial use only, and its download symbol in the settings window uses a community mirror because the official file needs a Hugging Face login. To get it by hand: log in at [huggingface.co/briaai/RMBG-2.0](https://huggingface.co/briaai/RMBG-2.0), accept the terms, download `model.safetensors`, rename it to `rmbg-2.0.safetensors` and put it into ComfyUI's `models/background_removal` folder (restart ComfyUI). Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), custom LoRAs, sharpen.**
 
 ## Help
 
@@ -217,8 +216,8 @@ results commercially.
 | Krea 2 | Krea 2 Community License | See the licence on its model page |
 | MOSS | Apache 2.0 | Yes |
 
-Other files: the 4x UltraSharp upscaler (Flux 3 Upscale) is CC BY-NC-SA 4.0, so no commercial use; the Lenovo UltraReal LoRA for MOSS asks for credit (Danrisi), the Qwen3-VL and Qwen 3.5 text encoders,
-SeedVR2 and the MOSS LoRAs are Apache 2.0, BiRefNet is MIT.
+Other files: the 4x UltraSharp upscaler (Flux 3 Upscale and Fibo Upscale) is CC BY-NC-SA 4.0, so no commercial use; the Lenovo UltraReal LoRA for MOSS asks for credit (Danrisi), the Qwen3-VL and Qwen 3.5 text encoders,
+SeedVR2 and the MOSS LoRAs are Apache 2.0, BiRefNet is MIT. RMBG-2.0 (Bria AI, the optional second cut-out model) is source-available for non-commercial use only; the download link in the plugin points to a community mirror of the official file.
 
 ## Credits
 
@@ -227,7 +226,7 @@ SeedVR2 and the MOSS LoRAs are Apache 2.0, BiRefNet is MIT.
 - [ausboss](https://huggingface.co/ausboss) (Restore and Outpaint LoRAs for Flux 3)
 - [photocraft-comfyui-bridge](https://github.com/Peszemeszek/photocraft-comfyui-bridge) by Peszemeszek, the starting
   point of this project (MIT / Apache-2.0)
-- The model authors: Black Forest Labs (Flux 2 / Flux 3 Klein), Qwen (Qwen-Image 2.1), Bria (Fibo 2.0), Krea (Krea 2),
+- The model authors: Black Forest Labs (Flux 2 / Flux 3 Klein), Qwen (Qwen-Image 2.1), Bria (Fibo 2.0 and RMBG-2.0), Krea (Krea 2),
   MOSS-Image, ByteDance (SeedVR2), obsxrver (Flux 2 Klein int8 ConvRot), lodestones (MOSS DMD2 LoRA), Danrisi (Lenovo
   UltraReal LoRA), vizsumit (UltraReal LoRA for Flux 2)
 - [ThetaCursed/Krea2-Style-Explorer](https://github.com/ThetaCursed/Krea2-Style-Explorer) (MIT): the style prompts of the

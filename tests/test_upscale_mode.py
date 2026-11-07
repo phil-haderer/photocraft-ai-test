@@ -24,11 +24,11 @@ def links_resolve(g):
     return all(str(v[0]) in g for n in g.values() for v in n.get("inputs", {}).values() if isinstance(v, list) and v)
 
 
-def run(mode, wf=WF, scale=2.0, prompt="", with_sel=False):
+def run(mode, wf=WF, scale=2.0, prompt="", with_sel=False, **req_kw):
     tmp = tempfile.mkdtemp()
     pc, _, b = T.make(tmp, with_sel=with_sel, layers=2)
     b.comfy = T.FakeComfy()
-    req = Request(mode=mode, workflow=str(wf) if wf else None, scale=scale)
+    req = Request(mode=mode, workflow=str(wf) if wf else None, scale=scale, **req_kw)
     req.params = workflows.GenParams(prompt=prompt, seed=7)
     res = b.run(req)
     return pc, b, res
@@ -95,11 +95,39 @@ def main():
     assert img_up.size == (200, 120), img_up.size                          # at its own size, not scaled to a base resolution
     assert b.comfy.graphs[0]["159"]["inputs"]["text"] == "a young woman" and res["documents"] == 1
 
-    # Upscale of a selection: only that part, at its own size
+    # Fibo Upscale (6.11.): its own graph, the result's size (multiple of 8) comes from pc:upscale, the prompt goes to TextEncodeFibo2
+    pc, b, res = run("upscale", wf=ROOT / "workflows" / "fibo2-upscale.json", scale=2.0, prompt="a portrait", stage_on=True, stages_off=["102"])
+    g = b.comfy.graphs[0]
+    assert len(pc.docs) == 2 and abs(g["5"]["inputs"]["megapixels"] - 200 * 120 * 4 / 1e6) < 1e-6 and g["5"]["inputs"]["resolution_steps"] == 8
+    assert g["7"]["inputs"]["prompt"] == "a portrait" and g["7"]["inputs"]["width"] == ["6", 0] and g["8"]["inputs"]["steps"] == 8
+
+    # Fibo Upscale (7.11.): two stages in one graph: "4x UltraSharp first" (on) and "Tiles" (off), they exclude each other; 3 MP: Tiles by itself
+    FW = ROOT / "workflows" / "fibo2-upscale.json"
+    ft = workflows.load_template(FW)
+    assert [(s["label"], s["default_on"]) for s in workflows.stage_info(ft)] == [("4x UltraSharp first", True), ("Tiles", False)]
+    for off in ([], ["12"], ["102"], ["12", "102"]):
+        assert links_resolve(workflows.bypass_stage(ft, off) if off else ft), off
+    assert g["6"]["inputs"]["image"] == ["14", 0] and g["13"]["inputs"]["image"] == ["4", 0] and g["10"]["inputs"]["images"] == ["9", 0]
+    assert abs(g["14"]["inputs"]["megapixels"] - 200 * 120 * 4 / 1e6) < 1e-6 and g["5"]["inputs"]["resolution_steps"] == 8   # one pass: US on, Tiles off
+    pc, b, _ = run("upscale", wf=FW, scale=2.0, prompt="a portrait", stage_on=False, stages_off=["102"])      # the plain graph
+    g = b.comfy.graphs[0]
+    assert not {"12", "13", "14", "100", "103"} & set(g) and g["6"]["inputs"]["image"] == ["5", 0] and g["7"]["inputs"]["images.image_1"] == ["4", 0]
+    pc, b, _ = run("upscale", wf=FW, scale=2.0, prompt="a portrait", stage_on=False)                         # Tiles on, UltraSharp off
+    g = b.comfy.graphs[0]
+    assert "100" in g and "103" in g and "12" not in g and g["5"]["inputs"]["resolution_steps"] == 32 and g["6"]["inputs"]["image"] == ["5", 0]
+    assert g["100"]["inputs"]["image"] == ["5", 0] and g["10"]["inputs"]["images"] == ["103", 0] and g["7"]["inputs"]["images.image_1"] == ["100", 0]
+    pc, b, _ = run("upscale", wf=FW, scale=2.0, prompt="a portrait", stage_on=True, stages_off=["102"])      # the default: below 3 MP stays one pass
+    assert "100" not in b.comfy.graphs[0] and "13" in b.comfy.graphs[0]
+    req = Request(mode="upscale", workflow=str(FW), scale=2.0, stage_on=True, stages_off=["102"])
+    big = Bridge._auto_stages(req, str(FW), 3.5)                                    # above 3 MP: Tiles on, UltraSharp off
+    assert not big.stage_on and big.stages_off == [] and Bridge._auto_stages(req, str(FW), 3.0) is req
+    assert Bridge._auto_stages(Request(mode="upscale", workflow=str(WF), scale=2.0), str(WF), 9.0).stage_on     # a workflow without such a stage: unchanged
+
+    # Upscale ignores a selection (since 6.11., user): the whole picture, at its own size
     pc, b, _ = run("upscale", scale=3.0, with_sel=True)
     img_up = next(v for k, v in b.comfy.uploads.items() if k.endswith("-image.png"))
-    assert img_up.size == (T.SEL[2] - T.SEL[0], T.SEL[3] - T.SEL[1]), img_up.size
-    assert abs(mp_of(b) - 80 * 60 * 9 / 1e6) < 1e-6
+    assert img_up.size == (200, 120), img_up.size
+    assert abs(mp_of(b) - 200 * 120 * 9 / 1e6) < 1e-6
 
     # Refine: factor 1, the result is a layer in the same document
     pc, b, res = run("refine", scale=4.0)       # the factor is ignored

@@ -51,7 +51,7 @@ def test_manifest():
     for f in manifest.FILES.values():
         assert f.kind in manifest.KINDS, f
         assert f.size > 0 and (f.url.startswith("https://") or f.note), f        # a direct link, or a note why there is none
-        assert not f.url or f.url.endswith(f.name.rpartition("\\")[2]) or "civitai.com/api/download" in f.url, f   # a FILE, not a model page
+        assert not f.url or f.url.endswith(f.name.rpartition("\\")[2]) or "civitai.com/api/download" in f.url or f.url.endswith("/model.safetensors"), f   # a FILE, not a model page ("model.safetensors": saved under f.name, e.g. rmbg-2.0)
     assert manifest.FILES["flux2-vae.safetensors"].size_text == "336 MB" and manifest.FILES["krea2_turbo_int8_convrot.safetensors"].size_text == "13.5 GB"
     assert manifest.FILES["Moss\\lora_dmd2.safetensors"].target == "models\\loras\\Moss"
     assert manifest.FILES["flux2-vae.safetensors"].target == "models\\vae"

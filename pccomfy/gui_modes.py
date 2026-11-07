@@ -20,7 +20,11 @@ class ModeMixin:
     def _on_mode_ui(self):
         mode = self.v_mode.get()
         self._switch_context(mode)
-        if mode == "upscale":
+        if mode in SCALE_MODES:
+            self._scale_mode = mode
+        self.v_fn.set("scale" if mode in SCALE_MODES else "")
+        self._sync_fac()
+        if mode in SCALE_MODES:      # the factor row (with None) for both, in Easy Mode too
             self.f_scale.pack(fill="x", padx=10, pady=4, after=self._below_prompt())   # under the LLM row, above the LoRA
         else:
             self.f_scale.pack_forget()
@@ -56,6 +60,66 @@ class ModeMixin:
         self._update_availability()
         if self._sized:
             self._fit_height()
+
+    def _update_factor_buttons(self):
+        """The factors need a model with Upscale and stay within its largest factor (Fibo: 2x); Easy Mode asks which model it
+        would pick (gui_easy.py)."""
+        mm = self._model()
+        for key, rb in getattr(self, "rb_scale", {}).items():
+            rb.configure(state="normal" if (mm is None or self._custom_workflow() or self._factor_ok(mm, key)) else "disabled")
+        for rb in getattr(self, "rb_refine", {}).values():
+            rb.configure(state="normal" if (mm is None or "refine" in mm.modes or self._custom_workflow()) else "disabled")
+
+    @staticmethod
+    def _factor_ok(model, key: str) -> bool:
+        """The factor button `key` ("x 1.5") is offered for `model`: it has Upscale and the factor is within its largest one."""
+        spec = model.modes.get("upscale") if model else None
+        if spec is None:
+            return False
+        try:
+            return not spec.max_scale or float(str(key).lstrip("xX ").strip()) <= spec.max_scale + 1e-9
+        except ValueError:
+            return True
+
+    def _sync_fac(self):
+        """One choice over both rows: while Refine runs, its button is lit ("r:<label>"), else the factor in v_scale."""
+        if self.v_mode.get() == "refine":
+            labels = list(getattr(self, "rb_refine", {}))
+            want = "r:" + (self._rpick if self._rpick in labels else (labels[0] if labels else "Default"))
+        else:
+            want = self.v_scale.get()
+        if self.v_fac.get() != want:
+            self.v_fac.set(want)
+
+    def _on_scale_fn(self):
+        """The merged function button was clicked (standard mode): the last used of Upscale and Refine, at first Refine (= None)."""
+        self.v_mode.set(getattr(self, "_scale_mode", "refine"))
+        self._on_mode()
+
+    def _on_factor(self):
+        """A factor button runs Upscale, a Refine button runs Refine (two inner modes behind one function, PLAN.md 2). The
+        switch takes the other mode's start settings (steps, Turbo, stages), then the chosen factor goes back in. A Refine
+        button also puts its prompt in (the whole field, like the switches did), except when it only switches from Upscale
+        to the first button: then the usual rule applies (your own text stays)."""
+        pick = self.v_fac.get()
+        mode = "refine" if pick.startswith("r:") else "upscale"
+        was = self.v_mode.get()
+        if mode == "upscale":
+            self.v_scale.set(pick)
+        else:
+            self._rpick = pick[2:]
+        if mode != self.v_mode.get():
+            self.v_mode.set(mode)
+            self._on_mode()
+            if mode == "upscale":
+                self.v_scale.set(pick)      # the mode's start settings put 1.5x back
+        if mode == "refine":
+            spec = self._model().modes.get("refine") if self._model() else None
+            texts = {lb: text for lb, text, _ in (spec.prompts if spec else ())}
+            if self._rpick in texts and (was == "refine" or self._rpick != next(iter(texts))):
+                self._insert_prompt(texts[self._rpick])
+        self._sync_fac()
+        self._on_scale_pick()
 
     def _native_wanted(self) -> bool:
         """"Original size" applies to every function that sends a re-scaled picture to the model: not to Upscale and
@@ -128,9 +192,16 @@ class ModeMixin:
             offered = self._custom_workflow() or any(key in x.modes and x.key not in hidden for x in models.MODELS)
             rb.configure(state="normal" if offered else "disabled")
             self.tt_modes[key].text = MODE_TIPS[key]        # no ranking in the tooltip (user 3.11.: it was for development)
+            if key in SCALE_MODES:      # Upscale and Refine are ONE button (rb_scale_fn, Easy Mode too); these two stay hidden
+                rb.grid_remove()
+                if key == "upscale":
+                    shown.append("scale")
+                    self.rb_scale_fn.configure(state="normal" if self._custom_workflow() or any(
+                        ("upscale" in x.modes or "refine" in x.modes) and x.key not in hidden for x in models.MODELS) else "disabled")
+                continue
             shown.append(key)
         for i, key in enumerate(shown):
-            self.rb_modes[key].grid(row=i // 2, column=i % 2, sticky="ew", padx=2, pady=2)
+            (self.rb_scale_fn if key == "scale" else self.rb_modes[key]).grid(row=i // 2, column=i % 2, sticky="ew", padx=2, pady=2)
         self._update_model_chips()
 
     def _update_model_chips(self):
@@ -147,7 +218,8 @@ class ModeMixin:
                 continue
             rb.grid(row=i // 3, column=i % 3, sticky="ew", padx=2, pady=2)
             i += 1
-            rb.configure(state="normal" if (mode in m.modes or self._custom_workflow()) else "disabled")
+            ok = mode in m.modes or self._custom_workflow() or (mode == "upscale" and "refine" in m.modes)
+            rb.configure(state="normal" if ok else "disabled")      # standard mode: a model without Upscale (Fibo) falls back to None
 
     def _chip_menu(self, key: str, event):
         """Right-click on a model chip (L3, user 29.10.): this model as the favourite of the chosen function (a tick in the
@@ -234,7 +306,11 @@ class ModeMixin:
         self._remember_model_for_mode()
         self._reset_detail()
         if self.v_mode.get() not in m.modes:
-            self.v_mode.set(next(iter(m.modes)))
+            if self.v_mode.get() == "upscale" and "refine" in m.modes:
+                self.v_mode.set("refine")        # Fibo cannot enlarge: back to None
+                self._status(f"{m.label} cannot enlarge pictures, so the factor is None. Use Qwen, Flux 3 or Flux 2 for 1.5x and more.")
+            else:
+                self.v_mode.set(next(iter(m.modes)))
         self._apply_model_mode(force=True)
         self._on_mode_ui()
         self._on_workflow()
@@ -290,7 +366,8 @@ class ModeMixin:
             t.delete("1.0", "end")
             t.insert("1.0", first[1])
             t.edit_separator()
-            self.v_pchoice.set(first[0])
+            if mode == "refine":
+                self._rpick = first[0]
         elif (cur == "" or cur in models.STOCK_PROMPTS) and str(t.cget("state")) != "disabled":   # an unedited stock text is replaced
             t.delete("1.0", "end")
             if spec.prompt_hint:
@@ -465,7 +542,7 @@ class ModeMixin:
             self.v_bbox.set(False)
             self._refs_bbox_changed()
         self.v_clip.set(CLIP_DEFAULT)
-        self.v_pchoice.set("")
+        self._rpick = ""
         self.v_lora_str.set(1.0)
         self._lora_wf = None                     # the LoRA slider starts at the value the workflow ships with (else 1.0)
         self._ctx.pop(self.v_mode.get(), None)      # only this function forgets its Context value; the others keep theirs
@@ -609,6 +686,9 @@ class ModeMixin:
                     notes.append(f"{label} needs {', '.join(names[:2])}")
             else:
                 cb.configure(state="normal")
+        for i, cb in enumerate(self.stage_cbs):     # the twin in the Advanced settings looks the same (state and tip)
+            self.stage_adv_cbs[i].configure(state=str(cb.cget("state")))
+            self.stage_adv_tips[i].text = self.stage_tips[i].text
         if notes:
             self._on_turbo()
             self._update_stage_scales()
@@ -630,10 +710,11 @@ class ModeMixin:
             st = stages[i] if i < len(stages) else None
             if st is None or st.get("strength") is None:
                 sf.grid_remove()
-                if st is not None:
+                if st is not None and not st.get("advanced"):      # (a stage in the Advanced settings has no place in this box: grid_configure would show it again)
                     self.stage_cbs[i].grid_configure(columnspan=2)     # no slider: its text may use the slider's room
                 continue
-            self.stage_cbs[i].grid_configure(columnspan=1)
+            if not st.get("advanced"):
+                self.stage_cbs[i].grid_configure(columnspan=1)
             if reset:
                 self.v_sstr[i].set(min(1.0, st["strength"]))
             sf.grid()
@@ -738,6 +819,7 @@ class ModeMixin:
         """Grey out what has no effect in the current mode with the current workflow."""
         if not hasattr(self, "w_adv"):
             return
+        self._update_factor_buttons()
         mode = self._run_mode()
         scale = mode in SCALE_MODES
         masked = mode in ("inpaint", "remove", "outpaint")
@@ -819,14 +901,28 @@ class ModeMixin:
             reset_str = True
             for var, st in zip(self.stage_vars, stages):
                 var.set(st["default_on"])
+        moved = False
         for i, cb in enumerate(self.stage_cbs):
+            twin = self.stage_adv_cbs[i]
+            was = bool(twin.winfo_manager())
             if i < len(stages):
                 cb.configure(state="normal", text=stages[i]["label"])
                 self.stage_tips[i].text = stages[i]["tip"] or STAGE_TIP
-                cb.grid()
+                if stages[i].get("advanced"):      # the checkbox sits at the top of the Advanced settings (MOSS' skip-layer guidance, user 7.11.)
+                    cb.grid_remove()
+                    twin.configure(state="normal", text=stages[i]["label"])
+                    self.stage_adv_tips[i].text = self.stage_tips[i].text
+                    twin.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+                else:
+                    twin.grid_remove()
+                    cb.grid()
             else:
                 cb.configure(state="disabled", text="Stage")
                 cb.grid_remove()          # a workflow without that stage shows nothing (the stages belong to MOSS / Flux 3 upscale)
+                twin.grid_remove()
+            moved = moved or was != bool(twin.winfo_manager())
+        if moved and getattr(self, "_sized", False):
+            self._fit_height()
         self._update_stage_scales(reset=reset_str)
         self._enforce_switch_files()
         self._update_options_box(has_lora, stages)

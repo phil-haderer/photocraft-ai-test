@@ -1,0 +1,379 @@
+{
+ "1": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "fibo2_edit_turbo_int8_convrot.safetensors",
+   "weight_dtype": "default"
+  },
+  "_meta": {
+   "title": "Fibo 2 Edit Turbo"
+  }
+ },
+ "2": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+   "type": "fibo2",
+   "device": "default"
+  },
+  "_meta": {
+   "title": "Fibo text encoder"
+  }
+ },
+ "3": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "flux2-vae.safetensors"
+  },
+  "_meta": {
+   "title": "VAE"
+  }
+ },
+ "4": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "example.png"
+  },
+  "_meta": {
+   "title": "pc:image"
+  }
+ },
+ "5": {
+  "class_type": "ImageScaleToTotalPixels",
+  "inputs": {
+   "upscale_method": "lanczos",
+   "megapixels": 2,
+   "resolution_steps": 32,
+   "image": [
+    "4",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "pc:upscale Size of the result (without the model stage)"
+  }
+ },
+ "6": {
+  "class_type": "GetImageSize",
+  "inputs": {
+   "image": [
+    "14",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Result size"
+  }
+ },
+ "7": {
+  "class_type": "TextEncodeFibo2",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "prompt": "",
+   "negative_prompt": "",
+   "vae": [
+    "3",
+    0
+   ],
+   "images.image_1": [
+    "100",
+    0
+   ],
+   "width": [
+    "170",
+    1
+   ],
+   "height": [
+    "171",
+    1
+   ],
+   "batch_size": 1
+  },
+  "_meta": {
+   "title": "pc:prompt Positive prompt"
+  }
+ },
+ "8": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "positive": [
+    "7",
+    0
+   ],
+   "negative": [
+    "7",
+    1
+   ],
+   "latent_image": [
+    "7",
+    2
+   ],
+   "seed": 1234,
+   "steps": 8,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1
+  },
+  "_meta": {
+   "title": "pc:sampler"
+  }
+ },
+ "9": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "8",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Decode"
+  }
+ },
+ "10": {
+  "class_type": "PreviewImage",
+  "inputs": {
+   "images": [
+    "103",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "pc:output Result"
+  }
+ },
+ "12": {
+  "class_type": "UpscaleModelLoader",
+  "inputs": {
+   "model_name": "4x-UltraSharpV2.safetensors"
+  },
+  "_meta": {
+   "title": "Upscale model - 4x-UltraSharpV2",
+   "pc_stage_off": {
+    "label": "4x UltraSharp first",
+    "remove": [
+     "12"
+    ],
+    "rewire": [
+     "14",
+     "13"
+    ],
+    "excludes": [
+     "102"
+    ],
+    "set_nodes": {
+     "6": {
+      "image": [
+       "5",
+       0
+      ]
+     },
+     "100": {
+      "image": [
+       "5",
+       0
+      ]
+     }
+    },
+    "tip": "A model enlarges the picture first, then Fibo redraws it: sharper detail (best of the tests at 1.5x and 2x). Not together with Tiles. Licence of the model: non-commercial."
+   }
+  }
+ },
+ "13": {
+  "class_type": "ImageUpscaleWithModel",
+  "inputs": {
+   "upscale_model": [
+    "12",
+    0
+   ],
+   "image": [
+    "4",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Upscale Image (using Model) - 4x UltraSharp"
+  }
+ },
+ "14": {
+  "class_type": "ImageScaleToTotalPixels",
+  "inputs": {
+   "upscale_method": "lanczos",
+   "megapixels": 2,
+   "resolution_steps": 32,
+   "image": [
+    "13",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "pc:upscale Size of the result after the model stage"
+  }
+ },
+ "170": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "ceil(((a - 128) / max(1, ceil((a - 128) / 1280)) + 128) / 32) * 32",
+   "values.a": [
+    "6",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Math Expression - Tile width (equal tiles, about 1280 px apart)"
+  }
+ },
+ "171": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "ceil(((a - 128) / max(1, ceil((a - 128) / 1280)) + 128) / 32) * 32",
+   "values.a": [
+    "6",
+    1
+   ]
+  },
+  "_meta": {
+   "title": "Math Expression - Tile height (equal tiles, about 1280 px apart)"
+  }
+ },
+ "100": {
+  "class_type": "SplitImageToTileList",
+  "inputs": {
+   "image": [
+    "14",
+    0
+   ],
+   "tile_width": [
+    "170",
+    1
+   ],
+   "tile_height": [
+    "171",
+    1
+   ],
+   "overlap": 128
+  },
+  "_meta": {
+   "title": "Split Image into Tiles - tiles of about 1280 px"
+  }
+ },
+ "101": {
+  "class_type": "ImageMergeTileList",
+  "inputs": {
+   "image_list": [
+    "9",
+    0
+   ],
+   "final_width": [
+    "6",
+    0
+   ],
+   "final_height": [
+    "6",
+    1
+   ],
+   "overlap": 128
+  },
+  "_meta": {
+   "title": "Merge Tiles - Join the tiles"
+  }
+ },
+ "102": {
+  "class_type": "ImageScale",
+  "inputs": {
+   "image": [
+    "4",
+    0
+   ],
+   "upscale_method": "lanczos",
+   "width": [
+    "6",
+    0
+   ],
+   "height": [
+    "6",
+    1
+   ],
+   "crop": "disabled"
+  },
+  "_meta": {
+   "title": "Upscale Image - To the size of the result",
+   "pc_stage_off": {
+    "label": "Tiles",
+    "default_on": false,
+    "excludes": [
+     "12"
+    ],
+    "auto_on_above_mp": 3.0,
+    "remove": [
+     "100",
+     "101",
+     "102",
+     "103",
+     "170",
+     "171"
+    ],
+    "set_nodes": {
+     "7": {
+      "images.image_1": [
+       "14",
+       0
+      ],
+      "width": [
+       "6",
+       0
+      ],
+      "height": [
+       "6",
+       1
+      ]
+     },
+     "10": {
+      "images": [
+       "9",
+       0
+      ]
+     },
+     "5": {
+      "resolution_steps": 8
+     },
+     "14": {
+      "resolution_steps": 8
+     }
+    },
+    "tip": "Fibo redraws the picture in tiles, like Flux 3 Upscale: no limit from the size of one pass, and at 2x sometimes the better picture. Used by itself above 3 MP. Needs the ComfyUI-KJNodes pack (Color Match). Not together with 4x UltraSharp."
+   }
+  }
+ },
+ "103": {
+  "class_type": "ColorMatch",
+  "inputs": {
+   "image_ref": [
+    "102",
+    0
+   ],
+   "image_target": [
+    "101",
+    0
+   ],
+   "method": "mkl",
+   "strength": 1.0,
+   "multithread": true
+  },
+  "_meta": {
+   "title": "Color Match (KJNodes) - Colours back to your picture"
+  }
+ }
+}

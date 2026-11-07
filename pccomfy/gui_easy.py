@@ -66,7 +66,8 @@ class EasyMixin:
             mode = self.v_mode.get()
             changed = False
             if not picks.get(mode):
-                nxt = next((m for m in em.EASY_MODES if picks[m]), "")
+                twin = {"upscale": "refine", "refine": "upscale"}.get(mode, "")      # one button for both: stay on it (None / a factor)
+                nxt = twin if twin and picks.get(twin) else next((m for m in em.EASY_MODES if picks[m]), "")
                 if nxt:
                     mode, changed = nxt, True
                     self.v_mode.set(mode)
@@ -140,16 +141,31 @@ class EasyMixin:
         if not getattr(self, "_easy", False):
             return
         picks = self._easy_models()
-        shown = [k for k, _label in MODE_LABELS if k in em.EASY_MODES and k in self.rb_modes]     # the window's usual order
+        # the window's usual order; Upscale and Refine are one button "Upscale / Refine" (in Upscale's place)
+        shown = ["scale" if k == "upscale" else k for k, _label in MODE_LABELS
+                 if k in em.EASY_MODES and k in self.rb_modes and k != "refine"]
         for key, rb in self.rb_modes.items():
-            if key not in shown:
-                rb.grid_remove()
+            rb.grid_remove()
         for i, key in enumerate(shown):
-            rb = self.rb_modes[key]
+            rb = self.rb_scale_fn if key == "scale" else self.rb_modes[key]
             rb.grid(row=i // 2, column=i % 2, sticky="ew", padx=2, pady=2)
+            if key == "scale":
+                rb.configure(state="normal" if picks["upscale"] or picks["refine"] else "disabled")
+                continue
             rb.configure(state="normal" if picks[key] else "disabled")
             # only the model Easy Mode uses for it (user 3.11.)
             self.tt_modes[key].text = em.MODE_MODEL_TIP.format(model=models.BY_KEY[picks[key]].label) if picks[key] else em.MODE_GREYED_TIP
+
+    def _update_factor_buttons(self):
+        """Easy Mode: a factor is offered when a model for Upscale is installed, the Refine row when one for Refine is."""
+        if not getattr(self, "_easy", False):
+            return super()._update_factor_buttons()
+        picks = self._easy_models()
+        up = models.BY_KEY.get(picks.get("upscale") or "")
+        for key, rb in self.rb_scale.items():
+            rb.configure(state="normal" if up is not None and self._factor_ok(up, key) else "disabled")
+        for rb in self.rb_refine.values():
+            rb.configure(state="normal" if picks.get("refine") else "disabled")
 
     def _show_enhance_box(self, on: bool):
         if not getattr(self, "_easy", False):

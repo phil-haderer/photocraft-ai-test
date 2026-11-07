@@ -4,6 +4,7 @@ from __future__ import annotations
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 from . import icons
+from . import workflows
 from . import history as runhistory
 from .listpopup import ListPopup
 
@@ -332,13 +333,50 @@ class RunMixin:
         if getattr(self, "_last_seed", None) is not None:
             self.v_seed.set(self._last_seed)
 
-    def cut_background(self):
-        """The scissors in the footer (user 5.11.): the visible picture without its background, as a new layer on top
-        (Bridge.remove_background_layer, ComfyUI's BiRefNet). Runs like a generation: progress bar, Cancel, Undo afterwards."""
+    def _cutout_ok(self, key: str) -> bool:
+        """False only when ComfyUI was read and the model's file is not there; not read yet (or not reachable): the click tries."""
+        inv = getattr(self, "inv", None)
+        return inv is None or inv.has(workflows.cutout_model(key)[2])
+
+    def _cutout_available(self) -> bool:
+        """At least one cut-out model can run (the scissors is greyed out only when none can)."""
+        return any(self._cutout_ok(m[0]) for m in workflows.CUTOUT_MODELS)
+
+    def _cutout_rows(self) -> list[tuple[str, object, str]]:
+        """The menu of the scissors (user 6.11.): BiRefNet, RMBG-2.0, Both; an entry whose file is missing is greyed out."""
+        rows = []
+        for key, label, _file, _wf in workflows.CUTOUT_MODELS:
+            ok = self._cutout_ok(key)
+            rows.append((label if ok else f"{label} (file missing)", (lambda k=key: self.cut_background((k,))) if ok else None,
+                         "item" if ok else "disabled"))
+        both = all(self._cutout_ok(k) for k in workflows.CUTOUT_BOTH)
+        rows.append((CUTOUT_BOTH_LABEL if both else f"{CUTOUT_BOTH_LABEL} (file missing)",
+                     (lambda: self.cut_background(workflows.CUTOUT_BOTH)) if both else None, "item" if both else "disabled"))
+        return rows
+
+    def _cutout_menu(self):
+        """A click on the scissors opens the list of models above it (every time, user 6.11.); a second click closes it."""
         if self.worker and self.worker.is_alive():
+            return
+        old, self._cut_popup = getattr(self, "_cut_popup", None), None
+        if old is not None and not old.closed:
+            old.close()
             return
         if not self._cutout_available():
             self._status(CUTOUT_MISSING, error=True)
+            return
+        self._cut_popup = ListPopup(self.root, self.b_cut, self._cutout_rows(), scale=getattr(self, "ui", 1.0), above=True)
+
+    def cut_background(self, models: tuple = ("birefnet",)):
+        """The scissors in the footer (user 5.11.; the model menu 6.11.): the visible picture without its background, as a new layer
+        on top (Bridge.remove_background_layer, ComfyUI's BiRefNet and/or RMBG-2.0; Both: two layers, RMBG-2.0 above). Runs like a
+        generation: progress bar, Cancel, Undo afterwards."""
+        if self.worker and self.worker.is_alive():
+            return
+        models = tuple(models)
+        missing = [workflows.cutout_model(k)[2] for k in models if not self._cutout_ok(k)]
+        if missing:
+            self._status(f"{', '.join(missing)} is missing (optional file): download it in the gear window, Models, Additional.", error=True)
             return
         self._running = True
         self.b_go.configure(state="disabled")
@@ -357,8 +395,9 @@ class RunMixin:
         def work():
             t_start = time.monotonic()
             try:
-                self.bridge.remove_background_layer(progress)
-                self.events.put(("done", f"Done · background removed, new layer on top · {duration_text(time.monotonic() - t_start)}"))
+                self.bridge.remove_background_layer(progress, models)
+                what = "new layer on top" if len(models) == 1 else f"{len(models)} new layers on top"
+                self.events.put(("done", f"Done · background removed, {what} · {duration_text(time.monotonic() - t_start)}"))
             except Cancelled:
                 self.events.put(("done", "Cancelled."))
             except (BridgeError, ComfyError, PhotoCraftError, ValueError, OSError) as e:
@@ -368,13 +407,8 @@ class RunMixin:
         self.worker = threading.Thread(target=work, daemon=True)
         self.worker.start()
 
-    def _cutout_available(self) -> bool:
-        """False only when ComfyUI was read and has no birefnet.safetensors; not read yet (or not reachable): the click tries."""
-        inv = getattr(self, "inv", None)
-        return inv is None or inv.has("birefnet.safetensors")
-
     def _update_cut_button(self):
-        """The scissors is greyed out while the BiRefNet file is missing; its tooltip then names the file."""
+        """The scissors is greyed out while no model file is there; its tooltip then names the files."""
         b = getattr(self, "b_cut", None)
         if b is None:
             return

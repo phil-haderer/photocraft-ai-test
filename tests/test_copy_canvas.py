@@ -81,7 +81,7 @@ def cut_checks():
             self.calls = 0
         reset_cancel_all = lambda self: None   # noqa: E731
 
-        def remove_background_layer(self, progress):
+        def remove_background_layer(self, progress, models=("birefnet",)):
             self.calls += 1
             progress(0.5, "Cutting out the background")
             progress(0.6, "KSampler 1/1", phase="image", phase_fraction=0.5)
@@ -103,7 +103,7 @@ def cut_checks():
     assert app._running is True            # the "done" event (_poll) ends the run state like after a generation
 
     class Bad(B):
-        def remove_background_layer(self, progress):
+        def remove_background_layer(self, progress, models=("birefnet",)):
             raise BridgeError("Open a document in PhotoCraft first.")
     app._running = False
     app.bridge = Bad()

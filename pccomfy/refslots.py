@@ -391,11 +391,10 @@ class RefSlotsMixin:
         self.btn_refs.pack(side="left")
         Tooltip(self.btn_refs, "Shows or hides the reference image slots.")
         self.f_refbody = ttk.Frame(self.f_refs)      # everything under the head line: what the drop-down hides
-        head2 = ttk.Frame(self.f_refbody)       # the BBOX tick (Flux 3), at the left: a line of its own, the head line has no room for it
-        head2.pack(fill="x")
+        head2 = self.f_refhead2 = ttk.Frame(self.f_refbody)       # the BBOX tick (Flux 3), at the left: a line of its own, the head line has no room for it; packed only with the tick (user 7.11.: no empty line without it)
         # "Send reference images in original size": each image keeps its size up to a limit instead of the model's usual one (user 4.11.)
         self.f_refsize = ttk.Frame(self.f_refbody)
-        self.f_refsize.pack(fill="x", pady=(4, 0))
+        self.f_refsize.pack(fill="x")
         self.cb_refsize = ttk.Checkbutton(self.f_refsize, text="Send ref. images in original size, up to", variable=self.v_ref_native,
                                        style="Muted.TCheckbutton")
         self.cb_refsize.pack(side="left")
@@ -499,12 +498,15 @@ class RefSlotsMixin:
         if not want:
             self.f_refs.pack_forget()
             self.cb_bbox.pack_forget()
+            self.f_refhead2.pack_forget()
             return
         m = self._refs_model()
         if m.bbox:
             self.cb_bbox.pack(side="left")
+            self.f_refhead2.pack(fill="x", pady=(0, 4), before=self.f_refsize)
         else:
             self.cb_bbox.pack_forget()
+            self.f_refhead2.pack_forget()
         self._refs_bbox_changed()
         self.refslots.set_model(self._refs_max(m), m.tag_style)
         self.f_refs.pack(fill="x", padx=10, pady=(6, 0), before=self.f_neg)

@@ -6,6 +6,8 @@ from .refslots import BBOX_TIP
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
+REFINE_DEFAULT_TIP = "Refine with the default prompt: same size, as a new layer."
+
 
 def put_in_front(t, text: str) -> None:
     """A generated text (Describe, the LLM button) goes in front of the prompt, followed by a line break; an empty prompt
@@ -277,26 +279,27 @@ class PromptMixin:
             self._status(f"Could not copy: {e}", error=True)
 
     def _update_prompt_choices(self):
-        """Ready-made prompts of a mode (Flux 2 refine): small switches next to "Prompt" that put the text into the field (the
-        look of the Upscale factor, user 29.10.: PhotoCraft has no round radio buttons); the chosen one is orange."""
+        """The Refine row under the Upscale factor (user 6.11.): one small switch per ready-made prompt of the model's Refine
+        (Flux 2: Default, Neutral, Studio portrait; Flux 3: Default, Restore), a lone "Default" for the others. The lit one is the
+        Refine button that was chosen (v_fac); the prompt may be edited afterwards."""
         m = self._model()
-        spec = m.modes.get(self.v_mode.get()) if m else None
-        choices = spec.prompts if spec else ()
-        key = (m.key, self.v_mode.get()) if choices else None
-        if key == self._pchoice_key:
-            return
-        self._pchoice_key = key
-        for w in (self.f_pchoice.winfo_children() or []):
-            w.destroy()
-        if not choices:
-            return
-        cur = self.t_prompt.get("1.0", "end").strip()
-        self.v_pchoice.set(next((lb for lb, text, _ in choices if text.strip() == cur), ""))
-        for label, text, tip in choices:
-            rb = ttk.Radiobutton(self.f_pchoice, text=label, value=label, variable=self.v_pchoice,
-                                 command=lambda t=text: self._insert_prompt(t), style="Small.Toolbutton")
-            rb.pack(side="left", padx=(0, 4))
-            Tooltip(rb, tip)
+        spec = m.modes.get("refine") if m else None
+        choices = (spec.prompts or (("Default", None, REFINE_DEFAULT_TIP),)) if spec else ()
+        key = (m.key, tuple(c[0] for c in choices)) if m else None
+        if key != self._pchoice_key:
+            self._pchoice_key = key
+            self._rpick = ""
+            for w in (self.f_refine.winfo_children() or []):
+                w.destroy()
+            self.rb_refine = {}
+            for label, _text, tip in choices:
+                rb = ttk.Radiobutton(self.f_refine, text=label, value="r:" + label, variable=self.v_fac,
+                                     command=self._on_factor, style="Small.Toolbutton")
+                rb.pack(side="left", padx=(0 if not self.rb_refine else 4, 0))
+                Tooltip(rb, tip)
+                self.rb_refine[label] = rb
+        self._sync_fac()
+        self._update_factor_buttons()
 
     def _insert_prompt(self, text: str):
         t = self.t_prompt
@@ -427,7 +430,6 @@ class PromptMixin:
             t.edit_separator()
         finally:
             t.configure(autoseparators=auto)
-        self.v_pchoice.set("")
         t.focus_set()
         self._status("Style added to the prompt. Ctrl+Z in the field takes it away again.")
 
@@ -541,7 +543,6 @@ class PromptMixin:
         t.edit_separator()
         t.delete("1.0", "end")
         t.edit_separator()
-        self.v_pchoice.set("")
         t.focus_set()
 
     def _sync_prompt_field(self, mode: str):

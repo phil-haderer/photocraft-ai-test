@@ -180,10 +180,11 @@ class LoraMixin:
         self.lbl_lora_str.configure(text=f"{float(self.v_lora_str.get()):.2f}")
 
     def _opts_in_advanced(self) -> bool:
-        """The switch box sits in the Advanced settings for Flux 3 Upscale (SeedVR2) and every function of Qwen 2.1 (Turbo LoRA)
-        (user 6.11.); the other workflows keep it under the prompt."""
+        """The switch box sits in the Advanced settings for Flux 3 Upscale (SeedVR2), every function of Qwen 2.1 (Turbo LoRA) and
+        Flux 2 Upscale / Refine (Ultra real LoRA) (user 6.11.); the other workflows keep it under the prompt."""
         m = self._model()
-        return bool(m is not None and (m.key == "qwen" or (m.key == "flux3" and self.v_mode.get() == "upscale")))
+        return bool(m is not None and (m.key == "qwen" or (m.key == "flux3" and self.v_mode.get() == "upscale")
+                                       or (m.key == "flux2" and self.v_mode.get() in ("upscale", "refine"))))
 
     def _update_options_box(self, has_lora: bool, stages: list):
         """The box with the workflow's LoRA / stage switches is shown only when there is something in it: under the prompt,

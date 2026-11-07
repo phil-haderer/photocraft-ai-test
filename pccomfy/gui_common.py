@@ -54,6 +54,7 @@ MODE_LABELS = [
     ("refine", "Refine (same size)"),
     ("img2img", "Image → image"),    # only for a workflow of your own (no model tab)
 ]
+SCALE_FN_LABEL = "Upscale / Refine"      # the one function button of the standard mode for Upscale and Refine (user 6.11.)
 SHORT_MODES = {"txt2img": "Text", "edit": "Edit", "inpaint": "Fill Selection", "outpaint": "Expand", "multi_edit": "Multi Edit",
                "remove": "Remove Selection", "upscale": "Upscale", "refine": "Refine", "img2img": "Img2img"}   # layer names
 MODE_TIPS = models.FUNCTION_TIPS    # the tooltips of the function buttons, the same for every model (user 28.10.)
@@ -745,9 +746,11 @@ ACCENT_TEXT = "#6aaaf5"     # the blue for text and thin lines on the grey (the 
 NA_RED = "#ff6b6b"      # text of a tab that is not available (model files missing); 5.3 : 1 on PANEL
 DISABLED = "#8e8e8e"   # text of a greyed-out control: clearly darker than MUTED, so it reads as "not available here"
 SCALE_MODES = ("upscale", "refine")   # these run only with an upscale workflow (a node titled pc:upscale)
-CUTOUT_TIP = ("Remove background: cuts the subject out of the visible picture and adds it as a new layer with a transparent "
-              "background (BiRefNet in ComfyUI).")
-CUTOUT_MISSING = "birefnet.safetensors is missing (optional file): download it in the gear window, Models, Additional."
+CUTOUT_TIP = ("Remove background: choose a model (BiRefNet, RMBG-2.0 or Both); the subject is cut out of the visible picture and added "
+              "as a new layer with a transparent background (Both: one layer per model).")
+CUTOUT_MISSING = ("No background-removal model found: download birefnet.safetensors (or rmbg-2.0.safetensors) in the gear window, "
+                  "Models, Additional.")
+CUTOUT_BOTH_LABEL = "Both"
 NO_SHARPEN_MODES = ("outpaint", "inpaint", "remove")   # no "Sharpen result" slider and none applied: Expand, Fill, Remove (user 28.10. / 5.11.)
 NO_LLM_MODES = ("outpaint", "remove") + SCALE_MODES   # no "Enhance prompt with LLM" row: fixed or ready-made prompts (user 30.10.)
 LLM_TIP = "Describe Canvas: describes the picture in PhotoCraft and adds the text to the end of your prompt. Ctrl+Z undoes it."   # the Describe Canvas button (user 3.11.)
@@ -879,6 +882,7 @@ __all__ = [
     "writer_name",
     "FILL_CONTEXT",
     "MODE_LABELS",
+    "SCALE_FN_LABEL",
     "SHORT_MODES",
     "MODE_TIPS",
     "EXPAND_HINT",
@@ -918,6 +922,7 @@ __all__ = [
     "NO_SHARPEN_MODES",
     "CUTOUT_TIP",
     "CUTOUT_MISSING",
+    "CUTOUT_BOTH_LABEL",
     "LIVE_TIP",
     "LLM_TIP",
     "STYLES_TIP",

@@ -22,6 +22,7 @@ class Mode:
     remove_text: bool = False       # Remove Selection: the field stays usable and takes an optional name of the object ("the dog")
     describe: bool = False          # Expand with Krea 2 / MOSS: a prompt is required, the Describe button under the field writes one
     steps_tip: str = ""             # the tooltip of the Steps field in this mode ("" = none)
+    max_scale: float = 0.0          # Upscale: the largest factor this model is offered for (0 = all four; the others are greyed out)
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,9 @@ _SOFT = {"layer_mask": "soft", "mask_grow": 8, "mask_blur": 8}
 FLUX2_DEFAULT = "A sharp, natural photograph of the same scene: clean detail and texture, true-to-life colors, soft natural light. Keep the composition and colors exactly as they are."
 FLUX2_DEFAULT_PREV = "A sharp, natural photograph of the same scene: clean detail and texture, true-to-life colors, soft natural light. Keep the composition, and colors exactly as they are."
 FLUX2_DEFAULT_OLD = "A sharp, natural photograph of the same scene: clean detail and texture, true-to-life colors, soft natural light. Keep the composition, people, faces and colors exactly as they are."
+# Fibo Upscale (provisional, 6.11.): FLUX2_DEFAULT ("true-to-life colors, soft natural light") coloured an old sepia photo in the first trial;
+# this text names no colour or light, only sharpness (docs/tests/fibo-upscale-ergebnis.md; more prompts follow in the next test round)
+FIBO_UPSCALE_DEFAULT = "A sharp, high-resolution version of the same photograph: clean detail and texture. Keep the composition, the subjects, the colors and the light exactly as they are."
 FLUX3_DEFAULT = "Restore the photo: remove blur, noise and compression artifacts and recover sharp, natural detail, keeping the same composition and colors."
 RELIGHT_NEUTRAL = "A crystal-clear, high-fidelity photograph of the subject captured under perfectly neutral, even lighting. The scene utilizes soft global illumination to eliminate harsh shadows and high contrast, resulting in a balanced, flat-field exposure. The white balance is calibrated to 5500K (daylight neutral), ensuring absolutely accurate, true-to-life colors with no warm or cool color casts. Photographed with a Sony A7R V using a 55mm f/8 lens for maximum sharpness from edge to edge and zero distortion. The aesthetic is objective, documentary-style, and ultra-realistic. 8k resolution, clean ISO 100, raw output. Remove watermarks and checkerboard patterns."
 RELIGHT_STUDIO = "Transform the image into a professionally lit studio portrait with soft, diffused lighting. Remove harsh sunlight, strong contrast, and directional shadows."
@@ -84,7 +88,7 @@ DESCRIBE_TIP = "Add a short description of your image in front of the default pr
 REFINE_TIP = "Refine keeps the size and redraws fine detail. " + DESCRIBE_TIP   # Refine, every model (user 3.11.)
 T2I_TIP = "A new image is added to the canvas."   # user 3.11.
 FLUX3_DEFAULT_OLD = "Restore the photo: remove blur, noise and compression artifacts and recover sharp, natural detail, keeping the same composition, people and colors."
-STOCK_PROMPTS = {FLUX2_DEFAULT_PREV, FLUX2_DEFAULT_OLD, FLUX3_DEFAULT_OLD, PLACEHOLDER, FLUX2_DEFAULT, FLUX3_DEFAULT, FLUX3_RESTORE, QWEN_UPSCALE_DEFAULT, RELIGHT_NEUTRAL, RELIGHT_STUDIO, FIBO_REFINE}   # texts the window may replace when the mode changes
+STOCK_PROMPTS = {FIBO_UPSCALE_DEFAULT, FLUX2_DEFAULT_PREV, FLUX2_DEFAULT_OLD, FLUX3_DEFAULT_OLD, PLACEHOLDER, FLUX2_DEFAULT, FLUX3_DEFAULT, FLUX3_RESTORE, QWEN_UPSCALE_DEFAULT, RELIGHT_NEUTRAL, RELIGHT_STUDIO, FIBO_REFINE}   # texts the window may replace when the mode changes
 
 # The tooltips of the function buttons: one general text per function, the same for every model (user 28.10.); what
 # holds for one model only goes into its tip under the prompt (Mode.prompt_tip). No ranking in it (user 3.11.).
@@ -97,7 +101,7 @@ FUNCTION_TIPS = {
                  "Text is optional; an empty prompt often works best. Expand large areas in small steps."),
     "edit": "Changes the whole picture from your text (\"make it night\"). A selection is ignored.",
     "img2img": "Reworks the picture (or selection) from your text.",
-    "upscale": "Enlarges the picture (or selection) into a NEW document, up to 24 MP.",
+    "upscale": "Enlarges the whole picture into a NEW document, up to 24 MP. A selection is ignored.",
     "refine": "Cleans up the whole picture at the same size, as a new layer. A selection is ignored.",
     "txt2img": "New picture from text only, as a new layer. A selection is ignored.",
 }
@@ -225,6 +229,11 @@ FIBO = Model(
         "multi_edit": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False), prompt_tip=MULTI_TIP, run_as="edit"),
         "refine": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="none", enhance=False, sharpen=0.1), FLUX2_DEFAULT, run_as="edit",
                        prompt_tip=REFINE_TIP),   # Sharpen 10 % (final, user 31.10.)
+        # Upscale (6.11.): Fibo draws the picture anew at the larger size (the user's Fibo2_turbo_edit_2K-ROPE workflow); 8 steps; tested at
+        # 1.5x to 2x only, so the larger factors are greyed out until a test run says otherwise (docs/tests/fibo-upscale-ergebnis.md)
+        # Prompt C (the Qwen upscale text) is the standard since 7.11. (rounds 3 and 4: truest to the original); the stage "4x UltraSharp first"
+        # starts on (best at 1.5x and 2x), "Tiles" is a second stage that excludes it; above 3 MP the result is made in tiles by itself (auto_on_above_mp)
+        "upscale": Mode("fibo2-upscale.json", dict(scale=1.5, layer_mask="none", enhance=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=DESCRIBE_TIP, max_scale=2.0),
         "inpaint": Mode("fibo2-edit.json", dict(base_res=1024, context=0.1, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=FILL_TIP),   # Context 0.1 chosen by the user 1.11. (was 0.4 from the test round 28.10.); Edge feather 10 % stays
         "outpaint": Mode("fibo2-edit.json", dict(base_res=1024, context=1.0, layer_mask="soft", enhance=False)),   # Context 100 %: with 40 % Fibo saw mostly the white margin and drew bars (user 4.11.); soft mask: only the new area is returned
         "remove": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=REMOVE_TIP, remove_text=True),
@@ -249,7 +258,7 @@ RANKING = {
     # the rest is the order of Easy Mode (user 31.10.); Refine and Multi Image Edit are accepted for now, still being checked (1.11.)
     "txt2img": ("flux3", "moss", "flux2", "qwen", "fibo"),
     "edit": ("flux3", "qwen", "flux2", "fibo"),
-    "upscale": ("qwen", "flux3", "flux2"),         # user 2.11.: Qwen 2.1 Upscale with the default prompt is perfect, the best one
+    "upscale": ("qwen", "flux3", "flux2", "fibo"),         # Fibo last (6.11., 1.5x and 2x only); user 2.11.: Qwen 2.1 Upscale with the default prompt is perfect, the best one
     "refine": ("fibo", "flux2", "flux3", "qwen"),     # Qwen last for now: ranked "good", more tests needed (user 4.11.)
     "multi_edit": ("flux3", "flux2", "qwen", "fibo"),
 }

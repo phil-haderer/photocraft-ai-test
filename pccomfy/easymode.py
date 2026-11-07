@@ -23,7 +23,7 @@ PRIORITY = {
     "inpaint": ("fibo", "qwen"),
     "remove": ("fibo", "qwen"),
     "outpaint": ("flux2", "flux3", "qwen", "fibo"),
-    "upscale": ("qwen", "flux3", "flux2"),
+    "upscale": ("qwen", "flux3", "flux2", "fibo"),   # Fibo last: only 1.5x and 2x (6.11.)
     "refine": ("fibo", "flux2", "flux3", "qwen"),   # same order as the ranking
 }
 

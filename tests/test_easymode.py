@@ -53,7 +53,7 @@ def main():
     # Flux 3 locked as a whole: the next model takes over; Upscale has no other model offered here -> greyed out
     no_flux3 = lambda k: k == "fibo"  # noqa: E731
     got = em.available_modes(no_flux3)
-    assert got["txt2img"] == "fibo" and got["edit"] == "fibo" and got["outpaint"] == "fibo" and got["upscale"] == "" and got["refine"] == "fibo"
+    assert got["txt2img"] == "fibo" and got["edit"] == "fibo" and got["outpaint"] == "fibo" and got["upscale"] == "fibo" and got["refine"] == "fibo"
 
     # hidden models are never chosen
     assert em.best_model("inpaint", everything, hidden={"fibo"}) == "qwen"

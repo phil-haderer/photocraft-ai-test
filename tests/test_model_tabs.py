@@ -189,12 +189,12 @@ def main():
     app.v_model.set("flux2")
     app.v_mode.set("refine")
     app._on_model()
-    assert app._pchoice_key == ("flux2", "refine")
+    assert app._pchoice_key == ("flux2", ("Default", "Neutral", "Studio portrait")) and list(app.rb_refine) == ["Default", "Neutral", "Studio portrait"]
     app._insert_prompt(models.RELIGHT_NEUTRAL)
     assert app._prompt_text().startswith("A crystal-clear, high-fidelity photograph")
     app.v_mode.set("upscale")
     app._on_model()
-    assert app._scale() == 1.5 and app.v_scale.get() == "x 1.5" and app._pchoice_key is None
+    assert app._scale() == 1.5 and app.v_scale.get() == "x 1.5" and app._pchoice_key == ("flux2", ("Default", "Neutral", "Studio portrait"))
     # Expand image: the prompt field turns orange with a hint
     app.v_mode.set("outpaint")
     app._on_model()

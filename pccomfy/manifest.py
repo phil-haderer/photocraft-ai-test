@@ -27,6 +27,11 @@ KINDS = {
     "upscale_model": ("UpscaleModelLoader", "model_name", "upscale_models"),               # 4x UltraSharp in Flux 3 Upscale
 }
 # helpers several models share, listed apart in the settings window as "Additional models" (user 30.10.), with their use
+# Own use line of a file under "Additional" with no model list behind it (the scissors work with every model, so no "...: Flux 3, Flux 2 ..."; user 6.11.)
+ADDITIONAL_USE = {
+    "birefnet.safetensors": "Remove background (scissors), Cut out in Multi Image Edit",
+    "rmbg-2.0.safetensors": "Remove background (scissors), second model",
+}
 ADDITIONAL_KINDS = {"bg_removal": "Remove background (scissors), Cut out in Multi Image Edit", "preview": "Live preview"}
 KIND_LABEL = {"unet": "Diffusion model", "clip": "Text encoder", "vae": "VAE", "lora": "LoRA", "preview": "Preview decoder",
               "bg_removal": "Background removal", "upscale_model": "Upscale model"}
@@ -129,9 +134,14 @@ _LIST = [
 _LIST += [
     # the reference slots' "Cut out" button (ComfyUI's own BiRefNet nodes)
     File("4x-UltraSharpV2.safetensors", "upscale_model", _HF + "Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.safetensors",
-         "Flux 3 Upscale, switch \"4x UltraSharp\" (on by default)", size=139792588),
+         "Flux 3 Upscale and Fibo Upscale, switch \"4x UltraSharp\" (on by default)", size=139792588),
     File("birefnet.safetensors", "bg_removal", _HF + "Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors",
          "optional: \"Cut out\" in the reference slots and the footer scissors (Remove background); licence: MIT", size=444473596),
+    # second model of the footer scissors' menu (PLAN: Cutout-Knopf, 6.11.). Bria's RMBG-2.0 (BiRefNet-based); the official file is
+    # gated (401 without a Hugging Face login), so the link goes to the community mirror whose file is byte-identical (same SHA-256).
+    File("rmbg-2.0.safetensors", "bg_removal", _HF + "chflame163/ComfyUI_LayerStyle/resolve/main/ComfyUI/models/BiRefNet/RMBG-2.0/model.safetensors",
+         "optional: second model for the footer scissors (Remove background); RMBG-2.0 by Bria AI, licence: non-commercial use "
+         "only (Bria RMBG-2.0 licence); this link is a community mirror of briaai/RMBG-2.0", size=884878856),
 ]
 _TAESD = "https://raw.githubusercontent.com/madebyollin/taesd/main/"      # not github.com: its certificate chain fails in Windows Python
 _LIVE = "optional: sharper live preview (without it ComfyUI shows coarse colours); "
@@ -173,6 +183,7 @@ _SHA256 = {
     'Moss\\lenovo_moss.safetensors': "f28ab12e33e60146c8740a86730385cf5ba488e9f6eda50b14383d6ddbf300fb",
     '4x-UltraSharpV2.safetensors': "2b5db674aa8f3864a696dccd1d07d7cc0500fbf220f35044cd30eee9a7f971a7",
     'birefnet.safetensors': "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154",
+    'rmbg-2.0.safetensors': "566ed80c3d95f87ada6864d4cbe2290a1c5eb1c7bb0b123e984f60f76b02c3a7",
     'lighttaew2_1.safetensors': "8666e769f449f2d955651564bcadb0c5e12461b50480e67b7241f32c15f11a19",
 }
 _LIST = [replace(f, sha256=_SHA256.get(f.name, "")) for f in _LIST]
@@ -198,7 +209,7 @@ _ULTRA = ("Flux 2\\ultra_real_v4.safetensors",)
 _UPSAMPLER = "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"
 _TAEF2 = "taef2_decoder.pth"           # live preview of the Flux 2 latent: Flux 2, Flux 3, Fibo, MOSS
 DESCRIBE_FALLBACK = "qwen3.5_9b_int8_convrot.safetensors"     # the LLM button and "Describe" in the reference slots (user 30.10.)
-_CUT_OWN_LLM = ModeSpec(optional=("birefnet.safetensors",))     # the same without the 9B fallback, for every model: the 9B fallback is no longer listed anywhere (Fibo, Flux 3 and Qwen 6.11., Flux 2 6.11. evening)
+_CUT_OWN_LLM = ModeSpec(optional=("birefnet.safetensors", "rmbg-2.0.safetensors"))     # the same without the 9B fallback, for every model: the 9B fallback is no longer listed anywhere (Fibo, Flux 3 and Qwen 6.11., Flux 2 6.11. evening)
 
 TABS: dict[str, TabSpec] = {
     "flux3": TabSpec(
@@ -239,7 +250,8 @@ TABS: dict[str, TabSpec] = {
         optional=("qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors", "taeqi2_1_decoder.pth")),      # no 9B int8 fallback in the list (user 6.11.): Describe uses the w4a8 writer of Qwen Text to image
     "fibo": TabSpec(
         required=("fibo2_edit_turbo_int8_convrot.safetensors", "qwen3vl_4b_int8_convrot.safetensors", _UPS),
-        modes={"multi_edit": _CUT_OWN_LLM},      # Fibo describes with its own 4B writer (user 6.11.): the 9B file is not listed
+        modes={"multi_edit": _CUT_OWN_LLM,
+               "upscale": ModeSpec(requires=("4x-UltraSharpV2.safetensors",))},      # "4x UltraSharp first" starts on (user 7.11.): a required file. Fibo describes with its own 4B writer (user 6.11.): the 9B file is not listed
         optional=(_TAEF2,)),
     "krea2": TabSpec(
         required=("krea2_turbo_int8_convrot.safetensors", "qwen3vl_4b_int8_convrot.safetensors", "qwen_image_vae.safetensors"),
@@ -333,6 +345,7 @@ FEATURE_USE = {
     "qwen3.5_9b_w4a8_gptq.safetensors": "LLM prompt enhancement",
     "qwen3vl_4b_int8_convrot.safetensors": "LLM prompt enhancement, Describe",
     "birefnet.safetensors": "Cut out, remove background",
+    "rmbg-2.0.safetensors": "Remove background (second model)",
     "qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors": "Turbo LoRA",
     "Moss\\lora_dmd2.safetensors": "Turbo LoRA",
     "seedvr2_3b_int8_convrot.safetensors": "SeedVR2 pre-cleaning",
@@ -373,7 +386,7 @@ GGUF_PAGES = {
 # node class prefix -> (pack, where to get it). Only what the shipped workflows use.
 NODE_PACKS = (
     ("SeedVR2", "ComfyUI itself (SeedVR2 nodes): update ComfyUI", "https://github.com/comfyanonymous/ComfyUI"),
-    ("ColorMatch", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),      # Flux 3 Upscale: colours back to your picture
+    ("ColorMatch", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),      # Flux 3 Upscale and Fibo Upscale tiles: colours back to your picture
     ("GrowMaskWithBlur", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),
     ("MaskBoundingBox+", "ComfyUI_essentials", "https://github.com/cubiq/ComfyUI_essentials"),
 )
@@ -393,7 +406,7 @@ CONTRIBUTORS = (
     ("Comfy-Org", "ComfyUI-ready model files: Qwen-Image 2.1, Qwen3-VL, FLUX.2, MOSS-Image, SeedVR2, Fibo 2.0", "https://huggingface.co/Comfy-Org"),
     ("Black Forest Labs", "FLUX.2 Klein and FLUX.3 Klein", "https://huggingface.co/black-forest-labs"),
     ("Qwen team (Alibaba)", "Qwen-Image 2.1 and the Qwen text encoders", "https://huggingface.co/Qwen"),
-    ("Bria", "Fibo 2.0 Edit and the VGL prompt format", "https://huggingface.co/briaai"),
+    ("Bria", "Fibo 2.0 Edit, the VGL prompt format and RMBG-2.0 (second model of the Remove background scissors; non-commercial licence)", "https://huggingface.co/briaai/RMBG-2.0"),
     ("OpenMOSS", "MOSS-Image", "https://huggingface.co/OpenMOSS-Team"),
     ("Krea", "Krea 2 Turbo", "https://www.krea.ai"),
     ("ausboss", "the FLUX.3 Klein Restore and Outpaint LoRAs", "https://huggingface.co/ausboss"),

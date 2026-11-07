@@ -72,7 +72,8 @@
      "7"
     ],
     "default_on": false,
-    "tip": "Skip-layer guidance: cleaner detail, can look over-processed."
+    "tip": "Skip-layer guidance: cleaner detail, can look over-processed.",
+    "advanced": true
    }
   }
  },

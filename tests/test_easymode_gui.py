@@ -69,7 +69,8 @@ def main():
     assert shown(app.f_go) and shown(app.t_prompt) and shown(app.cb_live) and shown(app.b_history) and shown(app.b_copy_canvas)
     assert shown(app.b_easy)
     on = [k for k, rb in app.rb_modes.items() if shown(rb)]
-    assert on == [k for k, _ in gui.MODE_LABELS if k in em.EASY_MODES], on                       # no Multi Image Edit, no Refine
+    assert on == [k for k, _ in gui.MODE_LABELS if k in em.EASY_MODES and k not in ("upscale", "refine")], on   # no Multi Image Edit
+    assert shown(app.rb_scale_fn) and (app.rb_scale_fn.grid_info()["row"], app.rb_scale_fn.grid_info()["column"]) == (2, 1), "the sixth Easy Mode button"
     assert app.t_prompt.get("1.0", "end").strip() == "a red kite", repr(app.t_prompt.get("1.0", "end"))
 
     # a function click picks the best model for it
@@ -105,10 +106,11 @@ def main():
     app._model_usable = lambda key, mode: key == "fibo"
     app._easy_refresh()
     app.root.update()
-    assert str(app.rb_modes["upscale"].cget("state")) == "disabled"
     assert str(app.rb_modes["edit"].cget("state")) == "normal"
-    assert app.v_model.get() == "fibo" and app.v_mode.get() == "txt2img", (app.v_model.get(), app.v_mode.get())
-    assert app.tt_modes["upscale"].text == em.MODE_GREYED_TIP
+    # Upscale / Refine is one button: Fibo enlarges up to 2x (6.11.), so 3x and 4x are greyed out, the Refine row works
+    assert str(app.rb_scale_fn.cget("state")) == "normal"
+    assert app.v_model.get() == "fibo" and app.v_mode.get() in ("upscale", "refine"), (app.v_model.get(), app.v_mode.get())
+    assert [str(app.rb_scale[k].cget("state")) for k in ("x 1.5", "x 2", "x 3", "x 4")] == ["normal", "normal", "disabled", "disabled"] and app.rb_refine and all(str(rb.cget("state")) == "normal" for rb in app.rb_refine.values())
     assert app.tt_modes["edit"].text == "Currently used for this mode: Fibo 2.0 Edit Turbo."     # only the model (user 3.11.)
     del app._model_usable
 
@@ -126,7 +128,8 @@ def main():
     assert list(app.f_body.pack_slaves()) == before, "stacking order changed"
     assert not shown(app.lbl_easy_model)
     assert app.v_status.get() != em.STATUS_ON, "the Easy Mode line stays only in Easy Mode"
-    assert all(shown(rb) for rb in app.rb_modes.values() if rb is not app.rb_modes.get("img2img"))
+    assert all(shown(rb) for k, rb in app.rb_modes.items() if k not in ("img2img", "upscale", "refine"))
+    assert shown(app.rb_scale_fn) and not shown(app.rb_modes["upscale"]) and not shown(app.rb_modes["refine"])   # standard mode: one button for both
 
     # the settings window has a tab "Easy Mode" between "Models" and "Credits" with the button for the starter models
     from pccomfy import inventory, manifest

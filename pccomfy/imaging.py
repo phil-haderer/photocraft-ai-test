@@ -437,3 +437,55 @@ def crop_to_alpha(im: Image.Image, threshold: int = 4) -> Image.Image:
         return im
     box = im.getchannel("A").point(lambda v: 255 if v > threshold else 0).getbbox()
     return im.crop(box) if box and box != (0, 0, im.width, im.height) else im
+
+
+def _box_blur(a: np.ndarray, r: int) -> np.ndarray:
+    """Separable box blur of radius r on an HxW or HxWxC float array (cumulative sums: the cost does not grow with r)."""
+    n = 2 * r + 1
+    for axis in (0, 1):
+        pad = [(r, r) if i == axis else (0, 0) for i in range(a.ndim)]
+        c = np.cumsum(np.pad(a, pad, mode="edge"), axis=axis, dtype=np.float64)
+        c = np.concatenate([np.zeros_like(np.take(c, [0], axis=axis)), c], axis=axis)
+        size = a.shape[axis]
+        a = ((np.take(c, range(n, n + size), axis=axis) - np.take(c, range(0, size), axis=axis)) / n).astype(np.float32)
+    return a
+
+
+def defringe(im: Image.Image, work_side: int = 1024, core_alpha: float = 0.95) -> Image.Image:
+    """Edge colour clean-up of a cut-out (PLAN: Cutout-Knopf, 6.11.): the pixels along the edge of a cut-out still carry the colour of
+    the old background (a light wall shows as a bright rim once the subject lies on black). The colours of the sure inside (alpha
+    above `core_alpha`, eroded by 2 px) are spread outwards in steps (radius 2, 4, 8, 16) and replace the colour of every pixel
+    outside that core; alpha stays untouched. The colour field is made at most `work_side` px on the long side (it is smooth) and
+    scaled up. Pixels no inside colour reaches keep their own colour. Not RGBA: returned as it is."""
+    if im.mode != "RGBA":
+        return im
+    w, h = im.size
+    alpha = im.getchannel("A")
+    lo, hi = alpha.getextrema()
+    if hi == 0 or lo == 255:                      # nothing visible, or no edge at all
+        return im
+    k = min(1.0, work_side / max(w, h))
+    sw, sh = max(1, round(w * k)), max(1, round(h * k))
+    rgb = im.convert("RGB")
+    small = np.asarray(rgb.resize((sw, sh), Image.BILINEAR) if k < 1 else rgb, dtype=np.float32)
+    a_s = np.asarray(alpha.resize((sw, sh), Image.BILINEAR) if k < 1 else alpha, dtype=np.float32) / 255.0
+    core_img = Image.fromarray(((a_s > core_alpha) * 255).astype("uint8")).filter(ImageFilter.MinFilter(5))
+    core = np.asarray(core_img) > 127
+    if not core.any():
+        return im
+    out = np.where(core[..., None], small, 0.0)
+    wt = core.astype(np.float32)
+    for r in (2, 4, 8, 16):
+        num = _box_blur(_box_blur(out * wt[..., None], r), r)
+        den = _box_blur(_box_blur(wt, r), r)
+        take = (wt < 0.5) & (den > 0.02)
+        out = np.where(take[..., None], num / np.maximum(den[..., None], 1e-4), out)
+        wt = np.where(take, 1.0, wt)
+    field = np.where((wt > 0.5)[..., None], out, small).clip(0, 255).astype("uint8")
+    field_img = Image.fromarray(field, "RGB")
+    core_full = core_img if k >= 1 else core_img.resize((w, h), Image.BILINEAR).point(lambda v: 255 if v > 127 else 0)
+    if k < 1:
+        field_img = field_img.resize((w, h), Image.BILINEAR)
+    res = Image.composite(rgb, field_img, core_full)
+    res.putalpha(alpha)
+    return res

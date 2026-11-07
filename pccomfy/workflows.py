@@ -113,6 +113,21 @@ def inpaint(p: GenParams, image_name: str, mask_name: str) -> dict:
 
 DESCRIBE_WORKFLOW = Path(__file__).resolve().parent.parent / "workflows" / "describe-image.json"   # reference slots: Qwen 3.5 9B describes the picture
 BIREFNET_WORKFLOW = Path(__file__).resolve().parent.parent / "workflows" / "birefnet-remove-bg.json"   # reference slots: cut out the background
+RMBG2_WORKFLOW = Path(__file__).resolve().parent.parent / "workflows" / "rmbg2-remove-bg.json"   # the same graph with the RMBG-2.0 file (BiRefNet-based, Bria)
+# The footer scissors' menu (PLAN: Cutout-Knopf, 6.11.): key, menu text, model file in models/background_removal, workflow.
+CUTOUT_MODELS = (
+    ("birefnet", "BiRefNet", "birefnet.safetensors", BIREFNET_WORKFLOW),
+    ("rmbg2", "RMBG-2.0", "rmbg-2.0.safetensors", RMBG2_WORKFLOW),
+)
+CUTOUT_BOTH = ("birefnet", "rmbg2")      # "Both": BiRefNet first (the lower layer), RMBG-2.0 on top
+
+
+def cutout_model(key: str) -> tuple:
+    """(key, menu text, file, workflow) of a cut-out model; an unknown key is an error."""
+    for m in CUTOUT_MODELS:
+        if m[0] == key:
+            return m
+    raise ValueError(f"Unknown cut-out model: {key}")
 
 
 # TextGenerate with sampling on, as in the text-to-image workflows (temperature 0.7 ...): a new seed gives new words
@@ -648,7 +663,7 @@ def set_lora_strength(graph: dict, value: float) -> dict:
 
 def stage_switches(graph: dict) -> list[tuple[str, str]]:
     """(node id, label) of the stages the window can switch off: a node whose _meta has `pc_stage_off`
-    ({"label": ..., "set": {input: link}, "remove": [node ids], "rewire": [node ids], "default_on": bool}) - e.g. the
+    ({"label": ..., "set": {input: link}, "set_nodes": {node id: {input: link}}, "remove": [node ids], "rewire": [node ids], "default_on": bool}) - e.g. the
     SeedVR2 pre-cleaning of the Flux 3 upscale, or an optional LoRA / skip-layer patch of MOSS (`rewire`: the node
     drops out and whatever read its model reads the model it was given)."""
     return [(nid, str(n["_meta"]["pc_stage_off"].get("label", "Stage"))) for nid, n in graph.items()
@@ -656,8 +671,8 @@ def stage_switches(graph: dict) -> list[tuple[str, str]]:
 
 
 def stage_info(graph: dict) -> list[dict]:
-    """The switchable stages of a workflow, in order: {id, label, tip, default_on, strength} (tip: `tip` in
-    pc_stage_off)."""
+    """The switchable stages of a workflow, in order: {id, label, tip, default_on, strength, excludes, auto_mp, advanced} (advanced: the checkbox sits at the top of the Advanced settings, MOSS' skip-layer guidance; tip: `tip` in
+    pc_stage_off; auto_mp: `auto_on_above_mp`, the result size above which the stage switches itself on)."""
     out = []
     for nid, label in stage_switches(graph):
         spec = graph[nid]["_meta"]["pc_stage_off"]
@@ -666,7 +681,7 @@ def stage_info(graph: dict) -> list[dict]:
             v = graph[nid].get("inputs", {}).get("strength_model")
             strength = float(v) if isinstance(v, (int, float)) else 1.0
         out.append({"id": nid, "label": label, "tip": str(spec.get("tip", "")), "default_on": bool(spec.get("default_on", True)),
-                    "strength": strength,
+                    "strength": strength, "advanced": bool(spec.get("advanced")), "auto_mp": float(spec.get("auto_on_above_mp", 0) or 0),
                     "excludes": [str(x) for x in spec.get("excludes", [])]})
     return out
 
@@ -718,6 +733,9 @@ def bypass_stage(graph: dict, only=None) -> dict:
     gone = set()
     for nid in off:
         g[nid]["inputs"].update(specs[nid].get("set", {}))
+        for other, ins in specs[nid].get("set_nodes", {}).items():     # inputs of OTHER nodes (Fibo Upscale: the size and the reference read the picture again)
+            if str(other) in g:
+                g[str(other)]["inputs"].update(ins)
     for nid in off:
         for r in specs[nid].get("remove", []):
             if g.pop(str(r), None) is not None:

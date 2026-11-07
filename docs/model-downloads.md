@@ -35,6 +35,7 @@ answers "401" until then.
 | Moss\lenovo_moss.safetensors | loras\Moss | 65 MB | [Danrisi/lenovo_moss](https://huggingface.co/Danrisi/lenovo_moss/resolve/main/lenovo_moss.safetensors) (also Civitai 1662740) | HF: Apache 2.0; Civitai: credit required, no derivatives | no |
 | Flux 3\flux-3-image-klein-restore.safetensors | loras\Flux 3 | 161 MB | [ausboss/FLUX-3-Image-Klein-Restore-LoRA](https://huggingface.co/ausboss/FLUX-3-Image-Klein-Restore-LoRA/resolve/main/flux-3-image-klein-restore.safetensors) (added 30.10., size matches the user's copy) | FLUX Kommunity License | no |
 | birefnet.safetensors | background_removal | 444 MB | [Comfy-Org/BiRefNet](https://huggingface.co/Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors) (added 30.10., size matches the user's copy) | MIT | no |
+| rmbg-2.0.safetensors | background_removal | 885 MB | [chflame163/ComfyUI_LayerStyle](https://huggingface.co/chflame163/ComfyUI_LayerStyle/resolve/main/ComfyUI/models/BiRefNet/RMBG-2.0/model.safetensors) (community mirror of briaai/RMBG-2.0, whose own file needs a Hugging Face login; same SHA-256 `566ed80c3d95f87ada6864d4cbe2290a1c5eb1c7bb0b123e984f60f76b02c3a7`; added 6.11.) | Bria RMBG-2.0 licence: non-commercial only | no |
 
 ## Findings
 

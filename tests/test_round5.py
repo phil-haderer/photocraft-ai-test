@@ -184,7 +184,7 @@ def main():
     assert app.v_workflow.get() == "krea2-turbo-t2i.json" and app.v_res.get() == 1024 and app.v_enhance.get() is False
     # the names: Fill Selection, no Bionic anywhere, one Fibo workflow with the LLM checkbox
     assert dict(gui.MODE_LABELS)["inpaint"] == "Fill Selection" and gui.SHORT_MODES["inpaint"] == "Fill Selection"
-    assert sorted(p.name for p in (t.ROOT / "workflows").glob("fibo2*")) == ["fibo2-edit.json", "fibo2-t2i.json"]
+    assert sorted(p.name for p in (t.ROOT / "workflows").glob("fibo2*")) == ["fibo2-edit.json", "fibo2-t2i.json", "fibo2-upscale.json"]
     assert not any("bionic" in p.read_text(encoding="utf-8").lower() for p in (t.ROOT / "workflows").glob("*.json"))
     # the LoRA / stage box sits under the LLM row (or the negative prompt when that row is hidden), a light line above Advanced
     packs = rec(app.f_opts, "pack")
@@ -310,13 +310,14 @@ def main():
     scale_pack = rec(app.f_scale, "pack")
     pick("flux2", "upscale")
     assert scale_pack and scale_pack[-1][1].get("after") is app._below_prompt(), scale_pack
+    pick("flux3", "refine")                  # (Flux 2 Upscale / Refine keep the box in the Advanced settings since 6.11.)
     packs2 = rec(app.f_opts, "pack")
     app.f_scale.winfo_manager = lambda: "pack"
     app.f_opts.winfo_manager = lambda: ""
     app._update_options_box(True, [])
     assert packs2[-1][1].get("after") is app.f_scale
     # SeedVR2 (Flux 3 Upscale) and the Turbo LoRA (every Qwen function) sit in the Advanced settings, the rest under the prompt (user 6.11.)
-    for model, mode, adv in (("flux3", "upscale", True), ("qwen", "edit", True), ("qwen", "txt2img", True), ("flux3", "edit", False), ("flux2", "upscale", False), ("moss", "txt2img", False)):
+    for model, mode, adv in (("flux3", "upscale", True), ("qwen", "edit", True), ("qwen", "txt2img", True), ("flux3", "edit", False), ("flux2", "upscale", True), ("flux2", "refine", True), ("flux2", "edit", False), ("moss", "txt2img", False)):
         pick(model, mode)
         assert app._opts_in_advanced() is adv, (model, mode)
     grids = rec(app.f_opts, "grid")
@@ -366,11 +367,11 @@ def main():
     app.v_model.set("flux2"); app.v_mode.set("edit"); app._on_model()
     app.t_prompt.delete("1.0", "end"); app.t_prompt.insert("1.0", "my own text")
     app.v_mode.set("refine"); app._on_mode()
-    assert app._prompt_text() == "my own text" and app.v_pchoice.get() == "", (app._prompt_text(), app.v_pchoice.get())
+    assert app._prompt_text() == "my own text" and app.v_fac.get() == "r:Default", (app._prompt_text(), app.v_fac.get())
     app.v_mode.set("edit"); app._on_mode()
     app.t_prompt.delete("1.0", "end")
     app.v_mode.set("refine"); app._on_mode()
-    assert app._prompt_text() == models.FLUX2_DEFAULT and app.v_pchoice.get() == "Default", (app._prompt_text(), app.v_pchoice.get())
+    assert app._prompt_text() == models.FLUX2_DEFAULT and app.v_fac.get() == "r:Default", (app._prompt_text(), app.v_fac.get())
     ok = gui.ValueBox._typed_ok              # only numbers can be typed: digits and one decimal point or comma (more: test_number_fields)
     assert ok("1", "5", "5") and ok("1", "3", "0.3") and ok("1", ",", "0,") and ok("0", "", "") and ok("1", "12", "12")
     assert not ok("1", "a", "a") and not ok("1", "%", "5%") and not ok("1", ".", "0.5.") and not ok("1", "-", "-") and not ok("1", " ", "5 ")
@@ -397,9 +398,8 @@ def main():
     app.t_prompt.configure(state="normal")
     app.t_prompt.delete("1.0", "end")
     app.t_prompt.insert("1.0", "a red car")
-    app.v_pchoice.set("Default")
     app._clear_prompt()
-    assert app.t_prompt.get("1.0", "end").strip() == "" and app.v_pchoice.get() == ""
+    assert app.t_prompt.get("1.0", "end").strip() == ""
     app.t_prompt.insert("1.0", "kept")
     app.t_prompt.configure(state="disabled")
     app._clear_prompt()
