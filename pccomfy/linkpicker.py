@@ -10,11 +10,12 @@ import tkinter as tk
 from collections.abc import Callable
 
 from . import hostos
-from .gui_common import ACCENT, FG, MUTED, PANEL, bind_wheel, font, wheel_up
+from .gui_common import ACCENT, DONE_GREEN, FG, MUTED, PANEL, bind_wheel, font, wheel_up
 
 SEPARATOR = "─" * 24         # the unselectable row between the matches of the expected file and the rest
-ROWS = 12                    # rows shown before the list scrolls
+ROWS = 16                    # rows shown before the list scrolls
 HOT_FG = "#1b1b1b"
+NL = chr(10)
 
 
 def _key(name: str) -> str:
@@ -22,12 +23,13 @@ def _key(name: str) -> str:
 
 
 def order(cands, pinned=(), typed: str = "") -> tuple[list[str], list[str]]:
-    """(top, rest): the files whose name holds every word of ``typed`` (any case); ``top`` = those in ``pinned`` (equal to the expected
-    file), ``rest`` = all others; both alphabetical (sub-folder as part of the name)."""
+    """(top, rest): the files whose name holds every word of ``typed`` (any case); ``top`` = those in ``pinned`` (the likely right files:
+    the expected one, copies of it, the one in use, similar names), in the order ``pinned`` has them; ``rest`` = all others,
+    alphabetical (sub-folder as part of the name)."""
     words = typed.lower().split()
-    pinned = set(pinned)
-    keep = [n for n in cands if all(w in n.lower() for w in words)]
-    return sorted((n for n in keep if n in pinned), key=_key), sorted((n for n in keep if n not in pinned), key=_key)
+    keep = {n for n in cands if all(w in n.lower() for w in words)}
+    top = [n for n in dict.fromkeys(pinned) if n in keep]
+    return top, sorted((n for n in keep if n not in set(top)), key=_key)
 
 
 def rows(cands, pinned=(), typed: str = "") -> list[str | None]:
@@ -37,11 +39,13 @@ def rows(cands, pinned=(), typed: str = "") -> list[str | None]:
 
 
 class LinkPicker:
-    """``on_pick(name)`` is called with the chosen file ("" for Unlink, only offered when ``unlink`` is set)."""
+    """``on_pick(name)`` is called with the chosen file ("" for "Use the expected file again", only offered when ``unlink`` is set)."""
 
     def __init__(self, root, anchor_xy, cands: list[str], pinned=(), hints: dict | None = None, mapped: str | None = None,
-                 explain: str = "", unlink: str = "", on_pick: Callable[[str], None] | None = None, scale: float = 1.0):
-        self.root, self.cands, self.pinned, self.hints = root, list(cands), set(pinned), dict(hints or {})
+                 explain: str = "", unlink: str = "", on_pick: Callable[[str], None] | None = None, scale: float = 1.0,
+                 strong=()):
+        self.root, self.cands, self.pinned, self.hints = root, list(cands), list(pinned), dict(hints or {})
+        self.strong = set(strong)      # files shown in green with a dot (the one in use): easy to see in a long list
         self.mapped, self.on_pick, self.closed, self.shown = mapped, on_pick, False, []
         px = lambda n: round(n * scale)  # noqa: E731
         top = self.top = tk.Toplevel(root, **hostos.TOP_KW)
@@ -56,7 +60,7 @@ class LinkPicker:
                      wraplength=px(420)).pack(fill="x", padx=px(8), pady=(0, px(4)))
         body = tk.Frame(top, bg=PANEL)
         body.pack(fill="both", expand=True, padx=px(8), pady=(0, px(4)))
-        self.lb = tk.Listbox(body, height=ROWS, width=max(40, min(80, max((len(n) for n in self.cands), default=40) + 12)),
+        self.lb = tk.Listbox(body, height=ROWS, width=self._chars(root, px),
                              exportselection=False, activestyle="none", bg=PANEL, fg=FG, selectbackground=ACCENT,
                              selectforeground=HOT_FG, relief="flat", highlightthickness=0, font=font(9))
         sb = tk.Scrollbar(body, orient="vertical", command=self.lb.yview)
@@ -77,6 +81,8 @@ class LinkPicker:
         bind_wheel(self.lb, lambda e: (self.lb.yview_scroll(-3 if wheel_up(e) else 3, "units"), "break")[1])
         top.bind("<Escape>", lambda e: self.close())
         top.bind("<FocusOut>", lambda e: root.after(200, self._lost_focus))
+        self._outside_id = None
+        root.after(200, self._watch_clicks)      # not at once: the click that opened the window must not close it
         self.refill()
         top.update_idletasks()
         x, y = anchor_xy
@@ -91,6 +97,21 @@ class LinkPicker:
         top.focus_force()
         self.entry.focus_force()
 
+    def _chars(self, root, px) -> int:
+        """The list is as wide as its longest line (names are never cut), at most the screen less a margin."""
+        try:
+            import tkinter.font as tkfont
+            f = tkfont.Font(root=root, font=font(9))
+            longest = max((f.measure(self._line(n)) for n in self.cands), default=0)
+            room = root.winfo_vrootwidth() - px(120)
+            return max(40, int(min(longest + px(40), room) / max(1, f.measure("0"))) + 1)
+        except (tk.TclError, TypeError, ValueError):
+            return max(40, min(120, max((len(self._line(n)) for n in self.cands), default=40) + 8))
+
+    def _line(self, n: str) -> str:
+        tag = f"   ({self.hints[n]})" if n in self.hints else ""
+        return ("● " if n in self.strong else "✓ " if n == self.mapped else "") + n + tag
+
     # ---------- the list ----------
 
     def refill(self):
@@ -101,8 +122,9 @@ class LinkPicker:
                 self.lb.insert("end", SEPARATOR)
                 self.lb.itemconfigure("end", foreground=MUTED, selectforeground=MUTED, selectbackground=PANEL)
                 continue
-            tag = f"   ({self.hints[n]})" if n in self.hints else ""
-            self.lb.insert("end", ("✓ " if n == self.mapped else "") + n + tag)
+            self.lb.insert("end", self._line(n))
+            if n in self.strong:
+                self.lb.itemconfigure("end", foreground=DONE_GREEN)
         first = next((i for i, n in enumerate(self.shown) if n is not None), None)
         if first is not None:
             self.lb.selection_clear(0, "end")
@@ -137,6 +159,33 @@ class LinkPicker:
 
     # ---------- closing ----------
 
+    def _watch_clicks(self):
+        """A click anywhere in the plugin outside this window closes it (user 7.11.; the window has no title bar, so the lost focus alone
+        does not always say it). A click in another program is covered by the lost focus."""
+        if self.closed:
+            return
+        try:
+            self._outside_id = self.root.bind_all("<ButtonPress>", self._outside, add="+")
+        except tk.TclError:
+            self._outside_id = None
+
+    def _outside(self, e):
+        if self.closed:
+            return
+        if not str(e.widget).startswith(str(self.top)):
+            self.close()
+
+    def _unwatch_clicks(self):
+        fid, self._outside_id = self._outside_id, None
+        if not fid:
+            return
+        try:      # remove only our own line of the binding on "all" (other parts of the plugin bind there too)
+            keep = [ln for ln in str(self.root.tk.call("bind", "all", "<ButtonPress>")).split(NL) if fid not in ln]
+            self.root.tk.call("bind", "all", "<ButtonPress>", NL.join(keep))
+            self.root.deletecommand(fid)
+        except tk.TclError:
+            pass
+
     def _take(self, name: str):
         self.close()
         if self.on_pick:
@@ -154,6 +203,7 @@ class LinkPicker:
 
     def close(self):
         self.closed = True
+        self._unwatch_clicks()
         try:
             self.top.destroy()
         except Exception:  # noqa: BLE001

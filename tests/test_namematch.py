@@ -49,6 +49,49 @@ def main():
     data = st._file_data(f, None, "required")
     assert data["similar"] == "moss_image_sft_fp8.safetensors" and data["probable"] == "", data
     assert st._file_data(f, "moss_image_sft_int8_convrot.safetensors", "required")["similar"] == ""      # found: no hint
+    # the tester's case (7.11.): his MOSS file sits in flux/. It is found, so it is in the chain list marked "in use" (before it was left
+    # out and looked missing), and the row says "your file: flux/..." instead of showing nothing
+    from pccomfy import inventory
+    moss = "moss_image_sft_int8_convrot.safetensors"
+    lists = {"unet": ["flux/flux-2-klein-9b-fp8.safetensors", "flux/" + moss]}
+
+    class Stub2(Stub):
+        def __init__(self):
+            self.inv = inventory.Inventory(lists)
+            self.models_dir = lambda ask=False: None
+            self._dl, self._dl_restart, self.dl_log = {}, set(), []
+
+    s2 = Stub2()
+    assert s2.inv.found(moss) == "flux/" + moss
+    cands, pinned, hints, mapped, current = s2._link_entries(moss)
+    assert sorted(cands) == sorted(lists["unet"]) and hints == {"flux/" + moss: ui_settings.HINT_IN_USE} and mapped is None, hints
+    assert pinned == ["flux/" + moss] and current == "flux/" + moss          # the file in use is on top
+    # linked to a wrong file by hand: the expected file is back in the list, first, with its own hint; the linked one is "in use"
+    wrong = "flux/flux-2-klein-9b-fp8.safetensors"
+    ui_settings.cfgmod.set_model_link(moss, wrong)
+    try:
+        s2.inv.mapping = ui_settings.cfgmod.model_map()
+        cands, pinned, hints, mapped, current = s2._link_entries(moss)
+        assert mapped == current == wrong and pinned[0] == "flux/" + moss, (pinned, mapped)
+        assert hints["flux/" + moss] == ui_settings.HINT_EXPECTED and hints[wrong] == ui_settings.HINT_IN_USE and sorted(cands) == sorted(lists["unet"])
+    finally:
+        ui_settings.cfgmod.set_model_link(moss, "")
+        s2.inv.mapping = {}
+    # names like the expected one come right after the file in use, best first; the rest is alphabetical (the picker's order())
+    lists["unet"] = ["zzz.safetensors", "aaa.safetensors", "moss_image_sft_fp8.safetensors", "moss_image_sft_int8.safetensors", "flux/" + moss]
+    s2.inv = inventory.Inventory(lists)
+    cands, pinned, hints, mapped, current = s2._link_entries(moss)
+    assert pinned[0] == "flux/" + moss and set(pinned[1:]) == {"moss_image_sft_fp8.safetensors", "moss_image_sft_int8.safetensors"}, pinned
+    assert hints["moss_image_sft_fp8.safetensors"] == ui_settings.HINT_SIMILAR and "aaa.safetensors" not in pinned
+    from pccomfy import linkpicker
+    shown = linkpicker.rows(cands, pinned, "")
+    assert shown[0] == "flux/" + moss and None in shown and shown[shown.index(None) + 1:] == ["aaa.safetensors", "zzz.safetensors"], shown
+    lists["unet"] = ["flux/flux-2-klein-9b-fp8.safetensors", "flux/" + moss]
+    s2.inv = inventory.Inventory(lists)
+    assert s2._is_other_file(f, "flux/" + moss) and "flux/" + moss in str(s2._file_data(f, "flux/" + moss, "required")["found"])
+    assert s2._file_data(f, "flux/" + moss, "required")["other"] is True
+    s2.inv = inventory.Inventory({"unet": ["flux/" + moss]})           # only the used file: nothing to choose from
+    assert s2._link_entries(moss) is None
     assert (Path(__file__).resolve().parent.parent / "pccomfy" / "assets" / "LICENSE-model-linker.txt").is_file()
     assert any(n == "kianxyzw" for n, _w, _u in manifest.CONTRIBUTORS)
     print("test_namematch: ok")

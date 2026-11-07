@@ -31,6 +31,9 @@ GGUF_ALT = "Alternatively:"
 GGUF_LINK = "Download GGUF-weights"      # under the weights of a main model (user 5.11.)
 SIMILAR_FILE = "A file with a similar name (not checked, make sure it is the right one): "      # under a missing file with no renamed copy: same model name, other precision or spelling (user 7.11.)
 PROBABLE_FILE = "This is probably the right file: "      # under a missing file, when a renamed copy of it is in the models folder (user 3.11.)
+HINT_IN_USE = "in use"            # behind the file the plugin uses now in the list of the chain symbol (user 7.11.)
+HINT_EXPECTED = "the expected file"      # in the chain list, when another file is linked: the way back
+HINT_SIMILAR = "similar name"
 HINT_EXPLAIN = "Marked files have the same size and safetensors header as another file this plugin expects."
 DOT_RED = "#e5484d"                   # the dot in front of a model that is not available (nothing in front of a ready one)
 DOT_PAD = 4                            # px of room to the left of the dot (user 1.11.)
@@ -549,12 +552,10 @@ class SettingsMixin(DownloadMixin):
 
     @staticmethod
     def _is_other_file(f, found: str) -> bool:
-        """Show "your file: ..." only when another file than the expected one stands in: for the main diffusion model (kind unet)
-        that means another file name; the same file in another folder is no news (user 2.11.). Other kinds: as before."""
-        if f.kind != "unet":
-            return found != f.name
-        base = lambda n: n.replace("\\", "/").rpartition("/")[2].lower()      # noqa: E731
-        return base(found) != base(f.name)
+        """Show "your file: ..." when ComfyUI's file is not the expected one by name, folder included (user 7.11.: a tester's file in
+        ``flux/`` was found but looked missing; before, a main diffusion model in another folder was left out). Only case and the
+        kind of slash do not count."""
+        return inventory.norm(found) != inventory.norm(f.name)
 
     def _credits_segments(self) -> list[tuple]:
         """The "Credits" tab: who made the code, nodes and models the plugin builds on (links)."""
@@ -1362,16 +1363,46 @@ class SettingsMixin(DownloadMixin):
         except (AttributeError, tk.TclError):
             pass
 
-    def _choose_for(self, expected: str):
-        """The chain next to a file: a list of the files ComfyUI has for its kind, the most similar first, "Unlink" last when
-        the file is linked. A click links at once (Undo and Reset are in "Linked files")."""
+    def _link_entries(self, expected: str):
+        """What the window of the chain symbol lists for ``expected``: (files, likely right files in order, hints, linked file, file in use),
+        or None when ComfyUI lists no other file of this kind. Likely right files go on top (user 7.11.): the expected file itself
+        (it was missing from the list after a wrong link), the file in use, renamed copies (same size and header), then names like
+        the expected one, best first; all the others follow alphabetically. The file in use is marked "in use" and shown in green."""
         cands, mapped = self._link_candidates(expected), cfgmod.model_map().get(expected)
         if not cands and not mapped:
+            return None
+        f = manifest.FILES.get(expected)
+        all_hints = self._link_hints(expected, cands)
+        copies = [n for n in cands if all_hints.get(n, "").startswith(HINT_SAME + expected)]
+        hints = self._menu_hints(expected, all_hints)
+        avail = list(self.inv.lists.get(f.kind, [])) if (f is not None and self.inv is not None) else []
+        own = inventory.resolve(f.name, avail, None, f.aliases) if f is not None else None      # the expected file itself (not in ``cands``)
+        used = self.inv.found(expected) if self.inv is not None else None
+        known = [g.name for g in manifest.FILES.values() if g.name != expected]
+        similar = sorted((n for n in cands if n not in copies and namematch.suggest(expected, [n], known)),
+                         key=lambda n: -namematch.confidence(expected, n))
+        pinned = list(dict.fromkeys(n for n in (own, used, *copies, *similar) if n))
+        if own and own not in cands:
+            cands = [*cands, own]
+        if used and used not in cands:
+            cands = [*cands, used]
+        for n in similar:
+            hints.setdefault(n, HINT_SIMILAR)
+        current = mapped or used          # the file the plugin uses now
+        if own and own != current:
+            hints[own] = HINT_EXPECTED
+        if current:
+            hints[current] = HINT_IN_USE
+        return cands, pinned, hints, mapped, current
+
+    def _choose_for(self, expected: str):
+        """The chain next to a file: a search window with the files ComfyUI has for its kind (typing filters, alphabetical, "Use the expected file again"
+        at the bottom when the file is linked). A click links at once (Undo and Reset are in "Linked files")."""
+        entries = self._link_entries(expected)
+        if entries is None:
             self._status("ComfyUI lists no other file of this kind. Copy yours into its folder and restart ComfyUI.", error=True)
             return
-        all_hints = self._link_hints(expected, cands)
-        pinned = [n for n in cands if all_hints.get(n, "").startswith(HINT_SAME + expected)]      # copies of the expected file: first, a line below them
-        hints = self._menu_hints(expected, all_hints)
+        cands, pinned, hints, mapped, current = entries
         win = self._settings_win or self.root
         old = getattr(self, "_link_picker", None)
         if old is not None:
@@ -1380,8 +1411,8 @@ class SettingsMixin(DownloadMixin):
         self._link_picker = linkpicker.LinkPicker(
             win, (win.winfo_pointerx(), win.winfo_pointery()), cands, pinned, hints, mapped,
             explain=HINT_EXPLAIN if any(h.startswith(HINT_SAME) for h in hints.values()) else "",
-            unlink="Unlink (use the expected file again)" if mapped else "",
-            on_pick=lambda n: self._link_models(expected, n), scale=getattr(self, "ui", 1.0))
+            unlink="Use the expected file again" if mapped else "",
+            on_pick=lambda n: self._link_models(expected, n), scale=getattr(self, "ui", 1.0), strong=[current] if current else ())
 
     def _link_models(self, expected: str, actual: str):
         """The plugin uses ``actual`` from now on for ``expected`` ("" removes the link)."""

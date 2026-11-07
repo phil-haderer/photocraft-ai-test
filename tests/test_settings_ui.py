@@ -272,11 +272,12 @@ def test_page_layout_and_stop():
     app._dl_restart.add("qwen_image_vae.safetensors")
     after = next(r for r in app._settings_rows() if r[0] == "model" and r[1] == "krea2")[5]
     assert after is None or after["count"] == before["count"] - 1, (before, after)
-    # no licence notes in the file rows (user 2.11.), "your file" for the main diffusion model only when its name is another one
+    # no licence notes in the file rows (user 2.11.); "your file" whenever ComfyUI's file is not the expected one by name, folder included (user 7.11.)
     from pccomfy import manifest
     q = manifest.FILES["qwen_image_2.1_int8_convrot.safetensors"]
     assert q.note.startswith("licence") and app._file_data(q, None, "required")["note"] == ""
-    assert not app._is_other_file(q, "Qwen\\" + q.name) and not app._is_other_file(q, q.name.upper())      # same file, another folder
+    assert app._is_other_file(q, "flux/" + q.name) and app._is_other_file(q, "Qwen\\" + q.name)      # the same file name in a sub-folder is shown (7.11.)
+    assert not app._is_other_file(q, q.name.upper()) and not app._is_other_file(q, q.name)             # only case / slash do not count
     assert app._is_other_file(q, "my_qwen.safetensors")
     v = manifest.FILES["flux2-vae.safetensors"]
     assert app._is_other_file(v, "Flux 2\flux2-vae.safetensors")                                         # other kinds: as before
@@ -525,7 +526,7 @@ def main():
     hi = rws.index(("head", "Relinked models:"))
     assert rws[hi + 1][0] == "line" and rws[hi - 1][0] == "intro", rws[hi - 1:hi + 2]
     assert rws[hi + 1][2] == "hint" and ui_settings.SET_STYLES["hint"] == "SetHint.TLabel"      # relinked models in the blue of the prompt tip (user 6.11.)
-    app._link_models("flux2-vae.safetensors", "")         # "Unlink" in the list
+    app._link_models("flux2-vae.safetensors", "")         # "Use the expected file again" in the list
     assert ("head", "Relinked models:") not in app._settings_rows()
     assert cfgmod.model_map() == {} and app.rb_tabs["flux3"]["style"] == "Missing.Chip.Toolbutton"
     app._settings_close()
