@@ -777,7 +777,10 @@ class SettingsMixin(DownloadMixin):
                 ("Reset all modes to default settings", "Forgets every page you saved with “Set as my settings” (right-click on a model chip): "
                  "all models and functions start with their standard settings again. Asks first.", self._reset_all_modes),
                 ("Reset favourite models", "Forgets every favourite you set with the right-click menu of a model chip: "
-                 "The functions use the first usable model of their tabs again. Asks first.", self._reset_favourites)):
+                 "The functions use the first usable model of their tabs again. Asks first.", self._reset_favourites),
+                ("Copy report", "Copies a report to the clipboard for a bug report: plugin version, where it is installed, Python, "
+                 "which config files it reads and what they change, the ComfyUI address, which model files are missing. No prompts, "
+                 "no passwords; your user folder is shown as ~.", self._copy_report)):
             b = ttk.Button(parent, text=text, style="SetSmall.TButton", command=command)
             b.pack(side="top", anchor="w", padx=14, pady=(8, 0))
             Tooltip(b, tip)
@@ -1331,6 +1334,11 @@ class SettingsMixin(DownloadMixin):
             menu.tk_popup(e.x_root, e.y_root)
         finally:
             menu.grab_release()
+
+    def _copy_report(self):
+        """"Copy report" (user 7.11.): the diagnostic text of appinfo.build_report on the clipboard."""
+        from . import appinfo
+        self._copy_text(appinfo.build_report(self), "Report copied. Paste it into your message.")
 
     def _copy_text(self, text: str, msg: str):
         self.root.clipboard_clear()

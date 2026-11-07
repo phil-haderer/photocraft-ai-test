@@ -13,6 +13,14 @@ WATCH_MS = 1000       # how often the window asks PhotoCraft's control port (Lin
 COMFY_WATCH_MS = 1000   # how often the ComfyUI dot asks the server whether it is still there (tester 5.11.: 5 s felt slow)
 
 
+def show_comfy(app, up: bool, read):
+    """The dot and its text. Green only when ComfyUI answered AND its lists were read (`read` True): the first quick question
+    (/system_stats) alone said "connected" for a second before the real read failed (tester 7.11.). While the read is still
+    to come (`read` None) the dot stays red with "connecting ..", never grey (user 3.11.)."""
+    app.v_conn.set("ComfyUI connected" if up and read else "ComfyUI connecting …" if up and read is None else "ComfyUI not connected")
+    set_dot(app.lbl_dot, bool(up and read))
+
+
 class StateMixin:
     # ---------- connections ----------
 
@@ -24,8 +32,8 @@ class StateMixin:
             return
         ok = comfyaddr.probe(self.comfy.url, 0.5)[0]
         self._comfy_up = ok
-        self.v_conn.set("ComfyUI connected" if ok else "ComfyUI not connected")
-        set_dot(self.lbl_dot, ok)
+        self._comfy_read = None             # not read yet: the dot turns green when refresh() has read the lists
+        show_comfy(self, ok, None)
 
     def _watch_comfy(self):
         """The dot at the bottom left follows ComfyUI while the window is open: every COMFY_WATCH_MS a short question on a fresh
@@ -48,8 +56,9 @@ class StateMixin:
             return
         was = getattr(self, "_comfy_up", None)
         self._comfy_up = ok
-        self.v_conn.set("ComfyUI connected" if ok else "ComfyUI not connected")
-        set_dot(self.lbl_dot, ok)
+        if not ok:
+            self._comfy_read = None         # gone: when it comes back it is read again first
+        show_comfy(self, ok, getattr(self, "_comfy_read", None))
         if ok and was is False:
             self.refresh()
 
@@ -110,8 +119,8 @@ class StateMixin:
     def _apply_refresh(self, info):
         if "comfy" in info:
             self._comfy_up = bool(info["comfy"])
-        self.v_conn.set("ComfyUI connected" if info.get("comfy") else "ComfyUI not connected")
-        set_dot(self.lbl_dot, bool(info.get("comfy")))
+        self._comfy_read = bool(info.get("comfy"))
+        show_comfy(self, self._comfy_read, self._comfy_read)
         if info.get("ckpts") and self.v_ckpt.get() not in info["ckpts"]:
             self.v_ckpt.set(info["ckpts"][0])  # only used by the built-in graph; there is no picker any more
         if info.get("clips"):
@@ -140,7 +149,9 @@ class StateMixin:
             if first:
                 self.v_model.set(first.key)
                 self._on_model()
-        note = photocraft.version_note(info.get("pc_version"))
+        self._pc_version_seen = info.get("pc_version") or getattr(self, "_pc_version_seen", None)
+        note = " ".join(n for n in (getattr(self, "_wf_dir_note", ""), getattr(self, "_version_note", ""),
+                                    photocraft.version_note(info.get("pc_version"))) if n)
         if note and not getattr(self, "_pc_note_shown", False):
             self._pc_note_shown = True            # once per start
             self._status(note)

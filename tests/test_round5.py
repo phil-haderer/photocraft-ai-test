@@ -144,7 +144,7 @@ def main():
     pick("flux3", "remove")
     assert app._layer_prefix() == "Flux 3 Klein Edit Remove Selection"
     pick("qwen", "remove")
-    assert app._layer_prefix() == "Qwen 2.1 Edit Remove Selection" and dict(gui.MODE_LABELS)["remove"] == "Remove Selection"
+    assert app._layer_prefix() == "Qwen Image 2.1 Edit Remove Selection" and dict(gui.MODE_LABELS)["remove"] == "Remove Selection"
 
     # Sampler / scheduler: usable (readonly) where the workflow has them, a change is sent as an override
     pick("qwen", "edit")

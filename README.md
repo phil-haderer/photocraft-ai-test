@@ -5,18 +5,20 @@
 **Photoshop-style generative AI for PhotoCraft, running on your own PC.**
 Pick a function, type a prompt, press Generate: the result arrives as a new layer in your document.
 
-<img src="readme-images/plugin-window.png" alt="The plugin window: eight functions, six models, prompt box and Generate button" width="330">
+*New to AI image tools? No problem: this page explains every step and every term. You do not need to know anything about AI or programming.*
 
-Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.2 · ComfyUI version: 0.42.0 
+<img src="readme-images/plugin-window.png" alt="The plugin window: six functions, six models, prompt box and Generate button" width="330">
 
-[Quick start](#quick-start) · [Install on Windows](#install-on-windows) · [Install on Linux](#install-on-linux) · [First start](#first-start) · [Functions](#functions) · [Help](#help) · [Technical details](#technical-details) · [Licences](#licences-of-the-models)
+Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.21.0 · ComfyUI version: 0.42.0 
+
+[Quick start](#quick-start) · [Install on Windows](#install-on-windows) · [Install on Linux](#install-on-linux) · [First start](#first-start) · [Model downloads](#model-downloads) · [Functions](#functions) · [Help](#help) · [Technical details](#technical-details) · [Licences](#licences-of-the-models)
 
 </div>
 
 ---
 
-- **Seven function buttons:** Text to image, Expand, Fill, Remove, Edit Canvas, Multi Image Edit and Upscale / Refine.
-- **Six models:** Flux 3 Klein, Flux 2 Klein, Qwen 2.1 Edit, Fibo 2.0 Edit Turbo, Krea 2 Turbo and MOSS Image.
+- **Six function buttons:** Text to image, Expand, Fill, Remove, Edit and Upscale / Refine. Edit has three tabs under the prompt: Edit canvas, Multi image edit and (Flux 3 only) BBOX placement.
+- **Six models:** Flux 3 Klein, Flux 2 Klein, Qwen Image 2.1 Edit, Fibo 2.0 Edit Turbo, Krea 2 Turbo and MOSS Image.
 - **Local:** the models run in ComfyUI on your own graphics card.
 
 > Unofficial community project, not affiliated with PhotoCraft, ArtCraft or Storyteller. PhotoCraft is in early alpha
@@ -24,14 +26,21 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.2 · ComfyUI version: 0.42.0
 
 ## Quick start
 
-You need [PhotoCraft](https://github.com/storytold/photocraft/releases) and [ComfyUI](https://github.com/comfyanonymous/ComfyUI#installing) installed, an NVIDIA graphics card with 16 GB VRAM, and Python 3.11 or newer ([download](https://www.python.org/downloads/windows/)).
+**What you need first** (all free):
+
+- **[PhotoCraft](https://github.com/storytold/photocraft/releases)**: the image editor where you work. The plugin adds AI functions to it.
+- **[ComfyUI](https://github.com/comfyanonymous/ComfyUI#installing)**: the program that runs the AI models on your graphics card. Install it, start it once, and leave it running while you work.
+- **An NVIDIA graphics card with 16 GB of VRAM** (VRAM is the memory of the graphics card; you can look it up in the Task Manager under Performance ▸ GPU). Released and tested on 16 GB.
+- **[Python](https://www.python.org/downloads/windows/) 3.11 or newer** (a free programming language the plugin is written in; the setup script uses it, you never have to write any code).
+- **About 15 to 20 GB of free disk space per model you want to use** (the models are large files; one model is enough to start).
+- **A custom node pack, only for Upscale with Flux 3 (and the tiles option with Fibo):** [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) (a small add-on for ComfyUI; install it from the ComfyUI Manager or from the link). Everything else works without it. Details: [Model downloads](#model-downloads).
 
 **Windows**
 
 1. Click **Code ▸ Download ZIP** (green button at the top of this page) and unpack it to a folder you keep, for example `C:\Tools\photocraft-ai`.
 2. Double-click **`setup-windows.bat`**. It sets everything up and puts **PhotoCraft AI** on your desktop.
 3. Start ComfyUI, close PhotoCraft, then double-click **PhotoCraft AI** on your desktop. PhotoCraft opens and the plugin window appears next to it.
-4. In the plugin window click the gear ▸ pick a model tab (for example **Flux 3**) ▸ **Download all model files**, then restart ComfyUI.
+4. In the plugin window click the gear ▸ pick a model tab (for example **Qwen Image 2.1**, which needs no login) ▸ **Download all model files**, then restart ComfyUI. (You can also download the files by hand: see [Model downloads](#model-downloads).)
 5. Pick a function and a model, type a prompt and press **Generate** (Ctrl+Enter).
 
 **Linux** (Debian/Ubuntu; other distributions: [Install on Linux](#install-on-linux))
@@ -54,7 +63,7 @@ PhotoCraft  <-->  this plugin (a small window)  <-->  ComfyUI (your graphics car
 - **ComfyUI** runs the AI models on your graphics card.
 - **This plugin** sits between them: it sends your picture or selection to ComfyUI and puts the result back as a layer.
 
-You need Windows 10/11 or Linux, an NVIDIA card with 16 GB VRAM, Python 3.11+ (Linux: 3.10+), PhotoCraft 0.20.2, and ComfyUI 0.42 or newer.
+You need Windows 10/11 or Linux, an NVIDIA card with 16 GB VRAM, Python 3.11+ (Linux: 3.10+), PhotoCraft 0.21.0, and ComfyUI 0.42 or newer.
 
 ## Install on Windows
 
@@ -90,10 +99,158 @@ Then go on with [First start](#first-start). Window too small or too big? Gear w
 
 ## First start
 
-1. **Get the models.** Open the plugin's settings window (gear symbol) and pick a model tab. The button **Download all model files** loads everything the model needs (the button shows the total size). A good start is Flux 3 Klein plus Qwen 2.1 Edit or Fibo 2.0 Edit Turbo. Flux 3 needs a free Hugging Face login once (the button opens its page). Restart ComfyUI afterwards. The models have their own licences: see [Licences of the models](#licences-of-the-models).
-2. **Generate.** Pick a function and a model, type a prompt and press **Generate** (Ctrl+Enter). Each model starts with its tested settings; the Advanced settings below the prompt change them.
+1. **Get the models.** A *model* is the AI itself, one big file (or a few) that ComfyUI loads. Open the plugin's settings window (gear symbol at the top right) and pick a model tab. The button **Download all model files** loads everything that model needs; it shows the total size first (5 to 20 GB, so it can take a while). A model whose files are missing is greyed out. Good first choices:
+   - **Qwen Image 2.1** or **Fibo 2.0**: no login needed.
+   - **Flux 3 Klein**: needs a free Hugging Face account once (the button opens the page; log in and accept the licence there).
+2. **Restart ComfyUI.** It reads its model folders only when it starts, so new files appear after a restart.
+3. **Generate.** Pick a function and a model, type a prompt (a short description of what you want, in English) and press **Generate** (Ctrl+Enter). Each model starts with its tested settings; the Advanced settings below the prompt change them. The status line at the bottom tells you what is happening.
 
-Optional: Flux 3 Upscale needs one ComfyUI custom node pack, and GGUF model files need another. Both are described in [Technical details](#technical-details).
+Prefer to download by hand, or want to see every file and its size? Open [Model downloads](#model-downloads). The models have their own licences: see [Licences of the models](#licences-of-the-models).
+
+## Model downloads
+
+Everything below is for people who want to download the files themselves; the plugin's **Download all model files** button does the same. Click a model to open its list. Put each file into the named folder inside your ComfyUI folder (for example `ComfyUI/models/diffusion_models`; a folder like `loras/Flux 3` is a sub-folder you create), then restart ComfyUI. You only need the files of the models you want. "Optional" files switch extra features on; without them the model still works.
+
+**Custom nodes.** A custom node pack is a small add-on for ComfyUI. Only two are ever mentioned, and both are optional:
+- [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes): its *Color Match* node is used by **Upscale with Flux 3** and by the **tiles** option of **Upscale with Fibo**. Without it only these two things are greyed out.
+- [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF): only if you want to use smaller GGUF model files (gear window, chain symbol). Not needed otherwise.
+
+Install a pack from the ComfyUI Manager (search for its name) or from its link, then restart ComfyUI.
+
+<!-- model-downloads:start -->
+
+<details>
+<summary><b>Flux 3 Klein</b>: about 11.5 GB needed</summary>
+
+| File | Needed for | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `flux3-image-klein-int8-convrot.safetensors` | all functions | `models/diffusion_models` | 5.8 GB | [Hugging Face: black-forest-labs/flux-3-image-klein-comfy](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/flux3-image-klein-int8-convrot.safetensors) (needs a free Hugging Face login and acceptance of the licence) |
+| `qwen3vl_4b_int8_convrot.safetensors` | all functions | `models/text_encoders` | 4.9 GB | [Hugging Face: Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_int8_convrot.safetensors) |
+| `flux2-vae.safetensors` | all functions | `models/vae` | 336 MB | [Hugging Face: Comfy-Org/Flux-2-Dev](https://huggingface.co/Comfy-Org/Flux-2-Dev/resolve/main/split_files/vae/flux2-vae.safetensors) |
+| `flux-3-image-klein-outpaint.safetensors` | Expand | `models/loras/Flux 3` | 161 MB | [Hugging Face: ausboss/FLUX-3-Image-Klein-Outpaint-LoRA](https://huggingface.co/ausboss/FLUX-3-Image-Klein-Outpaint-LoRA/resolve/main/flux-3-image-klein-outpaint.safetensors) |
+| `flux-3-image-klein-restore.safetensors` | Upscale | `models/loras/Flux 3` | 161 MB | [Hugging Face: ausboss/FLUX-3-Image-Klein-Restore-LoRA](https://huggingface.co/ausboss/FLUX-3-Image-Klein-Restore-LoRA/resolve/main/flux-3-image-klein-restore.safetensors) |
+| `4x-UltraSharpV2.safetensors` | Upscale | `models/upscale_models` | 140 MB | [Hugging Face: Kim2091/UltraSharpV2](https://huggingface.co/Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.safetensors) |
+
+Optional (the model works without them, the named feature is greyed out):
+
+| File | Feature | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `seedvr2_3b_int8_convrot.safetensors` | SeedVR2 pre-cleaning | `models/diffusion_models` | 3.5 GB | [Hugging Face: Comfy-Org/SeedVR2](https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_3b_int8_convrot.safetensors) |
+| `qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors` | LLM prompt enhancement | `models/text_encoders` | 6.7 GB | [Hugging Face: black-forest-labs/flux-3-image-klein-comfy](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors) (needs a free Hugging Face login and acceptance of the licence) |
+| `seedvr2_ema_vae_fp16.safetensors` | SeedVR2 pre-cleaning | `models/vae` | 501 MB | [Hugging Face: Comfy-Org/SeedVR2](https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/seedvr2_ema_vae_fp16.safetensors) |
+| `taef2_decoder.pth` | live preview | `models/vae_approx` | 3 MB | [GitHub: madebyollin/taesd](https://raw.githubusercontent.com/madebyollin/taesd/main/taef2_decoder.pth) |
+
+**Custom node:** Upscale also needs the custom node pack [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) (Color Match). Install it from the ComfyUI Manager or the link, then restart ComfyUI.
+
+</details>
+
+<details>
+<summary><b>Flux 2 Klein</b>: about 18.6 GB needed</summary>
+
+| File | Needed for | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `flux-2-klein-9b_int8_convrot.safetensors` | all functions | `models/diffusion_models` | 9.4 GB | [Hugging Face: obsxrver/ComfyUI-Native-INT8_ConvRot](https://huggingface.co/obsxrver/ComfyUI-Native-INT8_ConvRot/resolve/main/diffusion_models/flux-2-klein-9b_int8_convrot.safetensors) |
+| `qwen_3_8b_fp8mixed.safetensors` | all functions | `models/text_encoders` | 8.7 GB | [Hugging Face: Comfy-Org/Flux-2-Klein-9B](https://huggingface.co/Comfy-Org/Flux-2-Klein-9B/resolve/main/split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors) |
+| `flux2-vae.safetensors` | all functions | `models/vae` | 336 MB | [Hugging Face: Comfy-Org/Flux-2-Dev](https://huggingface.co/Comfy-Org/Flux-2-Dev/resolve/main/split_files/vae/flux2-vae.safetensors) |
+| `ultra_real_v4.safetensors` | Upscale, Refine | `models/loras/Flux 2` | 166 MB | [Civitai](https://civitai.com/api/download/models/2846977) (Civitai may ask you to log in) |
+
+Optional (the model works without them, the named feature is greyed out):
+
+| File | Feature | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `qwen3vl_4b_int8_convrot.safetensors` | LLM prompt enhancement, Describe | `models/text_encoders` | 4.9 GB | [Hugging Face: Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_int8_convrot.safetensors) |
+| `taef2_decoder.pth` | live preview | `models/vae_approx` | 3 MB | [GitHub: madebyollin/taesd](https://raw.githubusercontent.com/madebyollin/taesd/main/taef2_decoder.pth) |
+
+</details>
+
+<details>
+<summary><b>Qwen Image 2.1</b>: about 17.3 GB needed</summary>
+
+| File | Needed for | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `qwen_image_2.1_int8_convrot.safetensors` | all functions | `models/diffusion_models` | 7.3 GB | [Hugging Face: Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_int8_convrot.safetensors) |
+| `qwen3vl_8b_int8_convrot.safetensors` | all functions | `models/text_encoders` | 9.4 GB | [Hugging Face: Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors) |
+| `qwen_image_2.1_vae_bf16.safetensors` | all functions | `models/vae` | 676 MB | [Hugging Face: Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors) |
+
+Optional (the model works without them, the named feature is greyed out):
+
+| File | Feature | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `qwen3.5_9b_w4a8_gptq.safetensors` | LLM prompt enhancement | `models/text_encoders` | 7.3 GB | [Hugging Face: Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_w4a8_gptq.safetensors) |
+| `qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors` | Turbo LoRA | `models/loras/qwen` | 913 MB | [Hugging Face: Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors) |
+| `taeqi2_1_decoder.pth` | live preview | `models/vae_approx` | 15 MB | [GitHub: madebyollin/taesd](https://raw.githubusercontent.com/madebyollin/taesd/main/taeqi2_1_decoder.pth) |
+
+</details>
+
+<details>
+<summary><b>Fibo 2.0</b>: about 13.7 GB needed</summary>
+
+| File | Needed for | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `fibo2_edit_turbo_int8_convrot.safetensors` | all functions | `models/diffusion_models` | 8.4 GB | [Hugging Face: Comfy-Org/Fibo-2.0](https://huggingface.co/Comfy-Org/Fibo-2.0/resolve/main/diffusion_models/fibo2_edit_turbo_int8_convrot.safetensors) |
+| `qwen3vl_4b_int8_convrot.safetensors` | all functions | `models/text_encoders` | 4.9 GB | [Hugging Face: Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_int8_convrot.safetensors) |
+| `flux2-vae.safetensors` | all functions | `models/vae` | 336 MB | [Hugging Face: Comfy-Org/Flux-2-Dev](https://huggingface.co/Comfy-Org/Flux-2-Dev/resolve/main/split_files/vae/flux2-vae.safetensors) |
+| `4x-UltraSharpV2.safetensors` | Upscale | `models/upscale_models` | 140 MB | [Hugging Face: Kim2091/UltraSharpV2](https://huggingface.co/Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.safetensors) |
+
+Optional (the model works without them, the named feature is greyed out):
+
+| File | Feature | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `taef2_decoder.pth` | live preview | `models/vae_approx` | 3 MB | [GitHub: madebyollin/taesd](https://raw.githubusercontent.com/madebyollin/taesd/main/taef2_decoder.pth) |
+
+**Custom node:** The tiles option of Upscale also needs the custom node pack [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) (Color Match). Install it from the ComfyUI Manager or the link, then restart ComfyUI.
+
+</details>
+
+<details>
+<summary><b>Krea 2 Turbo</b>: about 18.6 GB needed</summary>
+
+| File | Needed for | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `krea2_turbo_int8_convrot.safetensors` | all functions | `models/diffusion_models` | 13.5 GB | [Hugging Face: Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_int8_convrot.safetensors) |
+| `qwen3vl_4b_int8_convrot.safetensors` | all functions | `models/text_encoders` | 4.9 GB | [Hugging Face: Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_int8_convrot.safetensors) |
+| `qwen_image_vae.safetensors` | all functions | `models/vae` | 254 MB | [Hugging Face: Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors) |
+
+Optional (the model works without them, the named feature is greyed out):
+
+| File | Feature | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `lighttaew2_1.safetensors` | live preview | `models/vae_approx` | 45 MB | [Hugging Face: lightx2v/Autoencoders](https://huggingface.co/lightx2v/Autoencoders/resolve/main/lighttaew2_1.safetensors) |
+
+</details>
+
+<details>
+<summary><b>MOSS Image</b>: about 13.1 GB needed</summary>
+
+| File | Needed for | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `moss_image_sft_int8_convrot.safetensors` | all functions | `models/diffusion_models` | 5.4 GB | [Hugging Face: Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/diffusion_models/moss_image_sft_int8_convrot.safetensors) |
+| `qwen3.5_9b_w4a8_gptq.safetensors` | all functions | `models/text_encoders` | 7.3 GB | [Hugging Face: Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_w4a8_gptq.safetensors) |
+| `flux2-vae_small.safetensors` | all functions | `models/vae` | 250 MB | [Hugging Face: Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/vae/flux2-vae_small.safetensors) |
+| `lenovo_moss.safetensors` | Text to image | `models/loras/Moss` | 65 MB | [Hugging Face: Danrisi/lenovo_moss](https://huggingface.co/Danrisi/lenovo_moss/resolve/main/lenovo_moss.safetensors) |
+
+Optional (the model works without them, the named feature is greyed out):
+
+| File | Feature | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `lora_dmd2.safetensors` | Turbo LoRA | `models/loras/Moss` | 1.2 GB | [Hugging Face: lodestones/MOSS-Image-Base-8-steps-dmd](https://huggingface.co/lodestones/MOSS-Image-Base-8-steps-dmd/resolve/main/lora_dmd2.safetensors) |
+| `taef2_decoder.pth` | live preview | `models/vae_approx` | 3 MB | [GitHub: madebyollin/taesd](https://raw.githubusercontent.com/madebyollin/taesd/main/taef2_decoder.pth) |
+
+</details>
+
+<details>
+<summary><b>Remove background</b> (scissors button, optional)</summary>
+
+| File | Feature | Goes into ComfyUI's | Size | Download |
+|---|---|---|---|---|
+| `birefnet.safetensors` | Cut out, remove background | `models/background_removal` | 444 MB | [Hugging Face: Comfy-Org/BiRefNet](https://huggingface.co/Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors) |
+| `rmbg-2.0.safetensors` | Remove background (second model) | `models/background_removal` | 885 MB | [Hugging Face: chflame163/ComfyUI_LayerStyle](https://huggingface.co/chflame163/ComfyUI_LayerStyle/resolve/main/ComfyUI/models/BiRefNet/RMBG-2.0/model.safetensors) |
+
+RMBG-2.0 is a community copy of the official file, which needs a Hugging Face login ([official page](https://huggingface.co/briaai/RMBG-2.0)).
+
+</details>
+
+<!-- model-downloads:end -->
 
 ## Functions
 
@@ -106,20 +263,20 @@ to ComfyUI and puts the result back into PhotoCraft as a new layer in a group, w
 | **Expand image** | Extend the canvas with the Crop tool, fill the new area white; the plugin paints it. |
 | **Fill Selection** | Select an area, type what should appear there. |
 | **Remove Selection** | Select an object, with a little margin around it; it is removed and the background filled in. |
-| **Edit Canvas** | Changes the whole picture from your text ("make it night"). |
-| **Multi Image Edit** | Edits the picture with reference images (drop or paste images into the slots). |
+| **Edit** › Edit canvas | Changes the whole picture from your text ("make it night"). |
+| **Edit** › Multi image edit | Edits the picture with reference images (drop or paste images into the slots). With Flux 3 the third tab, BBOX placement, puts one reference image into your rectangle selection. |
 | **Upscale / Refine** | Pick a factor (1.5x to 4x) in the row "Upscale factor": the whole picture is enlarged into a new document, up to 24 MP. Or pick a button in the row "Refine" (Default; with Flux 2 also Neutral and Studio portrait; with Flux 3 also Restore): the picture is cleaned up at the same size, as a new layer. A selection is ignored. |
 
 <details>
 <summary>Which model offers which function</summary>
 
-| | Flux 3 | Flux 2 | Qwen | Fibo | Krea 2 | MOSS |
+| | Flux 3 | Flux 2 | Qwen Image 2.1 | Fibo | Krea 2 | MOSS |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | Fill Selection | | | ✓ | ✓ | | |
 | Remove Selection | ✓ | ✓ | ✓ | ✓ | | |
 | Expand image | ✓ | ✓ | ✓ | ✓ | | |
-| Edit Canvas | ✓ | ✓ | ✓ | ✓ | | |
-| Multi Image Edit | ✓ | ✓ | ✓ | ✓ | | |
+| Edit › Edit canvas | ✓ | ✓ | ✓ | ✓ | | |
+| Edit › Multi image edit | ✓ | ✓ | ✓ | ✓ | | |
 | Upscale (new file) | ✓ | ✓ | ✓ | ✓ (up to 2x) | | |
 | Refine (same size) | ✓ | ✓ | ✓ | ✓ | | |
 | Text to image | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -144,10 +301,9 @@ More in the window: **variants** (several results as layers in one group), promp
 
 **Report a problem.** Open an issue on this repository's **Issues** page and tell us:
 - what you did, what you expected and what happened (the status line at the bottom of the window is useful);
-- your operating system, graphics card, and the versions of PhotoCraft, ComfyUI and the plugin (the ZIP's date or the git commit);
-- the last lines of `data\exchange\runs.jsonl` (Linux: `~/.cache/pccomfy/exchange/runs.jsonl`): one line per run. `last-graph.json` in the same folder is the exact request sent to ComfyUI.
+- the **report** of the plugin: gear window ▸ **Other settings** ▸ **Copy report**, then paste it into the issue. It lists the plugin version, Python, your settings and what ComfyUI and PhotoCraft answered; it contains no prompts and no access tokens.
 
-Both files can contain your prompts, so look through them before you post.
+If we ask for more: the last lines of `data\exchange\runs.jsonl` (Linux: `~/.cache/pccomfy/exchange/runs.jsonl`) have one line per run, and `last-graph.json` in the same folder is the exact request sent to ComfyUI. Both can contain your prompts, so look through them before you post.
 
 ## Technical details
 
@@ -188,9 +344,9 @@ Settings and the PhotoCraft token live in `~/.config/pccomfy/`. A different Comf
 
 **PhotoCraft as a Flatpak.** It is found by itself; to name it: `PHOTOCRAFT=flatpak:ai.storyteller.photocraft ./photocraft-ai.sh`. The Flatpak sandbox sees only Pictures and Documents, so the plugin opens `~/.config/pccomfy` and `~/.cache/pccomfy` for the Flatpak run; that lets PhotoCraft write its token file there.
 
-**Custom nodes.** Flux 3 Upscale uses the *Color Match* node of [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes). Install the pack from the ComfyUI Manager or the link, then restart ComfyUI. Without it only Flux 3 Upscale cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes. GGUF files (link them with the chain symbol in the gear window) need [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF).
+**Custom nodes.** Flux 3 Upscale and the tiles option of Fibo Upscale use the *Color Match* node of [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes). Install the pack from the ComfyUI Manager or the link, then restart ComfyUI. Without it only these two cannot run (the line at the bottom of the plugin names the pack); everything else uses ComfyUI's own nodes. GGUF files (link them with the chain symbol in the gear window) need [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF).
 
-**Model files.** You only need the files for the models you want. The gear window lists the files each model needs, with size, ComfyUI target folder and a download button; the plugin enables a model when it finds all the files for its standard settings. To fit into 16 GB VRAM, release 1 uses the int8 ConvRot files. Some files are gated: log in to Hugging Face and accept the licence on the model page first. Flux 3 is one of them.
+**Model files.** All files with sizes, folders and links are listed under [Model downloads](#model-downloads). The gear window lists the same files with a download button; the plugin enables a model when it finds all the files for its standard settings. To fit into 16 GB VRAM, release 1 uses the int8 ConvRot files. Some files are gated: log in to Hugging Face and accept the licence on the model page first. Flux 3 is one of them.
 
 **Known limitations.**
 - Developed and tested on Windows 11 with a 16 GB NVIDIA card. On Linux it was run on Ubuntu 24.04 (Wayland); other distributions and X11 are not tested yet.
@@ -206,7 +362,7 @@ The plugin's code is MIT / Apache-2.0, but **the models have their own licences*
 |---|---|
 | Flux 3 (Klein) and its LoRAs | FLUX Kommunity License |
 | Flux 2 (Klein) | FLUX non-commercial licence |
-| Qwen (Qwen-Image 2.1) | Qwen Research License ("Built with Qwen") |
+| Qwen Image 2.1 | Qwen Research License ("Built with Qwen") |
 | Fibo 2.0 | CC BY-NC 4.0 |
 | Krea 2 | Krea 2 Community License |
 | MOSS | Apache 2.0 |
@@ -221,7 +377,7 @@ SeedVR2 and the MOSS LoRAs are Apache 2.0, BiRefNet is MIT. RMBG-2.0 (Bria AI, t
 - [ausboss](https://huggingface.co/ausboss) (Restore and Outpaint LoRAs for Flux 3)
 - [photocraft-comfyui-bridge](https://github.com/Peszemeszek/photocraft-comfyui-bridge) by Peszemeszek, the starting
   point of this project (MIT / Apache-2.0)
-- The model authors: Black Forest Labs (Flux 2 / Flux 3 Klein), Qwen (Qwen-Image 2.1), Bria (Fibo 2.0 and RMBG-2.0), Krea (Krea 2),
+- The model authors: Black Forest Labs (Flux 2 / Flux 3 Klein), Qwen (Qwen Image 2.1), Bria (Fibo 2.0 and RMBG-2.0), Krea (Krea 2),
   MOSS-Image, ByteDance (SeedVR2), obsxrver (Flux 2 Klein int8 ConvRot), lodestones (MOSS DMD2 LoRA), Danrisi (Lenovo
   UltraReal LoRA), vizsumit (UltraReal LoRA for Flux 2)
 - [ThetaCursed/Krea2-Style-Explorer](https://github.com/ThetaCursed/Krea2-Style-Explorer) (MIT): the style prompts of the

@@ -7,7 +7,7 @@ Three parts, each on the real ComfyUI (GPU; every run is one text step or one pi
                                                  Krea-2 prompt enhancer text with both files.
     python tests\\live_writer_compare.py flux2    Flux 2: the Flux 3 prompt upsampler (9B, A) against qwen3vl_4b_int8_convrot (B)
                                                  as the prompt upsampler: texts, then one picture per text.
-    python tests\\live_writer_compare.py qwen     Qwen 2.1: qwen3.5_9b_w4a8_gptq (A) against qwen3vl_8b_int8_convrot (B) as the prompt
+    python tests\\live_writer_compare.py qwen     Qwen Image 2.1: qwen3.5_9b_w4a8_gptq (A) against qwen3vl_8b_int8_convrot (B) as the prompt
                                                  enhancer (texts, then pictures) and as the describer (Describe Canvas, 3 pictures).
     add --dry to only build the graphs and check the files are known to ComfyUI.
 
@@ -199,7 +199,7 @@ def part_qwen(c, out, dry):
             print("qwen describe", img, tag, f"{secs:.1f} s", len(text), flush=True)
     cases = [(f"qwen_p{i + 1}", ps[i], 1234) for i in range(4)]
     rows = pictures_ab(c, out, cases, lambda p, s, tag: picture_graph("qwen-image-21-t2i.json", texts[(tag, ps.index(p))] or p, s), "qwen")
-    pair_report(out, "Qwen 2.1: enhancer and describer qwen3.5 9B w4a8 (A) against qwen3vl 8B int8 (B)", rows, extra)
+    pair_report(out, "Qwen Image 2.1: enhancer and describer qwen3.5 9B w4a8 (A) against qwen3vl 8B int8 (B)", rows, extra)
 
 
 def main():

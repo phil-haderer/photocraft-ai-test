@@ -1,6 +1,6 @@
-"""Manual check (not part of run_all.py): Qwen 2.1 Edit with its two Qwen3-VL 8B text encoder files, blind (user 30.10.).
+"""Manual check (not part of run_all.py): Qwen Image 2.1 Edit with its two Qwen3-VL 8B text encoder files, blind (user 30.10.).
 
-Qwen 2.1 loads Qwen3-VL 8B twice over: the edit graph (Edit, Fill, Expand, Remove, Multi Image Edit) as fp8_scaled
+Qwen Image 2.1 loads Qwen3-VL 8B twice over: the edit graph (Edit, Fill, Expand, Remove, Multi Image Edit) as fp8_scaled
 (10.6 GB), the text-to-image graph as int8_convrot (9.4 GB). If the edit graph is as good with int8_convrot, Qwen needs
 only that one file. This round runs Qwen Edit on the user's test pictures with each file (same prompt, seed and settings
 as the tab starts: no Turbo LoRA, base res. 1024; only the text encoder differs), and the user rates each pair blind
@@ -245,7 +245,7 @@ def cmd_summary(a):
     rated = sum(1 for r in data.values() if r.get("wahl"))
     a_, b_ = NAMES.values()
     lines = [f"# Qwen Edit Text-Encoder-Testrunde {out.name}", "", f"Bewertet: {rated} von {len(key['pairs'])} Paaren "
-             "(Qwen 2.1 Edit, ohne Turbo, ohne LLM, Basis 1024)", "",
+             "(Qwen Image 2.1 Edit, ohne Turbo, ohne LLM, Basis 1024)", "",
              f"| {a_} besser | {b_} besser | gleich gut | beide schlecht |", "|---|---|---|---|",
              f"| {wins[a_]} | {wins[b_]} | {same} | {bad} |"]
     notes = [r for r in data.values() if r.get("notiz")]

@@ -281,7 +281,7 @@ def test_page_layout_and_stop():
     assert app._is_other_file(q, "my_qwen.safetensors")
     v = manifest.FILES["flux2-vae.safetensors"]
     assert app._is_other_file(v, "Flux 2\flux2-vae.safetensors")                                         # other kinds: as before
-    assert "Qwen 2.1" in ui_settings.NOT_ALL_WEIGHTS.format(name="Qwen 2.1") and "restart" in ui_settings.NOT_ALL_WEIGHTS
+    assert "Qwen Image 2.1" in ui_settings.NOT_ALL_WEIGHTS.format(name="Qwen Image 2.1") and "restart" in ui_settings.NOT_ALL_WEIGHTS
     # "Stop downloads" cancels only the running ones of its page
     ev = {}
     app._dl["a.safetensors"] = {"cancel": type("E", (), {"set": lambda self: ev.setdefault("a", True)})()}
@@ -580,11 +580,15 @@ def main():
     reads = []
     app.refresh = lambda: reads.append(1)
     app._comfy_alive(app.comfy.url, True)
-    assert app.lbl_dot.cget("style") == "ConnOk.TLabel" and reads == [1]       # the refresh before it failed: ComfyUI is back, so everything is read again
+    assert app.v_conn.get() == "ComfyUI not connected" and reads == [1]        # the refresh before it failed: ComfyUI is back, so everything is read again
+    app._apply_refresh({"comfy": True})                                         # ... and only the read makes the dot green
+    assert app.lbl_dot.cget("style") == "ConnOk.TLabel"
     app._comfy_alive(app.comfy.url, False)
     assert app.v_conn.get() == "ComfyUI not connected" and app.lbl_dot.cget("style") == "ConnBad.TLabel"
-    app._comfy_alive(app.comfy.url, True)
-    assert app.v_conn.get() == "ComfyUI connected" and reads == [1, 1]
+    app._comfy_alive(app.comfy.url, True)                                        # back: red and "connecting" until it is read again
+    assert app.v_conn.get() == "ComfyUI connecting …" and app.lbl_dot.cget("style") == "ConnBad.TLabel" and reads == [1, 1]
+    app._apply_refresh({"comfy": True})
+    assert app.v_conn.get() == "ComfyUI connected" and app.lbl_dot.cget("style") == "ConnOk.TLabel"
     app._comfy_alive("http://other:1", False)                                   # an answer for an old address is ignored
     assert app.lbl_dot.cget("style") == "ConnOk.TLabel"
     # without a window link (Linux) the window closes with PhotoCraft: seen once, then gone twice in a row (not before it was seen)

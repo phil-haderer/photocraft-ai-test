@@ -62,14 +62,14 @@ def main():
     pick(app, "flux2", "multi_edit")
     app._refs_update()
     app.root.update()
-    # no empty row under "Reference images" without the BBOX tick (user 7.11.)
+    # the BBOX tick is a tab now (user 7.11.): no tick, no empty row; the tab only with Flux 3
     app._refs_update()
     app.root.update()
-    assert not shown(app.f_refhead2) and not shown(app.cb_bbox)
+    assert not shown(app.f_refhead2) and not shown(app.cb_bbox) and not shown(app.rb_edtabs["bbox"])
     pick(app, "flux3", "multi_edit")
     app._refs_update()
     app.root.update()
-    assert shown(app.f_refhead2) and shown(app.cb_bbox)
+    assert not shown(app.f_refhead2) and not shown(app.cb_bbox) and shown(app.rb_edtabs["bbox"])
     print("ALL OK (stage in Advanced, Fibo stages, reference row)")
 
 

@@ -308,7 +308,7 @@ def test_settings():
     cfgmod.set_tab_hidden("moss", False)
     assert cfgmod.hidden_tabs() == {"krea2"}
     saved = json.loads(cfgmod.SETTINGS_FILE.read_text(encoding="utf-8"))
-    assert set(saved) == {"model_map", "favorites", "hidden_tabs"}
+    assert set(saved) == {"model_map", "favorites", "hidden_tabs", "_version"}        # the plugin version is stamped in (7.11.)
     cfgmod.SETTINGS_FILE.write_text("not json", encoding="utf-8")       # a broken file is an empty settings file
     assert cfgmod.model_map() == {} and cfgmod.hidden_tabs() == set()
     # the window state file is separate and untouched

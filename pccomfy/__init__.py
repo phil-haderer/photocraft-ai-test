@@ -1,3 +1,3 @@
 """PhotoCraft ↔ ComfyUI bridge: inpaint, outpaint, img2img and txt2img as new layers."""
 
-__version__ = "0.3.0"
+__version__ = "0.21-test"      # set by the release export from the tag

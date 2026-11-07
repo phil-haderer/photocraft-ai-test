@@ -21,12 +21,13 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.state = cfgmod.load_state()
+        self._version_note = cfgmod.check_version()       # "Updated from X to Y" / newer settings / unwritable folder: shown once at the start (gui_state._apply_refresh)
         d = cfg["defaults"]
         pcc, cc = cfg["photocraft"], cfg["comfyui"]
         self.pc = PhotoCraft(pcc["host"], int(pcc["port"]), token_file=pcc["token_file"], headless=bool(pcc["headless"]))
         self.comfy = ComfyUI(cfgmod.get_setting("comfyui_url") or cc["url"])      # the address from Other settings wins over config.toml
         self.bridge = Bridge(self.pc, self.comfy, pcc["exchange_dir"])
-        self.workflows_dir = Path(cc["workflows_dir"]).expanduser()
+        self.workflows_dir, self._wf_dir_note = cfgmod.effective_workflows_dir(cc["workflows_dir"])
         self.events: queue.Queue = queue.Queue()
         self.worker: threading.Thread | None = None
 
@@ -68,7 +69,8 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
             self.root.after(200, lambda: winlink.caption(self.root, (0x40, 0x40, 0x40), (0xee, 0xee, 0xee)))
 
         g = lambda k, default: self.state.get(k, default)  # noqa: E731
-        self.v_mode = tk.StringVar(value=g("mode", "inpaint"))
+        start_mode = g("mode", "inpaint")
+        self.v_mode = tk.StringVar(value="edit" if start_mode == "multi_edit" else start_mode)     # Edit starts on the tab Edit canvas (user 7.11.)
         self.v_workflow = tk.StringVar(value=g("workflow", BUILTIN))
         self.v_ckpt = tk.StringVar(value=g("checkpoint", d["checkpoint"]))
         self.v_clip = tk.StringVar(value=g("clip", "") or CLIP_DEFAULT)
@@ -204,8 +206,9 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
         self.rb_modes = {}
         self.tt_modes = {}              # the tooltip of each function: the text of the selected model (see _update_mode_radios)
         for key, label in MODE_LABELS:
-            rb = ttk.Radiobutton(f_fn, text=label, value=key, variable=self.v_mode, style="Tab.Toolbutton",
-                                 image=self._function_icon(key), compound="left", command=self._on_mode)
+            merged = key == "edit"      # lit while Edit or Multi Image Edit runs: its own variable (v_fn), like Upscale / Refine
+            rb = ttk.Radiobutton(f_fn, text=label, value=key, variable=self.v_fn if merged else self.v_mode, style="Tab.Toolbutton",
+                                 image=self._function_icon(key), compound="left", command=self._on_edit_fn if merged else self._on_mode)
             self.rb_modes[key] = rb
             self.tt_modes[key] = ChipTooltip(rb, MODE_TIPS[key])
         # standard mode: ONE button for Upscale and Refine (PLAN.md 2, user 6.11.)

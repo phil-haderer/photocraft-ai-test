@@ -20,7 +20,7 @@ def links_ok(g):
 
 
 def main():
-    # Qwen 2.1 as text to image: no selection needed, a white canvas of the result's size is the picture
+    # Qwen Image 2.1 as text to image: no selection needed, a white canvas of the result's size is the picture
     pc, _, b = T.make(tempfile.mkdtemp(), with_sel=False)
     b.comfy = T.FakeComfy()
     req = Request(mode="txt2img", workflow=str(ROOT / "workflows" / "qwen-image-21-edit.json"), preset="X", run_no=1, base_res=1024)

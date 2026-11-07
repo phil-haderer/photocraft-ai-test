@@ -22,7 +22,7 @@ class ModeMixin:
         self._switch_context(mode)
         if mode in SCALE_MODES:
             self._scale_mode = mode
-        self.v_fn.set("scale" if mode in SCALE_MODES else "")
+        self.v_fn.set("scale" if mode in SCALE_MODES else "edit" if mode in ("edit", "multi_edit") else "")
         self._sync_fac()
         if mode in SCALE_MODES:      # the factor row (with None) for both
             self.f_scale.pack(fill="x", padx=10, pady=4, after=self._below_prompt())   # under the LLM row, above the LoRA
@@ -89,6 +89,13 @@ class ModeMixin:
             want = self.v_scale.get()
         if self.v_fac.get() != want:
             self.v_fac.set(want)
+
+    def _on_edit_fn(self):
+        """The Edit button was clicked: it always opens on the tab "Edit canvas" (user 7.11.); the other two tabs are under the prompt."""
+        self.v_mode.set("edit")
+        if getattr(self, "v_bbox", None) is not None:
+            self.v_bbox.set(False)
+        self._on_mode()
 
     def _on_scale_fn(self):
         """The merged function button was clicked (standard mode): the last used of Upscale and Refine, at first Refine (= None)."""
@@ -187,8 +194,13 @@ class ModeMixin:
             if key == "img2img" and not self._custom_workflow():
                 rb.grid_remove()           # no model uses it
                 continue
+            if key == "multi_edit":        # a tab of the Edit function (refslots.py), no button of its own
+                rb.configure(state="normal")
+                rb.grid_remove()
+                continue
             # greyed out when every model that can do it is hidden (right-click menu, gear window)
-            offered = self._custom_workflow() or any(key in x.modes and x.key not in hidden for x in models.MODELS)
+            own = ("edit", "multi_edit") if key == "edit" else (key,)
+            offered = self._custom_workflow() or any(any(k in x.modes for k in own) and x.key not in hidden for x in models.MODELS)
             rb.configure(state="normal" if offered else "disabled")
             self.tt_modes[key].text = MODE_TIPS[key]        # no ranking in the tooltip (user 3.11.: it was for development)
             if key in SCALE_MODES:      # Upscale and Refine are ONE button (rb_scale_fn); these two stay hidden
@@ -304,10 +316,12 @@ class ModeMixin:
             return
         self._remember_model_for_mode()
         self._reset_detail()
+        if self.v_mode.get() == "multi_edit" and "multi_edit" not in m.modes and "edit" in m.modes:
+            self.v_mode.set("edit")              # this model has no reference images: plain Edit canvas
         if self.v_mode.get() not in m.modes:
             if self.v_mode.get() == "upscale" and "refine" in m.modes:
                 self.v_mode.set("refine")        # Fibo cannot enlarge: back to None
-                self._status(f"{m.label} cannot enlarge pictures, so the factor is None. Use Qwen, Flux 3 or Flux 2 for 1.5x and more.")
+                self._status(f"{m.label} cannot enlarge pictures, so the factor is None. Use Qwen Image 2.1, Flux 3 or Flux 2 for 1.5x and more.")
             else:
                 self.v_mode.set(next(iter(m.modes)))
         self._apply_model_mode(force=True)

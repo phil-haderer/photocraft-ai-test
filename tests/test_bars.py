@@ -45,10 +45,10 @@ assert app.v_pl.v == "Generating · tile 2 · step 3/15"
 
 # with a model chosen the line names it (user 4.11.)
 class _M:
-    label = "Qwen 2.1 Edit"
+    label = "Qwen Image 2.1 Edit"
 app._model = lambda: _M()
 app._set_progress(0.6, "Sampling 6/10…", "image", 0.6, 9)
-assert app.v_pl.v == "Qwen 2.1 Edit is generating · Sampling 6/10", app.v_pl.v
+assert app.v_pl.v == "Qwen Image 2.1 Edit is generating · Sampling 6/10", app.v_pl.v
 app._model = lambda: None
 
 # a new run starts from zero, a finished one is full

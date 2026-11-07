@@ -315,9 +315,9 @@ def node_pack(cls: str) -> tuple[str, str] | None:
 CONTRIBUTORS = (
     ("Peszemeszek", "photocraft-comfyui-bridge, the upstream this plugin is forked from (MIT OR Apache-2.0)", "https://github.com/Peszemeszek/photocraft-comfyui-bridge"),
     ("ComfyUI", "the node-based engine behind every generation", "https://github.com/comfyanonymous/ComfyUI"),
-    ("Comfy-Org", "ComfyUI-ready model files: Qwen-Image 2.1, Qwen3-VL, FLUX.2, MOSS-Image, SeedVR2, Fibo 2.0", "https://huggingface.co/Comfy-Org"),
+    ("Comfy-Org", "ComfyUI-ready model files: Qwen Image 2.1, Qwen3-VL, FLUX.2, MOSS-Image, SeedVR2, Fibo 2.0", "https://huggingface.co/Comfy-Org"),
     ("Black Forest Labs", "FLUX.2 Klein and FLUX.3 Klein", "https://huggingface.co/black-forest-labs"),
-    ("Qwen team (Alibaba)", "Qwen-Image 2.1 and the Qwen text encoders", "https://huggingface.co/Qwen"),
+    ("Qwen team (Alibaba)", "Qwen Image 2.1 and the Qwen text encoders", "https://huggingface.co/Qwen"),
     ("Bria", "Fibo 2.0 Edit, the VGL prompt format and RMBG-2.0 (second model of the Remove background scissors)", "https://huggingface.co/briaai/RMBG-2.0"),
     ("OpenMOSS", "MOSS-Image", "https://huggingface.co/OpenMOSS-Team"),
     ("Krea", "Krea 2 Turbo", "https://www.krea.ai"),

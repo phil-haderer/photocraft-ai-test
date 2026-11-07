@@ -71,7 +71,7 @@ FLUX3_REFINE_PROMPTS = (
     ("Default", FLUX3_DEFAULT, "The workflow's own prompt: restore sharp, natural detail."),
     ("Restore", FLUX3_RESTORE, "Repair an old or damaged photo: scratches, dust, folds and stains go, faces get their detail back."),
 )
-# Qwen 2.1 Upscale and Refine (workflow qwen212KUpscale_v10): the generic prompt of the workflow is the standard setting (user 2.11.: perfect)
+# Qwen Image 2.1 Upscale and Refine (workflow qwen212KUpscale_v10): the generic prompt of the workflow is the standard setting (user 2.11.: perfect)
 QWEN_UPSCALE_DEFAULT = "Enhance this image to high resolution while preserving the original composition, lighting, and atmosphere. Image can be illustration or real photo, keep the original input style."
 FIBO_REFINE = "relight the scene to natural lighting"   # Fibo Refine's old prompt (now FLUX2_DEFAULT, user 28.10.); kept as a stock text
 FILL_TIP = "Draw a selection and prompt e.g. “add a red flower”. Always hide the layers of previous results before running again."   # wording from the user (3.11.)
@@ -107,7 +107,7 @@ FUNCTION_TIPS = {
 }
 
 QWEN = Model(
-    "qwen", "Qwen 2.1 Edit",
+    "qwen", "Qwen Image 2.1 Edit",
     "Qwen Image 2.1 Edit: instruction editor, best at Fill Selection, Remove Selection and Expand. Base res. 1024 works best.",
     {
         "txt2img": Mode("qwen-image-21-t2i.json", dict(native=True, base_res=1024, turbo=False, layer_mask="none", enhance=False), prompt_tip=T2I_TIP),   # LLM off like the others (user 30.10.)
@@ -248,7 +248,7 @@ FIBO = Model(
 MODELS = [FLUX3, FLUX2, QWEN, FIBO, KREA2, MOSS]      # the order of the tabs
 BY_KEY = {m.key: m for m in MODELS}
 
-SHORT = {"flux3": "Flux 3", "flux2": "Flux 2", "qwen": "Qwen", "fibo": "Fibo", "krea2": "Krea 2", "moss": "MOSS"}
+SHORT = {"flux3": "Flux 3", "flux2": "Flux 2", "qwen": "Qwen Image 2.1", "fibo": "Fibo", "krea2": "Krea 2", "moss": "MOSS"}
 
 
 def model_for_workflow(name: str) -> Model | None:

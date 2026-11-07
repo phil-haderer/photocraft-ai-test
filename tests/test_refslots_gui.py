@@ -54,17 +54,8 @@ def main():
     pick("qwen", "multi_edit")
     assert log[-1] == "on"
 
-    # the drop-down of the slots (user 6.11.): open at every start; closed it hides the body (slots, size line) and keeps the head
-    body = []
-    app.f_refbody.pack = lambda *a, **k: body.append("on")
-    app.f_refbody.pack_forget = lambda: body.append("off")
-    assert app.v_refs_open.get()
-    app._toggle_refs()
-    assert not app.v_refs_open.get() and body[-1] == "off"
-    app._refs_redraw()                  # a redraw while closed keeps it closed
-    assert body[-1] == "off"
-    app._toggle_refs()
-    assert app.v_refs_open.get() and body[-1] == "on"
+    # no drop-down any more (user 7.11.): the slots are always shown with their tab, the head line is a plain label
+    assert app.v_refs_open.get() and not hasattr(app, "btn_refs") and not hasattr(app, "_toggle_refs")
 
     # Paste button / Ctrl+V
     img = Image.new("RGB", (40, 30), "red")
@@ -150,7 +141,7 @@ def main():
     app.lbl_refmsg.pack = lambda *a, **k: packs.append("on")
     app.lbl_refmsg.pack_forget = lambda: packs.append("off")
     app._refs_redraw()
-    assert app.btn_refs["text"] == f"Reference images (max. {app.refslots.max_refs})"
+    assert app.lbl_refs["text"] == f"Reference images (max. {app.refslots.max_refs})"
     app._refs_say("x")
     app._refs_say("")
     assert packs[-2:] == ["on", "off"]
@@ -403,28 +394,48 @@ def main():
     assert tg["sampling_mode"] == "on" and tg["sampling_mode.seed"] == 42 and tg["sampling_mode.temperature"] == 0.7
 
     # BBOX: a Flux 3 Multi Image Edit switch; the request carries it only while it is ticked and the function is the right one
-    seen = []
-    app.cb_bbox.pack = lambda *a, **k: seen.append("box on")
-    app.cb_bbox.pack_forget = lambda: seen.append("box off")
     pick("flux3", "multi_edit")
-    assert seen[0:1] == ["box on"] and app._request().bbox is False and app._hint_text.startswith("Example:")
+    assert not app.cb_bbox.winfo_manager()           # the tick is the tab "BBOX placement" now (user 7.11.)
+    assert app._request().bbox is False and app._hint_text.startswith("Example:")
     assert not hasattr(app, "lbl_refbbox")          # no tip under the slots any more (user 3.11.)
-    assert app.refslots.max_refs == 3 and app.btn_refs["text"] == "Reference images (max. 3)"      # Flux 3 with BBOX off: its usual three
-    assert not app.lbl_refs.winfo_manager()                                              # no "Reference images (n/n)" header
-    app.v_bbox.set(True)
-    app._refs_bbox_changed()
-    assert app.refslots.max_refs == 1 and app.btn_refs["text"] == "Reference images (max. 1)"      # BBOX ticked: one reference image
+    assert app.refslots.max_refs == 3 and app.lbl_refs["text"] == "Reference images (max. 3)"      # Flux 3 with BBOX off: its usual three
+    app.v_edtab.set("bbox")                         # a click on the tab (the stubbed Tk has no invoke): it sets the mode and the tick
+    app._edtab_clicked()
+    assert app.v_mode.get() == "multi_edit" and app.v_bbox.get() and app.v_edtab.get() == "bbox"
+    assert app.refslots.max_refs == 1 and app.lbl_refs["text"] == "Reference images (max. 1)"      # BBOX placement: one reference image
     assert app._request().bbox is True and app._hint_text == refslots.BBOX_TIP     # BBOX ticked: its tip under the prompt instead
     assert "name the object from the reference image" in refslots.BBOX_TIP
     assert app._request().layer_mask == "soft"      # BBOX: the margin mask, whatever the mode's start value (live finding 30.10.: "none" gave a whole new picture)
     pick("flux3", "edit")
-    assert seen[-1] == "box off" and app._hint_text == gui.models.EDIT_TIP
+    assert app._hint_text == gui.models.EDIT_TIP and app.v_edtab.get() == "edit"       # back on Edit canvas
     assert app._request().bbox is False
     pick("qwen", "multi_edit")               # ticked, but not a Flux 3 function
     assert app._request().bbox is False and not app._bbox_on()
     app.v_bbox.set(False)
     app._refs_bbox_changed()
     assert app._refs_max(gui.models.BY_KEY["flux3"]) == 3 and refslots.BBOX_LABEL == "Place ref. image in selection (BBOX)"     # unticked: three again
+
+    # the tabs of the Edit function (user 7.11.): one function button "Edit", three tabs where "Reference images" was
+    assert gui.MODE_LABELS[4] == ("edit", "Edit") and ("multi_edit", "Multi Image Edit") in gui.MODE_LABELS
+    pick("flux3", "multi_edit")
+    assert app.v_fn.get() == "edit" and app.v_edtab.get() == "multi"           # the Edit button stays lit on the reference tabs
+    app.v_edtab.set("bbox")
+    app._edtab_clicked()
+    assert app.v_edtab.get() == "bbox" and app._bbox_on() and app.refslots.max_refs == 1
+    app.v_edtab.set("multi")                                                   # BBOX placement -> Multi image edit: only the tick changes
+    app._edtab_clicked()
+    assert app.v_mode.get() == "multi_edit" and not app.v_bbox.get() and app.refslots.max_refs == 3
+    app.v_edtab.set("edit")                                                    # -> Edit canvas: the plain edit, no slots
+    app._edtab_clicked()
+    assert app.v_mode.get() == "edit" and app.v_fn.get() == "edit" and not app._refs_wanted() and app._refs_for("edit") == []
+    app.v_edtab.set("bbox")
+    app._edtab_clicked()
+    app._on_edit_fn()                                                          # the Edit button always opens on Edit canvas, BBOX off
+    assert app.v_mode.get() == "edit" and app.v_edtab.get() == "edit" and not app.v_bbox.get()
+    pick("qwen", "multi_edit")                                                 # no BBOX placement for a model without it
+    assert app.v_edtab.get() == "multi" and not app._bbox_on()
+    pick("qwen", "inpaint")
+    assert app.v_fn.get() == ""                                                # another function: the Edit button is off
 
     assert not hasattr(refslots, "apply_strokes") and not hasattr(app, "_refs_pen")      # the pen is gone
     assert refslots.thumbnail_png(Image.new("RGBA", (300, 100), (0, 0, 0, 0)), 64)[:4] == b"\x89PNG"

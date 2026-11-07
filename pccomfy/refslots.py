@@ -264,7 +264,7 @@ class RefSlots:
 # Pure helpers for the widget (tested without Tk)
 # ======================================================================================================================
 
-def thumbnail_png(image: Image.Image, size: int, background=(0x28, 0x28, 0x28)) -> bytes:   # the colour of gui_common.PANEL (the slot box behind the thumbnail)
+def thumbnail_png(image: Image.Image, size: int, background=(0xe4, 0xed, 0xf9)) -> bytes:   # the colour of gui_common.SLOT_BG (the slot box behind the thumbnail)
     """A PNG of the picture that fits into a size x size square (kept proportional), transparency shown on `background`."""
     import io
     t = flatten(image, background)
@@ -385,17 +385,15 @@ class RefSlotsMixin:
         self.f_refs = ttk.Frame(self.f_body)      # inside the body frame (gui.py _build): it is packed before f_neg, which lives there
         head = ttk.Frame(self.f_refs)
         head.pack(fill="x")
-        self.lbl_refs = ttk.Label(head, text="Reference images", style="Muted.TLabel")     # not shown (user 3.11.): only "Max. images: n"
-        # a drop-down like "Advanced settings" (user 6.11.): open at every start; closed it hides everything but this line
-        self.v_refs_open = tk.BooleanVar(value=True)
-        self.btn_refs = ttk.Button(head, command=self._toggle_refs, style="Link.TButton")
-        self.btn_refs.pack(side="left")
-        Tooltip(self.btn_refs, "Shows or hides the reference image slots.")
+        # no drop-down any more (user 7.11.): the tabs "Multi image edit" and "BBOX placement" under the prompt show the slots
+        self.lbl_refs = ttk.Label(head, text="Reference images", style="Muted.TLabel")
+        self.lbl_refs.pack(side="left")
+        self.v_refs_open = tk.BooleanVar(value=True)       # always open
         self.f_refbody = ttk.Frame(self.f_refs)      # everything under the head line: what the drop-down hides
         head2 = self.f_refhead2 = ttk.Frame(self.f_refbody)       # the BBOX tick (Flux 3), at the left: a line of its own, the head line has no room for it; packed only with the tick (user 7.11.: no empty line without it)
         # "Send reference images in original size": each image keeps its size up to a limit instead of the model's usual one (user 4.11.)
-        self.f_refsize = ttk.Frame(self.f_refbody)
-        self.f_refsize.pack(fill="x")
+        # the row sits in the window body right above the Advanced settings (user 7.11.), not under the slots; shown by _refs_update
+        self.f_refsize = ttk.Frame(self.f_adv.master)
         self.cb_refsize = ttk.Checkbutton(self.f_refsize, text="Send ref. images in original size, up to", variable=self.v_ref_native,
                                        style="Muted.TCheckbutton")
         self.cb_refsize.pack(side="left")
@@ -490,51 +488,96 @@ class RefSlotsMixin:
             t.delete("1.0", "end")
             t.insert("1.0", new)
 
+    # ---- the tabs of the Edit function (user 7.11.) ----
+    EDIT_TABS = (("edit", "Edit canvas"), ("multi", "Multi image edit"), ("bbox", "BBOX placement"))
+
+    def _edtabs_ensure(self):
+        """Three tabs in the design of the model chips: Edit canvas (the plain whole-picture edit), Multi image edit (the
+        reference slots) and, for Flux 3 only, BBOX placement. Behind them the window modes stay `edit` and `multi_edit`
+        (BBOX = multi_edit with the tick), so workflows, saved pages and the bridge are as before."""
+        if getattr(self, "f_edtabs", None) is not None:
+            return
+        import tkinter as tk
+        from tkinter import ttk
+        from .gui_common import ChipTooltip
+        from . import models as _models
+        self._refs_ensure()                  # makes v_bbox and the slot frame
+        self.v_edtab = tk.StringVar(value="edit")
+        self.f_edtabs = ttk.Frame(self.f_body)
+        self.rb_edtabs, self.tt_edtabs = {}, {}
+        tips = {"edit": _models.FUNCTION_TIPS["edit"], "multi": _models.FUNCTION_TIPS["multi_edit"], "bbox": BBOX_CHECK_TIP}
+        for key, label in self.EDIT_TABS:
+            rb = ttk.Radiobutton(self.f_edtabs, text=label, value=key, variable=self.v_edtab, style="Chip.Toolbutton",
+                                 command=self._edtab_clicked)
+            self.rb_edtabs[key] = rb
+            self.tt_edtabs[key] = ChipTooltip(rb, tips[key])
+
+    def _edtab_clicked(self):
+        """A tab was clicked: it sets the window mode (and the BBOX tick) and the window follows like after a function click."""
+        tab = self.v_edtab.get()
+        mode = "edit" if tab == "edit" else MULTI_MODE
+        if self.v_mode.get() != mode:          # Edit canvas <-> the reference tabs: a new function page (it starts BBOX off)
+            self.v_mode.set(mode)
+            self._on_mode()
+        self.v_bbox.set(tab == "bbox")          # Multi image edit <-> BBOX placement: only the tick changes, like the old checkbox
+        self._refs_bbox_changed()
+        self._edtabs_update()
+
+    def _edtabs_update(self):
+        mode, m = self.v_mode.get(), self._refs_model()
+        show = m is not None and mode in ("edit", MULTI_MODE) and MULTI_MODE in m.modes
+        if not show and getattr(self, "f_edtabs", None) is None:
+            return
+        self._edtabs_ensure()
+        if not show:
+            self.f_edtabs.pack_forget()
+            return
+        bbox = bool(m.bbox)
+        tab = "edit" if mode == "edit" else "bbox" if (bbox and self.v_bbox.get()) else "multi"
+        if mode == MULTI_MODE and self.v_bbox.get() and not bbox:
+            self.v_bbox.set(False)          # a model without BBOX: the tick does not travel along
+        self.v_edtab.set(tab)
+        shown = [k for k, _l in self.EDIT_TABS if k != "bbox" or bbox]
+        for c in range(3):
+            self.f_edtabs.columnconfigure(c, weight=1 if c < len(shown) else 0, uniform="edtab")
+        for k, _l in self.EDIT_TABS:
+            if k in shown:
+                self.rb_edtabs[k].grid(row=0, column=shown.index(k), sticky="ew", padx=2, pady=2)
+            else:
+                self.rb_edtabs[k].grid_remove()
+        anchor = self.f_refs if self.f_refs.winfo_manager() else self.f_neg
+        self.f_edtabs.pack(fill="x", padx=10, pady=(6, 0), before=anchor)
+
     def _refs_update(self):
         self._refs_retag()
+        self._edtabs_update()
         want = self._refs_wanted()
         if not want and getattr(self, "f_refs", None) is None:
             return
         self._refs_ensure()
         if not want:
             self.f_refs.pack_forget()
+            self.f_refsize.pack_forget()
             self.cb_bbox.pack_forget()
             self.f_refhead2.pack_forget()
             return
         m = self._refs_model()
-        if m.bbox:
-            self.cb_bbox.pack(side="left")
-            self.f_refhead2.pack(fill="x", pady=(0, 4), before=self.f_refsize)
-        else:
-            self.cb_bbox.pack_forget()
-            self.f_refhead2.pack_forget()
+        self.cb_bbox.pack_forget()          # the tick is the tab "BBOX placement" now (user 7.11.); the variable stays
+        self.f_refhead2.pack_forget()
         self._refs_bbox_changed()
         self.refslots.set_model(self._refs_max(m), m.tag_style)
         self.f_refs.pack(fill="x", padx=10, pady=(6, 0), before=self.f_neg)
+        self.f_refsize.pack(fill="x", padx=10, pady=(6, 0), before=self.f_adv)
         self._refs_redraw()
 
     def _show_refs_body(self):
-        """The drop-down of the reference slots: chevron and word on the head line, the rest shown or hidden."""
-        from .gui_common import MUTED
-        opened = bool(self.v_refs_open.get())
-        # "(max. n)" only while it is open (user 6.11.)
-        self.btn_refs.configure(text=f"Reference images (max. {self.refslots.max_refs})" if opened else "Reference images", compound="left",
-                                image=self._icon("chevron-down" if opened else "chevron-right", MUTED))
-        if opened:
-            self.f_refbody.pack(fill="x")
-        else:
-            self.f_refbody.pack_forget()
-
-    def _toggle_refs(self):
-        self.v_refs_open.set(not self.v_refs_open.get())
-        self._show_refs_body()
-        self._on_content_size()
-        self._fit_height()
+        """The slots are always shown while the tab is open (no drop-down any more, user 7.11.): the head line says how many."""
+        self.f_refbody.pack(fill="x")
 
     def _refs_redraw(self):
         import tkinter as tk
         from tkinter import ttk
-        from .gui_common import ACCENT, FG, MUTED, PANEL, Tooltip, font
+        from .gui_common import ACCENT, FG, MUTED, PANEL, SLOT_BG, SLOT_DISABLED, SLOT_FG, SLOT_MUTED, Tooltip, font
         for w in (self.f_refgrid.winfo_children() or []):
             w.destroy()
         self._refs_preview_close()   # the slots change: an open larger view may show a picture that is gone
@@ -546,12 +589,12 @@ class RefSlotsMixin:
         for c in range(per_row):
             self.f_refgrid.columnconfigure(c, minsize=s + self._px(3))
         n_used = len(rs.active)
-        self.lbl_refs.configure(text=f"Reference images ({n_used}/{rs.max_refs})")
+        self.lbl_refs.configure(text=f"Reference images (max. {rs.max_refs})")      # only the maximum, not n/n (user 3.11.)
         self._show_refs_body()
         for k in range(self._refs_visible()):
             cell = ttk.Frame(self.f_refgrid)
             cell.grid(row=k // per_row, column=k % per_row, sticky="n", padx=(0, self._keep(3)), pady=(0, self._keep(2)))
-            box = tk.Frame(cell, width=s, height=self._px(max(self.SLOT, self.BAR_ICONS * (self._icon_px() + 3) + 2)), bg=PANEL, highlightthickness=1, highlightbackground="#5c5c5c")
+            box = tk.Frame(cell, width=s, height=self._px(max(self.SLOT, self.BAR_ICONS * (self._icon_px() + 3) + 2)), bg=SLOT_BG, highlightthickness=1, highlightbackground="#5c5c5c")
             box.pack_propagate(False)
             box.pack()
             self._ref_boxes[k] = box        # the larger view opens level with it
@@ -559,7 +602,7 @@ class RefSlotsMixin:
                 it = rs.items[k]
                 photo = tk.PhotoImage(data=_b64(thumbnail_png(it.image, s - 4 - self._px(self._bar_px()))))
                 self._ref_photos.append(photo)
-                lbl = tk.Label(box, image=photo, bg=PANEL, bd=0)
+                lbl = tk.Label(box, image=photo, bg=SLOT_BG, bd=0)
                 lbl.pack(expand=True, side="left")
                 lbl.configure(cursor="hand2")
                 # drag the picture into the prompt field: its tag lands where you let go (the eye shows it larger)
@@ -572,7 +615,7 @@ class RefSlotsMixin:
                 Tooltip(lbl, f"{it.name or 'clipboard'}" + ("  (cut out)" if it.cut_out else "") + (f"\n{it.description}" if it.description else ""))
                 tag = rs.tag(k)
                 # the tag in a box of the slots' colour, white, centred under the slot (user 29.10.)
-                lt = tk.Label(cell, text=tag or f"image {k + 2}", bg=PANEL, fg=FG, font=font(9), anchor="center",
+                lt = tk.Label(cell, text=tag or f"image {k + 2}", bg=SLOT_BG, fg=SLOT_FG, font=font(9), anchor="center",
                               bd=0, padx=0, pady=self._px(1))
                 lt.pack(fill="x", pady=(self._keep(1), 0))
                 if tag:         # a click on it adds it to the end of the prompt field
@@ -596,7 +639,7 @@ class RefSlotsMixin:
                 self._refs_bar(box, [("paste", "Paste", "Takes the picture from the clipboard (Ctrl+V does the same when no text field has the focus).", self._refs_paste, False),
                                      ("file", "Add file", "Picks a picture file. Or drop files onto a slot.", self._refs_add_file, False)], False)
                 # centred in the whole slot (the icons sit at the top, the hint at the bottom)
-                tk.Label(box, text="Drop a picture\nor Ctrl+V", fg=MUTED, bg=PANEL, bd=0, justify="center"
+                tk.Label(box, text="Drop a picture\nor Ctrl+V", fg=SLOT_MUTED, bg=SLOT_BG, bd=0, justify="center"
                          ).place(relx=0.5, rely=1.0, anchor="s", y=-self._px(4))
         self._refs_xy()                 # the description in spot XY follows its slot (new tag, removed picture)
         over = len(rs.overflow)
@@ -639,18 +682,18 @@ class RefSlotsMixin:
         mouse an icon turns orange. `buttons`: (icon, word, explanation, command, waits) - an action that waits is greyed
         out while a job runs."""
         import tkinter as tk
-        from .gui_common import ACCENT, DISABLED, FG, PANEL, Tooltip
-        bar = tk.Frame(box, width=self._px(self._bar_px()), bg=PANEL, bd=0)
+        from .gui_common import ACCENT, SLOT_BG, SLOT_DISABLED, SLOT_FG, Tooltip
+        bar = tk.Frame(box, width=self._px(self._bar_px()), bg=SLOT_BG, bd=0)
         bar.pack(side="right", fill="y")
         for kind, word, tip, cmd, waits, *more in buttons:
             missing = more[0] if more else ""          # a file the action needs is not there: greyed out, the tooltip says which (user 7.11.)
             off = (busy and waits) or bool(missing)
-            lb = tk.Label(bar, image=self._refs_icon(kind, DISABLED if off else FG), bg=PANEL, bd=0, cursor="" if off else "hand2")
+            lb = tk.Label(bar, image=self._refs_icon(kind, SLOT_DISABLED if off else SLOT_FG), bg=SLOT_BG, bd=0, cursor="" if off else "hand2")
             lb.pack(pady=self._keep(1))
             if not off:
                 lb.bind("<Button-1>", lambda e, c=cmd: c())
                 lb.bind("<Enter>", lambda e, l=lb, k=kind: l.configure(image=self._refs_icon(k, ACCENT)), add="+")
-                lb.bind("<Leave>", lambda e, l=lb, k=kind: l.configure(image=self._refs_icon(k, FG)), add="+")
+                lb.bind("<Leave>", lambda e, l=lb, k=kind: l.configure(image=self._refs_icon(k, SLOT_FG)), add="+")
             Tooltip(lb, f"{word}: {missing or tip}")
 
     # ---- dragging a slot picture into the prompt field ----

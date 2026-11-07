@@ -11,7 +11,7 @@ the right 30 % cut off, in "2MP-beschnitten". Two kinds of Expand per photo:
     C  only Flux 2 and Qwen: the 2 MP photo, 50 % of its width to the right. In B their work area stays under the model's own ~1 MP,
        so the cap makes no difference there; C is big enough for 1.0 MP against 2.0 MP to give different pictures (measured 5.11.)
 
-Every kind runs with "Original size, up to" 1.0 MP and 2.0 MP, with Flux 3, Flux 2, Qwen 2.1 and Fibo 2.0 (each model with its own
+Every kind runs with "Original size, up to" 1.0 MP and 2.0 MP, with Flux 3, Flux 2, Qwen Image 2.1 and Fibo 2.0 (each model with its own
 Expand start values, empty prompt, one seed). The run goes through the plugin's real bridge (Bridge.run) against a small
 PhotoCraft simulator (tests/test_reference_mode.py): crop around the new area, scale, model, layer mask, composite. Cases whose
 graph and uploaded pictures are identical (the cap does not matter when the work area is smaller than the cap) are run once; the

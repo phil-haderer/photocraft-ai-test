@@ -45,7 +45,8 @@ def start(answer):
 
 
 app, seen = start(True)
-assert app.v_conn.value == "ComfyUI connected" and app.lbl_dot.style == "ConnOk.TLabel" and app._comfy_up is True
+# the quick answer alone is not "connected": red with "connecting" until the lists are read (tester 7.11.)
+assert app.v_conn.value == "ComfyUI connecting …" and app.lbl_dot.style == "ConnBad.TLabel" and app._comfy_up is True and app._comfy_read is None
 assert seen == [("http://127.0.0.1:59999", 0.5)], seen                  # one question, short timeout, the plugin's own address
 app, _ = start(False)
 assert app.v_conn.value == "ComfyUI not connected" and app.lbl_dot.style == "ConnBad.TLabel" and app._comfy_up is False

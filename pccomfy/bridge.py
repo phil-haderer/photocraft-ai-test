@@ -33,7 +33,7 @@ from typing import Callable
 import numpy as np
 from PIL import Image
 
-from . import fillmask, imaging, refslots, workflows
+from . import __version__, fillmask, imaging, refslots, workflows
 from .comfy import Cancelled, ComfyUI
 from .photocraft import PhotoCraft, PhotoCraftError
 
@@ -1249,7 +1249,7 @@ class Bridge:
         try:
             f = self.exchange / "runs.jsonl"
             old = f.read_text(encoding="utf-8").splitlines()[-99:] if f.exists() else []
-            rec = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "mode": ("remove" if req.remove else req.mode), "attempt": attempt,
+            rec = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "version": __version__, "mode": ("remove" if req.remove else req.mode), "attempt": attempt,
                    "workflow": Path(wf).name if wf else "builtin", "seed": gp.seed, "size": [gp.width, gp.height],
                    "turbo": req.turbo, "enhance": req.enhance, "layer_mask": req.layer_mask, "base_res": req.base_res,
                    "native": req.native, "native_mp": req.native_mp,

@@ -45,10 +45,10 @@ def main():
     app._on_model()
     app.root.update()
 
-    # the grid: one button in Upscale's place (last row, left); Upscale and Refine themselves are hidden
+    # the grid: one button in Upscale's place (last of the six: Multi Image Edit is a tab of Edit, 7.11.); Upscale and Refine themselves are hidden
     assert shown(app.rb_scale_fn) and not shown(app.rb_modes["upscale"]) and not shown(app.rb_modes["refine"])
     info = app.rb_scale_fn.grid_info()
-    assert (info["row"], info["column"]) == (3, 0), info
+    assert (info["row"], info["column"]) == (2, 1), info
     assert app.rb_scale_fn["text"] == "Upscale / Refine", app.rb_scale_fn["text"]
     assert str(app.rb_scale_fn["state"]) == "normal", str(app.rb_scale_fn["state"])
     assert app.v_fn.get() == ""                                         # not chosen while Fill is on

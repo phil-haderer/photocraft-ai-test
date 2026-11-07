@@ -1,4 +1,4 @@
-"""Qwen 2.1 Upscale (workflow qwen212KUpscale_v10 as an API graph): the picture, the result's size, the prompt and the seed reach
+"""Qwen Image 2.1 Upscale (workflow qwen212KUpscale_v10 as an API graph): the picture, the result's size, the prompt and the seed reach
 the right nodes; no LoRA and no upscaler node; Qwen offers the function.
 
     python tests/test_qwen_upscale.py

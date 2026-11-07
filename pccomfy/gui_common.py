@@ -48,7 +48,7 @@ MODE_LABELS = [
     ("outpaint", "Expand image"),
     ("inpaint", "Fill Selection"),
     ("remove", "Remove Selection"),
-    ("edit", "Edit Canvas"),
+    ("edit", "Edit"),            # one function button for Edit canvas, Multi image edit and BBOX placement (tabs under the prompt, refslots.py; user 7.11.)
     ("multi_edit", "Multi Image Edit"),
     ("upscale", "Upscale (new file)"),
     ("refine", "Refine (same size)"),
@@ -741,6 +741,8 @@ CLIP_DEFAULT = "(workflow default)"
 PAGE_NOT_SAVED = ("mode", "workflow", "clip", "checkpoint", "seed", "prompt", "negative", "variants")   # what "Set as my settings" leaves out: the page itself, the text, the seed and the number of variants
 ON_ACCENT = "#ffffff"       # text and icons on the blue fill (chosen function, Generate): white, bold (user 3.11.)
 BG, PANEL, FG, MUTED, ACCENT = "#535353", "#282828", "#eeeeee", "#cfcfcf", "#378ef0"   # PhotoCraft grey and blue (both measured from a screenshot); PANEL = inactive tab, fields, buttons, slots
+SLOT_BG = "#e4edf9"     # the reference-image slots: nearly white with a touch of the accent blue (user 7.11.); keep refslots.thumbnail_png's default in step
+SLOT_FG, SLOT_MUTED, SLOT_DISABLED = "#1f1f1f", "#4d5560", "#9aa3ad"     # text and icons on SLOT_BG: dark, because the slot is light
 HINT_TEXT = "#82b8f7"       # the tip under the prompt: a little brighter than ACCENT_TEXT, for reading (user 3.11.)
 ACCENT_TEXT = "#6aaaf5"     # the blue for text and thin lines on the grey (the exact blue is too dark there: 2.3 : 1 on BG, this 3.2 : 1 like the old orange)
 NA_RED = "#ff6b6b"      # text of a tab that is not available (model files missing); 5.3 : 1 on PANEL
