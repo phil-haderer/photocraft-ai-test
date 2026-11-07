@@ -23,6 +23,7 @@ MAX_SIDE = 1024                      # the longest side of a reference image sen
 DEFAULT_BACKGROUND = (128, 128, 128)
 
 BBOX_MAX_REFS = 1       # with BBOX ticked the one reference image is the object for the box (user 3.11.)
+CUT_NEEDS_FILE = "Needs birefnet.safetensors (optional): get it in the gear window, Models, Additional."      # Cut out in a slot without the file (user 7.11.)
 BBOX_LABEL = "Place ref. image in selection (BBOX)"
 BBOX_CHECK_TIP = "Your selection becomes a box named <obj_1> in the prompt. Without a selection the run is a normal Multi Image Edit."
 BBOX_TIP = "Draw a rectangle selection and name the object from the reference image, e.g. “wine glass”. It lands in the box."   # under the prompt while BBOX is ticked (user 3.11.)
@@ -583,7 +584,8 @@ class RefSlotsMixin:
                         lambda k=k: self._refs_preview(k), False),
                        ("remove", "Remove", "Takes this image out of the slots.", lambda k=k: self._refs_remove(k), False),
                        ("cut", "Undo cut" if it.cut_out else "Cut out",
-                        "Back to the original picture." if it.cut_out else "Removes the background (BiRefNet in ComfyUI).", lambda k=k: self._refs_cut(k), True),
+                        "Back to the original picture." if it.cut_out else "Removes the background (BiRefNet in ComfyUI).", lambda k=k: self._refs_cut(k), True,
+                        "" if (it.cut_out or self._cut_file_ok()) else CUT_NEEDS_FILE),
                        ("describe", "Describe", "The text model of this model writes a short description of this picture (about 5 s).", lambda k=k: self._refs_describe(k), True)]
                 if it.description:
                     bar.append(("copy", "Copy text", "Puts the description on the clipboard.", lambda k=k: self._refs_copy_text(k), False))
@@ -640,15 +642,16 @@ class RefSlotsMixin:
         from .gui_common import ACCENT, DISABLED, FG, PANEL, Tooltip
         bar = tk.Frame(box, width=self._px(self._bar_px()), bg=PANEL, bd=0)
         bar.pack(side="right", fill="y")
-        for kind, word, tip, cmd, waits in buttons:
-            off = busy and waits
+        for kind, word, tip, cmd, waits, *more in buttons:
+            missing = more[0] if more else ""          # a file the action needs is not there: greyed out, the tooltip says which (user 7.11.)
+            off = (busy and waits) or bool(missing)
             lb = tk.Label(bar, image=self._refs_icon(kind, DISABLED if off else FG), bg=PANEL, bd=0, cursor="" if off else "hand2")
             lb.pack(pady=self._keep(1))
             if not off:
                 lb.bind("<Button-1>", lambda e, c=cmd: c())
                 lb.bind("<Enter>", lambda e, l=lb, k=kind: l.configure(image=self._refs_icon(k, ACCENT)), add="+")
                 lb.bind("<Leave>", lambda e, l=lb, k=kind: l.configure(image=self._refs_icon(k, FG)), add="+")
-            Tooltip(lb, f"{word}: {tip}")
+            Tooltip(lb, f"{word}: {missing or tip}")
 
     # ---- dragging a slot picture into the prompt field ----
     DRAG_PX = 5        # the mouse moves this far (before the display scaling) before a press on a picture becomes a drag
@@ -917,11 +920,19 @@ class RefSlotsMixin:
         self._refs_say("")
         self._refs_redraw()
 
+    def _cut_file_ok(self) -> bool:
+        """False only when ComfyUI was read and birefnet.safetensors is not listed (not read yet: the click tries)."""
+        ok = getattr(self, "_cutout_ok", None)
+        return True if ok is None else bool(ok("birefnet"))
+
     def _refs_cut(self, k: int):
         it = self.refslots.items[k]
         if it.cut_out:
             self.refslots.revert(k)
             self._refs_redraw()
+            return
+        if not self._cut_file_ok():       # no job for ComfyUI that it must reject: a calm note instead of "Cut out failed: ..." (user 7.11.)
+            self._refs_say(CUT_NEEDS_FILE)
             return
         import threading
         self._ref_busy.add(k)

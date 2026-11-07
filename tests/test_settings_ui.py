@@ -100,8 +100,8 @@ def test_start_state():
     # a tab that is not available does not open from the empty state either: its settings do
     app.v_model.set("krea2")
     app._on_model()
-    assert app.v_model.get() == "" and app._settings_win is not None and app._settings_focus == "krea2"
-    app._settings_close()
+    assert app.v_model.get() == "" and app._settings_win is None      # no pop-up (user 7.11.); the status line says why
+    assert "Krea 2" in app.v_status.get() and "gear" in app.v_status.get(), app.v_status.get()
     # the first click on a model shows it and remembers it for the next start (state.json)
     app._apply_refresh(det(full()))
     app.v_model.set("flux3")
@@ -367,6 +367,8 @@ def main():
     app.v_model.set("krea2")
     app._on_model()
     assert app.v_model.get() == "flux3" and app._last_model == "flux3"
+    assert app._settings_win is None and "gear" in app.v_status.get()
+    app.open_settings(focus="krea2")                                 # the gear shows what is missing
     assert app._settings_win is not None and app._settings_focus == "krea2"
     text = rows_text(app)
     assert "restart ComfyUI" in text and "Credits" not in text and "Krea 2 Turbo  is not yet available  \u25C0" in text

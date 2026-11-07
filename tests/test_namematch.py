@@ -92,6 +92,17 @@ def main():
     assert s2._file_data(f, "flux/" + moss, "required")["other"] is True
     s2.inv = inventory.Inventory({"unet": ["flux/" + moss]})           # only the used file: nothing to choose from
     assert s2._link_entries(moss) is None
+    # the chain on a kind whose list is empty (a tester's background removal / vae_approx, 7.11.): a note says where the file belongs,
+    # and the status line gets no red message any more
+    bg = "birefnet.safetensors"
+    note = s2._link_empty_note(bg)
+    assert "background removal" in note and "models/background_removal" in note and "restart ComfyUI" in note and "LoadBackgroundRemovalModel" in note, note
+    pv = s2._link_empty_note("taef2_decoder.pth")
+    assert "models/vae_approx" in pv and "Refresh" in pv and "node" not in pv, pv
+    assert "no other file" in s2._link_empty_note("no-such-file")
+    body = (Path(__file__).resolve().parent.parent / "pccomfy" / "ui_settings.py").read_text(encoding="utf-8")
+    body = body.split("def _choose_for", 1)[1].split("def _link_models", 1)[0]
+    assert "error=True" not in body and "note=self._link_empty_note" in body
     assert (Path(__file__).resolve().parent.parent / "pccomfy" / "assets" / "LICENSE-model-linker.txt").is_file()
     assert any(n == "kianxyzw" for n, _w, _u in manifest.CONTRIBUTORS)
     print("test_namematch: ok")

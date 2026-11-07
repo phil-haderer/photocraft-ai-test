@@ -65,6 +65,23 @@ def main():
     app.v_status.set("")
     app._update_ready()
     assert app.v_status.get() == app._idle_text
+    # a chosen model never runs the built-in SD1.5/SDXL graph (tester 7.11.: Realistic Vision under the name of MOSS)
+    app.inv = inventory.Inventory(full_lists(), nodes=nodes)
+    app.v_model.set("moss")
+    app.v_mode.set("txt2img")
+    app._on_model()
+    wf = app.v_workflow.get()
+    assert wf != gui.BUILTIN, wf
+    app.v_workflow.set(gui.BUILTIN)
+    seen = []
+    app._preflight = lambda: seen.append(1) or ["stop here"]            # stops right after the guard, nothing is started
+    app.generate()
+    assert app.v_workflow.get() == wf and seen, (app.v_workflow.get(), seen)      # the model's own workflow came back
+    app._apply_model_mode = lambda force=False: None                    # and when it cannot come back: an error, no run
+    app.v_workflow.set(gui.BUILTIN)
+    seen.clear()
+    app.generate()
+    assert not seen and "nothing was started" in app.v_status.get(), app.v_status.get()
     app.root.destroy()
     print("ALL OK (ready line)")
 

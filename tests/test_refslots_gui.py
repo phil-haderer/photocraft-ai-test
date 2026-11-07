@@ -295,6 +295,22 @@ def main():
     assert app.refslots.items[0].cut_out and not app._ref_busy
     app._refs_cut(0)
     assert not app.refslots.items[0].cut_out
+    # without birefnet.safetensors (a tester's empty background_removal list, 7.11.): no job for ComfyUI, a calm note, the icon is greyed out
+    from pccomfy import refslots as _rs
+    real_inv, said, called = app.inv, [], []
+    app.inv = type("Inv", (), {"has": lambda s, n: n != "birefnet.safetensors"})()
+    app.bridge.remove_background = lambda im: called.append(1) or im
+    real_say, app._refs_say = app._refs_say, said.append
+    try:
+        assert app._cut_file_ok() is False
+        app._refs_cut(0)
+        assert said == [_rs.CUT_NEEDS_FILE] and not called and not app._ref_busy and not app.refslots.items[0].cut_out, (said, called)
+        assert "birefnet.safetensors" in _rs.CUT_NEEDS_FILE and "failed" not in _rs.CUT_NEEDS_FILE
+        app._refs_redraw()                                  # the bar with the greyed icon builds without an error
+        app.inv = type("Inv", (), {"has": lambda s, n: True})()
+        assert app._cut_file_ok() is True
+    finally:
+        app.inv, app._refs_say = real_inv, real_say
 
     # the describe button: Qwen 3.5 9B's text lands in the slot and, on request, in the prompt (named like the model names the image)
     app.bridge.describe_image = lambda im, seed=None, **kw: "A red square on blue."

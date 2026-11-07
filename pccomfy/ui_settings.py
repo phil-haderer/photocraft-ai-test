@@ -195,6 +195,10 @@ class SettingsMixin(DownloadMixin):
         self._apply_start_state()
         self._update_cut_button()
         try:
+            self._refs_redraw()           # the Cut out icon of a slot follows the file lists (grey without birefnet)
+        except (AttributeError, tk.TclError):
+            pass
+        try:
             self._update_mode_radios()
         except (AttributeError, tk.TclError):      # the window is still being built
             pass
@@ -342,9 +346,12 @@ class SettingsMixin(DownloadMixin):
             return
         key, prev = self.v_model.get(), self._last_model
         if key and self.inv is not None and key != prev and self.inv.tab_status(key).state == "missing":
-            self.v_model.set(prev)              # a tab that is not available does not open: its settings do
-            self.open_settings(focus=key)
-            return
+            self.v_model.set(prev)              # a tab that is not available does not open; the settings do not pop up either (user 7.11.)
+            label = next((m.label for m in models.MODELS if m.key == key), key)
+            msg = f"{label} is not set up yet (model files missing). Open the settings (gear) to see what is needed."
+            self._status(msg)
+            self._idle_text = msg               # counts as an idle line: the next working model replaces it with "Ready"
+            return True
         self._last_model = self.v_model.get()
         if key:                                  # the last model comes back at the next start (state.json, like the other settings)
             self.state["model"] = key
@@ -352,7 +359,8 @@ class SettingsMixin(DownloadMixin):
         super()._on_model()
 
     def _on_model(self):
-        self._on_model_core()
+        if self._on_model_core():               # a tab without files: nothing changed, the message stays
+            return
         self._apply_start_state()
 
     # ---------- preflight ----------
@@ -429,6 +437,15 @@ class SettingsMixin(DownloadMixin):
         if self.start_state():
             self._status("Choose a model first.")      # Ctrl+Enter must not run with nothing chosen
             return
+        if self.v_model.get() and self.v_workflow.get() == BUILTIN:
+            # a model is chosen but the workflow fell back to the built-in SD1.5/SDXL graph: that would run the first
+            # checkpoint of ComfyUI (a Realistic Vision picture under the name of MOSS; tester 7.11.). Put the model's own back.
+            self._apply_model_mode(force=True)
+            if self.v_workflow.get() == BUILTIN:
+                m = self._model()
+                self._status(f"The workflow of {m.label if m else 'this model'} was not found, so nothing was started. "
+                             "Check the workflows folder, or choose the model again.", error=True)
+                return
         lines = self._preflight()
         if lines:
             self._status(inventory.short_message(lines, self._model().label), error=True)
@@ -1395,18 +1412,32 @@ class SettingsMixin(DownloadMixin):
             hints[current] = HINT_IN_USE
         return cands, pinned, hints, mapped, current
 
+    # a kind that needs a ComfyUI with a node of its own: said in the note when its list is empty
+    LINK_EMPTY_EXTRA = {"bg_removal": " It needs a current ComfyUI (the node LoadBackgroundRemovalModel).",
+                        "upscale_model": " It needs a ComfyUI with the node UpscaleModelLoader."}
+
+    def _link_empty_note(self, expected: str) -> str:
+        """The note of the chain window when ComfyUI lists no file of the kind: where the file belongs, what to do after."""
+        f = manifest.FILES.get(expected)
+        if f is None:
+            return "ComfyUI lists no other file of this kind. Put yours into its models folder, restart ComfyUI, then click Refresh."
+        what = manifest.KIND_LABEL.get(f.kind, f.kind).lower()
+        return (f"ComfyUI lists no {what} file yet. Put your file into ComfyUI's models/{f.folder} folder, restart ComfyUI, then click Refresh."
+                + self.LINK_EMPTY_EXTRA.get(f.kind, ""))
+
     def _choose_for(self, expected: str):
         """The chain next to a file: a search window with the files ComfyUI has for its kind (typing filters, alphabetical, "Use the expected file again"
         at the bottom when the file is linked). A click links at once (Undo and Reset are in "Linked files")."""
         entries = self._link_entries(expected)
-        if entries is None:
-            self._status("ComfyUI lists no other file of this kind. Copy yours into its folder and restart ComfyUI.", error=True)
-            return
-        cands, pinned, hints, mapped, current = entries
         win = self._settings_win or self.root
         old = getattr(self, "_link_picker", None)
         if old is not None:
             old.close()
+        if entries is None:      # nothing to choose from: a note in the window, no red message in the status line (user 7.11.)
+            self._link_picker = linkpicker.LinkPicker(win, (win.winfo_pointerx(), win.winfo_pointery()), [], note=self._link_empty_note(expected),
+                                                      scale=getattr(self, "ui", 1.0))
+            return
+        cands, pinned, hints, mapped, current = entries
         # a search window instead of a menu (user 7.11.): typing filters, the list is alphabetical, the wheel does not close it
         self._link_picker = linkpicker.LinkPicker(
             win, (win.winfo_pointerx(), win.winfo_pointery()), cands, pinned, hints, mapped,

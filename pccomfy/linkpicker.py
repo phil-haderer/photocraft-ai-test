@@ -43,7 +43,7 @@ class LinkPicker:
 
     def __init__(self, root, anchor_xy, cands: list[str], pinned=(), hints: dict | None = None, mapped: str | None = None,
                  explain: str = "", unlink: str = "", on_pick: Callable[[str], None] | None = None, scale: float = 1.0,
-                 strong=()):
+                 strong=(), note: str = ""):
         self.root, self.cands, self.pinned, self.hints = root, list(cands), list(pinned), dict(hints or {})
         self.strong = set(strong)      # files shown in green with a dot (the one in use): easy to see in a long list
         self.mapped, self.on_pick, self.closed, self.shown = mapped, on_pick, False, []
@@ -52,6 +52,12 @@ class LinkPicker:
         top.wm_overrideredirect(True)
         top.configure(bg=PANEL, highlightthickness=1, highlightbackground="#5c5c5c")
         self.v = tk.StringVar()
+        if note:          # nothing to choose from: a calm note instead of a list (no red error in the status line, user 7.11.)
+            self.entry = self.lb = None
+            tk.Label(top, text=note, bg=PANEL, fg=FG, font=font(9), justify="left", anchor="w",
+                     wraplength=px(380)).pack(padx=px(14), pady=px(12))
+            self._finish(top, anchor_xy, px, top)
+            return
         self.entry = tk.Entry(top, textvariable=self.v, bg="#1f1f1f", fg=FG, insertbackground=FG, relief="flat", font=font(9),
                               highlightthickness=1, highlightbackground="#454545", highlightcolor=ACCENT)
         self.entry.pack(fill="x", padx=px(8), pady=(px(8), px(4)))
@@ -79,11 +85,16 @@ class LinkPicker:
         self.lb.bind("<Return>", lambda e: self._pick_selected())
         # the wheel only moves the list: "break" keeps it from reaching the window under the pointer (the old menu closed here)
         bind_wheel(self.lb, lambda e: (self.lb.yview_scroll(-3 if wheel_up(e) else 3, "units"), "break")[1])
+        self.refill()
+        self._finish(top, anchor_xy, px, self.entry)
+
+    def _finish(self, top, anchor_xy, px, focus_widget):
+        """Closing (Escape, lost focus, a click outside), place the window inside the screen, take the keyboard."""
+        root = self.root
         top.bind("<Escape>", lambda e: self.close())
         top.bind("<FocusOut>", lambda e: root.after(200, self._lost_focus))
         self._outside_id = None
         root.after(200, self._watch_clicks)      # not at once: the click that opened the window must not close it
-        self.refill()
         top.update_idletasks()
         x, y = anchor_xy
         try:                            # inside the screen
@@ -95,7 +106,7 @@ class LinkPicker:
         top.wm_geometry(f"+{x}+{y}")
         top.lift()
         top.focus_force()
-        self.entry.focus_force()
+        focus_widget.focus_force()
 
     def _chars(self, root, px) -> int:
         """The list is as wide as its longest line (names are never cut), at most the screen less a margin."""
