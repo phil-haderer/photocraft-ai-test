@@ -14,7 +14,7 @@ TIPS = (
     "\"Show feather\" paints the blend area red in PhotoCraft (Quick Mask). Click it again, or Generate, to get your selection back.",
     "Qwen fills small selections badly. Use a larger selection, or try Fibo 2.0 Edit Turbo.",
     "Right-click the chosen model chip and pick \"Set as my settings…\": the current sliders, sampler, steps and LoRAs become your start for this function and model, and \"Reset page\" returns to them. Shift-click \"Reset page\" for the standard settings.",
-    "Right-click a model chip and tick \"Favourite for ...\": Easy Mode then uses this model first for that function. \"Reset favourite models\" (gear window, Other settings) forgets all favourites: Easy Mode and the functions use the default ranking again.",
+    "Right-click a model chip and tick \"Favourite for ...\": that function then opens with this model. \"Reset favourite models\" (gear window, Other settings) forgets all favourites.",
     "MOSS does text to image only; Krea 2 is the fast text to image model.",
     "The gear window lists the files each model needs. The chain icon links a file ComfyUI already has under another name.",
     "\"Live preview\" shows the picture while it is made. It is greyed out until the model's preview decoder file is downloaded.",

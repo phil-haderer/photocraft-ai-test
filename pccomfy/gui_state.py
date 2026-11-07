@@ -9,7 +9,7 @@ from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
 
-WATCH_MS = 5000       # how often the window asks PhotoCraft's control port (Linux: closing with PhotoCraft)
+WATCH_MS = 1000       # how often the window asks PhotoCraft's control port (Linux: closing with PhotoCraft; 7.11.: 5 s took ~12 s, now ~2-3 s)
 COMFY_WATCH_MS = 1000   # how often the ComfyUI dot asks the server whether it is still there (tester 5.11.: 5 s felt slow)
 
 
@@ -54,7 +54,7 @@ class StateMixin:
             self.refresh()
 
     def _watch_photocraft(self):
-        """Where the window cannot be linked to PhotoCraft's window (Linux), it still closes with PhotoCraft: every WATCH_MS a
+        """Where the window cannot be linked to PhotoCraft's window (Linux), it still closes with PhotoCraft: every WATCH_MS (1 s) a
         plain connection to its control port (no login) in a thread; gone twice in a row after it was seen, the window quits."""
         if os.environ.get("PCCOMFY_NO_WATCH") or winlink.available():
             return

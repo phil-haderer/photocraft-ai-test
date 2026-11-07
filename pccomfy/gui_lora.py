@@ -191,7 +191,7 @@ class LoraMixin:
         or (see _opts_in_advanced) in the Advanced settings, below Sampler and Scheduler."""
         want = bool(has_lora or stages)
         place = ("adv" if self._opts_in_advanced() else "main") if want else ""
-        now = {"pack": "main", "grid": "adv"}.get(self.f_opts.winfo_manager(), "")      # read from Tk: Easy mode hides it with pack_forget
+        now = {"pack": "main", "grid": "adv"}.get(self.f_opts.winfo_manager(), "")      # read from Tk
         if place != now:
             self.f_opts.pack_forget()
             self.f_opts.grid_forget()

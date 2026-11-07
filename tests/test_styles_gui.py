@@ -1,5 +1,5 @@
-"""The Styles button in the real Tk window (hidden): it sits left of the LLM button only in Text to image, goes in Easy Mode and
-comes back, the menu has a submenu per group, an entry is ADDED to the prompt after a line break in one undo step (Ctrl+Z takes it away),
+"""The Styles button in the real Tk window (hidden): it sits left of the LLM button only in Text to image and
+the menu has a submenu per group, an entry is ADDED to the prompt after a line break in one undo step (Ctrl+Z takes it away),
 and the hover box shows the whole text. Skipped when Tk cannot open a window.
 
     python tests/test_styles_gui.py
@@ -112,22 +112,12 @@ def main():
     assert abs(gy - (py - 12)) < 80 and vx0 <= gx < vx1 and (gx, gy) != (vx0, vy0), (gx, gy, px, py, vx0, vy0, vx1)
     app._style_tip_hide()
 
-    # Easy Mode keeps the Styles button (user 1.11.) beside the bin, hides LLM, and LLM comes back between them
-    app.v_easy.set(True)
-    app.toggle_easy()
-    app.root.update()
-    assert shown(app.b_styles) and not shown(app.b_llm)
-    assert app.b_styles.winfo_x() < app.b_clear.winfo_x()
     app.v_mode.set("edit")
     app._on_model()
     app.root.update()
-    assert not shown(app.b_styles)                                  # other functions have no styles, also in Easy Mode
+    assert not shown(app.b_styles)                                  # other functions have no styles
     app.v_mode.set("txt2img")
     app._on_model()
-    app.root.update()
-    assert shown(app.b_styles)
-    app.v_easy.set(False)
-    app.toggle_easy()
     app.root.update()
     assert shown(app.b_styles) and app.b_llm.winfo_x() < app.b_styles.winfo_x() < app.b_clear.winfo_x()
     app.root.destroy()

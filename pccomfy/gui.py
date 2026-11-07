@@ -9,17 +9,15 @@ from .gui_lora import LoraMixin
 from .gui_modes import ModeMixin
 from .gui_state import COMFY_WATCH_MS, WATCH_MS, StateMixin
 from .gui_run import RunMixin
-from .gui_easy import EasyMixin
 from .gui_tips import TipsMixin
 from .ui_settings import SettingsMixin, GEAR_PX, FOOT_REFRESH_PADX, FOOT_RESET_PADX
 from .refslots import RefSlotsMixin
 from . import clipboard
-from . import easymode
 from . import hostos, spacing
 from .appname import HEADER_TITLE, WINDOW_TITLE
 
 
-class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, ModeMixin, StateMixin, RunMixin, TipsMixin):
+class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, ModeMixin, StateMixin, RunMixin, TipsMixin):
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.state = cfgmod.load_state()
@@ -110,8 +108,6 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.v_enhance = tk.BooleanVar(value=g("enhance", False))   # off at the first start, like Reset
         self.v_turbo = tk.BooleanVar(value=g("turbo", True))
         self.v_lora_str = tk.DoubleVar(value=g("lora_strength", 1.0))
-        self._easy = easymode.is_on()               # Easy Mode (gui_easy.py): the switch lives in settings.json
-        self.v_easy = tk.BooleanVar(value=self._easy)
         self.v_model = tk.StringVar(value=g("model", ""))   # the tab; "" = a workflow of your own (everything enabled)
         self.v_sharpen = tk.DoubleVar(value=g("sharpen", 0.0))
         self.v_cmp_res = tk.StringVar(value="")
@@ -139,7 +135,6 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self._booting = True    # the saved window state is shown as it was: the model's starting settings are not applied
         self._on_mode()
         self._booting = False
-        self._easy_boot()
         self._start_fresh()
         # the edge feather is not kept from the last time: every start has the function's own value (decision of the
         # user 28.10.; before, every start showed 2 % and Fibo Fill / Qwen Fill looked hard until the function was chosen again)
@@ -213,7 +208,7 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
                                  image=self._function_icon(key), compound="left", command=self._on_mode)
             self.rb_modes[key] = rb
             self.tt_modes[key] = ChipTooltip(rb, MODE_TIPS[key])
-        # standard mode: ONE button for Upscale and Refine (PLAN.md 2, user 6.11.); Easy Mode keeps the two (rb_modes["upscale"], ["refine"])
+        # standard mode: ONE button for Upscale and Refine (PLAN.md 2, user 6.11.)
         self.rb_scale_fn = ttk.Radiobutton(f_fn, text=SCALE_FN_LABEL, value="scale", variable=self.v_fn, style="Tab.Toolbutton",
                                            image=self._function_icon("refine"), compound="left", command=self._on_scale_fn)
         f_md = self.f_models = ttk.Frame(self.f_tabs)
@@ -696,7 +691,6 @@ class App(EasyMixin, SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, Lora
         self.b_history.pack(side="right", padx=(6, 0))
         Tooltip(self.b_history, "Last runs: click one to load all its settings with a new seed. Nothing starts by itself.")
         self._build_settings(foot)      # the gear sits in the header (ui_settings.py)
-        self._build_easy()              # the Easy Mode switch in the header and the model line (gui_easy.py)
 
         for cb in (self.cb_lm, self.cb_sampler, self.cb_sched):
             self._open_on_click(cb)         # the list opens on a click anywhere in the box, not only on the arrow

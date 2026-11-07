@@ -1,5 +1,5 @@
 """The standard mode has ONE function button "Upscale / Refine" with the factors None | 1.5x | 2x | 3x | 4x (PLAN.md 2,
-user 6.11.): None runs the inner mode "refine", a factor the inner mode "upscale". Easy Mode keeps its two buttons. Real Tk window
+user 6.11.): None runs the inner mode "refine", a factor the inner mode "upscale". Real Tk window
 (hidden); skipped when Tk cannot open a window.
 
     python tests/test_scale_function.py
@@ -179,25 +179,6 @@ def main():
     app._on_factor()
     assert app._prompt_text() == models.FLUX3_RESTORE and app.v_fac.get() == "r:Restore"
 
-    # Easy Mode keeps the two functions and the four factors
-    app.v_easy.set(True)
-    app.toggle_easy()
-    app.root.update()
-    assert app._easy and shown(app.rb_scale_fn) and not shown(app.rb_modes["upscale"]) and not shown(app.rb_modes["refine"])
-    app.v_fn.set("scale")
-    app._on_scale_fn()                                                  # Easy Mode: the same button and the same factor row, with None
-    app.root.update()
-    assert shown(app.f_scale) and shown(app.rb_refine["Default"]) and app.v_fac.get() in ("r:Default", app.v_scale.get())
-    app.v_fac.set("x 2")
-    app._on_factor()                                                    # a factor: Upscale, with the model Easy Mode picks for it
-    assert app.v_mode.get() == "upscale" and app.v_model.get() == "qwen" and app._scale() == 2.0, (app.v_mode.get(), app.v_model.get())
-    app.v_fac.set("r:Default")
-    app._on_factor()                                                    # the Refine row: Refine, with the model Easy Mode picks for that
-    assert app.v_mode.get() == "refine" and app.v_model.get() == "fibo", (app.v_mode.get(), app.v_model.get())
-    assert all(str(rb["state"]) == "normal" for rb in app.rb_scale.values()) and str(app.rb_refine["Default"]["state"]) == "normal"
-    app.v_easy.set(False)
-    app.toggle_easy()
-    app.root.update()
     assert shown(app.rb_scale_fn) and not shown(app.rb_modes["upscale"])
     app.root.destroy()
     print("ALL OK (Upscale / Refine function button)")

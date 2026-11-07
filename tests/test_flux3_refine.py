@@ -27,7 +27,6 @@ def main():
     m = models.FLUX3.modes["refine"]
     assert m.workflow == WF.name and [p[0] for p in m.prompts] == ["Default", "Restore"]
     assert m.prompts[0][1] == models.FLUX3_DEFAULT and models.FLUX3_RESTORE in models.STOCK_PROMPTS
-    assert "flux3" in models.RANKING["refine"]
 
     for typed, want in (("", models.FLUX3_DEFAULT), (models.FLUX3_RESTORE, models.FLUX3_RESTORE)):
         pc, _, b = T.make(tempfile.mkdtemp(), with_sel=False)

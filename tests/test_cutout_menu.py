@@ -44,7 +44,7 @@ def manifest_checks():
     f = manifest.FILES["rmbg-2.0.safetensors"]
     assert f.kind == "bg_removal" and f.size == 884878856 and len(f.sha256) == 64 and f.sha256.startswith("566ed80c")
     assert f.url.startswith("https://huggingface.co/") and f.url.endswith("RMBG-2.0/model.safetensors")
-    assert "non-commercial" in f.note
+    assert "Bria" in f.note
     for m in workflows.CUTOUT_MODELS:      # every menu file is a manifest file, optional in every model
         assert m[2] in manifest.FILES
     for tab in manifest.TABS.values():

@@ -335,7 +335,7 @@ class PromptMixin:
 
     def _update_std_switch(self):
         """"v10 graph" (A/B test) likewise only in MOSS Fill of the standard window."""
-        want10 = (self.v_mode.get() == "inpaint" and self.v_model.get() == "moss" and not getattr(self, "_easy", False)
+        want10 = (self.v_mode.get() == "inpaint" and self.v_model.get() == "moss" 
                   and (self.workflows_dir / V10_WORKFLOW).exists())
         if want10 and not self._v10_shown:
             self.cb_v10.pack(side="left", padx=(10, 0), after=self.f_pchoice)
@@ -383,8 +383,8 @@ class PromptMixin:
             pass
 
     def _update_styles_button(self):
-        """The Styles button is there only in a mode that has styles (Text to image), also in Easy Mode (user 1.11.); it sits left
-        of the LLM button, or left of the bin while Easy Mode hides the LLM button."""
+        """The Styles button is there only in a mode that has styles (Text to image), it sits left
+        of the LLM button."""
         b = getattr(self, "b_styles", None)
         if b is None:
             return

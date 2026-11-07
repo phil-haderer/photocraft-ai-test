@@ -151,7 +151,7 @@ def set_model_map(m: dict) -> None:
     set_setting("model_map", dict(m) or None)
 
 
-# Favourites and hidden tabs: the right-click menu (lane L3) and Easy Mode read and write them only through these.
+# Favourites and hidden tabs: the right-click menu (lane L3) read and write them only through these.
 
 def favorites() -> dict:
     """Function (mode key) -> the tab key the user prefers for it."""

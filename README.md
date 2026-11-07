@@ -18,7 +18,6 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.20.2 · ComfyUI version: 0.42.0
 - **Seven function buttons:** Text to image, Expand, Fill, Remove, Edit Canvas, Multi Image Edit and Upscale / Refine.
 - **Six models:** Flux 3 Klein, Flux 2 Klein, Qwen 2.1 Edit, Fibo 2.0 Edit Turbo, Krea 2 Turbo and MOSS Image.
 - **Local:** the models run in ComfyUI on your own graphics card.
-- **Easy Mode:** only the function buttons and the prompt; the plugin picks the best installed model.
 
 > Unofficial community project, not affiliated with PhotoCraft, ArtCraft or Storyteller. PhotoCraft is in early alpha
 > and so is this plugin. "PhotoCraft AI" is a working title.
@@ -32,8 +31,8 @@ You need [PhotoCraft](https://github.com/storytold/photocraft/releases) and [Com
 1. Click **Code ▸ Download ZIP** (green button at the top of this page) and unpack it to a folder you keep, for example `C:\Tools\photocraft-ai`.
 2. Double-click **`setup-windows.bat`**. It sets everything up and puts **PhotoCraft AI** on your desktop.
 3. Start ComfyUI, close PhotoCraft, then double-click **PhotoCraft AI** on your desktop. PhotoCraft opens and the plugin window appears next to it.
-4. In the plugin window click the gear ▸ **Easy Mode** tab ▸ download the starter models, then restart ComfyUI.
-5. Switch on **Easy Mode**, pick a function, type a prompt and press **Generate** (Ctrl+Enter).
+4. In the plugin window click the gear ▸ pick a model tab (for example **Flux 3**) ▸ **Download all model files**, then restart ComfyUI.
+5. Pick a function and a model, type a prompt and press **Generate** (Ctrl+Enter).
 
 **Linux** (Debian/Ubuntu; other distributions: [Install on Linux](#install-on-linux))
 
@@ -91,10 +90,8 @@ Then go on with [First start](#first-start). Window too small or too big? Gear w
 
 ## First start
 
-1. **Get the models.** Open the plugin's settings window (gear symbol) ▸ **Easy Mode** tab. One button downloads the starter models: Flux 3 Klein, plus Qwen 2.1 Edit and Fibo 2.0 Edit Turbo (the button shows the total size). Easy Mode needs Flux 3 plus Qwen or Fibo, so you can also get just one of the two from its model tab. Flux 3 needs a free Hugging Face login once (the button opens its page). Restart ComfyUI afterwards. The models have different licences, some without commercial use: see [Licences of the models](#licences-of-the-models).
-2. **Generate.** Switch on **Easy Mode**, pick a function, type a prompt and press **Generate** (Ctrl+Enter).
-
-Easy Mode shows only the basic function buttons and the prompt; the plugin picks the best installed model and its tested settings. Multi Image Edit is not part of Easy Mode: switch it off to use it and to get all settings. To use every model, download the rest from the model tabs of the settings window.
+1. **Get the models.** Open the plugin's settings window (gear symbol) and pick a model tab. The button **Download all model files** loads everything the model needs (the button shows the total size). A good start is Flux 3 Klein plus Qwen 2.1 Edit or Fibo 2.0 Edit Turbo. Flux 3 needs a free Hugging Face login once (the button opens its page). Restart ComfyUI afterwards. The models have their own licences: see [Licences of the models](#licences-of-the-models).
+2. **Generate.** Pick a function and a model, type a prompt and press **Generate** (Ctrl+Enter). Each model starts with its tested settings; the Advanced settings below the prompt change them.
 
 Optional: Flux 3 Upscale needs one ComfyUI custom node pack, and GGUF model files need another. Both are described in [Technical details](#technical-details).
 
@@ -129,7 +126,7 @@ to ComfyUI and puts the result back into PhotoCraft as a new layer in a group, w
 
 </details>
 
-More in the window: **variants** (several results as layers in one group), prompt history, prompt templates, Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**Remove background**) opens a small menu: **BiRefNet**, **RMBG-2.0** or **Both** (two layers, RMBG-2.0 on top). The subject is cut out of the visible picture and added as a new layer with a transparent background, and the edge colours are cleaned so no light rim shows on a dark background. It needs the optional `birefnet.safetensors` and/or `rmbg-2.0.safetensors` (gear window ▸ Models ▸ Additional); RMBG-2.0 is for non-commercial use only, and its download symbol in the settings window uses a community mirror because the official file needs a Hugging Face login. To get it by hand: log in at [huggingface.co/briaai/RMBG-2.0](https://huggingface.co/briaai/RMBG-2.0), accept the terms, download `model.safetensors`, rename it to `rmbg-2.0.safetensors` and put it into ComfyUI's `models/background_removal` folder (restart ComfyUI). Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), custom LoRAs, sharpen.**
+More in the window: **variants** (several results as layers in one group), prompt history, prompt templates, Enhance prompt with LLM, live preview. The **scissors** at the bottom right (**Remove background**) opens a small menu: **BiRefNet**, **RMBG-2.0** or **Both** (two layers, RMBG-2.0 on top). The subject is cut out of the visible picture and added as a new layer with a transparent background, and the edge colours are cleaned so no light rim shows on a dark background. It needs the optional `birefnet.safetensors` and/or `rmbg-2.0.safetensors` (gear window ▸ Models ▸ Additional); RMBG-2.0 is by Bria AI, and its download symbol in the settings window uses a community mirror because the official file needs a Hugging Face login. To get it by hand: log in at [huggingface.co/briaai/RMBG-2.0](https://huggingface.co/briaai/RMBG-2.0), accept the terms, download `model.safetensors`, rename it to `rmbg-2.0.safetensors` and put it into ComfyUI's `models/background_removal` folder (restart ComfyUI). Advanced settings: **edge feather, context size, mask density (PhotoCraft 0.17+), custom LoRAs, sharpen.**
 
 ## Help
 
@@ -203,21 +200,19 @@ Settings and the PhotoCraft token live in `~/.config/pccomfy/`. A different Comf
 
 ## Licences of the models
 
-The plugin's code is MIT / Apache-2.0, but **the models have their own licences**, and several limit commercial use.
-This is a summary of what the model pages state, not legal advice; read the licence on each model page before you use
-results commercially.
+The plugin's code is MIT / Apache-2.0, but **the models have their own licences**. The table names them; the terms are on each model page.
 
-| Model | Licence | Commercial use |
-|---|---|---|
-| Flux 3 (Klein) and its LoRAs | FLUX Kommunity License | Free only below a yearly revenue limit (USD 5 million, with conditions); above that you need a licence from Black Forest Labs |
-| Flux 2 (Klein) | FLUX non-commercial | No |
-| Qwen (Qwen-Image 2.1) | Qwen Research License | No (research and evaluation only); products must say "Built with Qwen" |
-| Fibo 2.0 | CC BY-NC 4.0 | No |
-| Krea 2 | Krea 2 Community License | See the licence on its model page |
-| MOSS | Apache 2.0 | Yes |
+| Model | Licence |
+|---|---|
+| Flux 3 (Klein) and its LoRAs | FLUX Kommunity License |
+| Flux 2 (Klein) | FLUX non-commercial licence |
+| Qwen (Qwen-Image 2.1) | Qwen Research License ("Built with Qwen") |
+| Fibo 2.0 | CC BY-NC 4.0 |
+| Krea 2 | Krea 2 Community License |
+| MOSS | Apache 2.0 |
 
-Other files: the 4x UltraSharp upscaler (Flux 3 Upscale and Fibo Upscale) is CC BY-NC-SA 4.0, so no commercial use; the Lenovo UltraReal LoRA for MOSS asks for credit (Danrisi), the Qwen3-VL and Qwen 3.5 text encoders,
-SeedVR2 and the MOSS LoRAs are Apache 2.0, BiRefNet is MIT. RMBG-2.0 (Bria AI, the optional second cut-out model) is source-available for non-commercial use only; the download link in the plugin points to a community mirror of the official file.
+Other files: the 4x UltraSharp upscaler (Flux 3 Upscale and Fibo Upscale) is CC BY-NC-SA 4.0; the Lenovo UltraReal LoRA for MOSS asks for credit (Danrisi), the Qwen3-VL and Qwen 3.5 text encoders,
+SeedVR2 and the MOSS LoRAs are Apache 2.0, BiRefNet is MIT. RMBG-2.0 (Bria AI, the optional second cut-out model) has the Bria RMBG-2.0 licence; the download link in the plugin points to a community mirror of the official file.
 
 ## Credits
 

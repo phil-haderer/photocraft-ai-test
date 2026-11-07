@@ -1,6 +1,5 @@
 """The Styles button beside the prompt (user 1.11.): styles.json (186 style prompts of the Krea 2 Style Explorer, MIT, in 9 groups,
-Text to image only), the loader (a broken file means no styles), the palette icon, the button (only in a mode that has styles,
-not in Easy Mode), a click on an entry is ADDED to the prompt after a line break, and the whole text of every entry is kept for the hover box.
+Text to image only), the loader (a broken file means no styles), the palette icon, the button (only in a mode that has styles), a click on an entry is ADDED to the prompt after a line break, and the whole text of every entry is kept for the hover box.
 Stubbed Tk.
 
     python tests/test_styles.py
@@ -69,7 +68,7 @@ def icon_checks():
 def gui_checks():
     app = ra.make()
     assert set(app.m_styles) == {"txt2img"} and len(app._style_texts) == 186
-    # the button: only in Text to image, not in Easy Mode
+    # the button: only in Text to image
     ra.go(app, "flux3", "txt2img")
     app._on_mode_ui()
     assert app._styles_shown
@@ -78,14 +77,6 @@ def gui_checks():
     assert not app._styles_shown
     ra.go(app, "flux3", "txt2img")
     app._on_mode_ui()
-    assert app._styles_shown
-    app._easy = True
-    app._easy_hide()
-    assert app._styles_shown                 # Easy Mode keeps the button (user 1.11.)
-    app._on_mode_ui()
-    assert app._styles_shown
-    app._easy = False
-    app._update_styles_button()
     assert app._styles_shown
     # an entry is added after a line break (an empty field just gets the style; one undo step in a real Tk)
     app.t_prompt.delete("1.0", "end")

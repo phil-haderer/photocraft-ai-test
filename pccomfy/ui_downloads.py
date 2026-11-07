@@ -43,7 +43,6 @@ class DownloadMixin:
         self._dl: dict[str, dict] = {}              # file name -> {"file", "target", "done", "total", "phase", "cancel"} (running)
         self._dl_restart: set[str] = set()          # loaded, but ComfyUI does not list it yet
         self._dl_widgets: dict[str, dict] = {}      # file name -> the progress widgets of its row
-        self._dl_widgets_easy: dict[str, dict] = {} # the same for the rows in the Easy Mode tab
         self._comfy_root: Path | None = None        # found for this session
 
     def _dl_info(self, name: str) -> dict | None:
@@ -94,7 +93,7 @@ class DownloadMixin:
 
     def _dl_done(self, f) -> bool:
         """Is the file already on the disk although ComfyUI does not list it yet (loaded in this session, or copied in; ComfyUI reads
-        its folders only at start)? "Download needed models" and the Easy Mode button leave such files out (user 2.11.)."""
+        its folders only at start)? "Download needed models" leaves such files out (user 2.11.)."""
         if f.name in self._dl_restart:
             return True
         base = self.models_dir(ask=False)
@@ -142,7 +141,7 @@ class DownloadMixin:
     def download_missing(self, key, required_only: bool = False):
         """The disk symbol in a model's head: every file of it that is missing (all of them load at the same time). Files that
         need a website (gated, Civitai) are named in the OK window and their pages open in the browser. `key` may be several
-        models (the Easy Mode tab: the starter models; a file two models share is listed once)."""
+        models (a file two models share is listed once)."""
         if self.inv is None:
             return
         keys = (key,) if isinstance(key, str) else tuple(key)
@@ -241,7 +240,7 @@ class DownloadMixin:
 
     def _dl_paint(self, name: str):
         info = self._dl_info(name)
-        for widgets in (self._dl_widgets, self._dl_widgets_easy):
+        for widgets in (self._dl_widgets,):
             w = widgets.get(name)
             if not w or not info:
                 continue

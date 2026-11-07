@@ -34,7 +34,6 @@ def main():
     refine = models.BY_KEY["qwen"].modes["refine"]               # the same graph at the canvas size, with a Turbo LoRA switch
     assert refine.workflow == "qwen-image-21-refine.json" and refine.prompt_hint == models.QWEN_UPSCALE_DEFAULT and refine.prompts == ()
     assert refine.settings["turbo"] is False                      # starts off: 25 steps like Upscale
-    assert models.RANKING["upscale"][0] == "qwen" and models.ranking_text("refine") == "Ranking: 1. Fibo, 2. Flux 2, 3. Flux 3, 4. Qwen."
     r = json.loads((ROOT / "workflows" / refine.workflow).read_text(encoding="utf-8"))
     assert workflows.lora_subgraph(r) and workflows.lora_strength(r) == 1
     off = workflows.bypass_lora(r)                                # switch off = exactly the Upscale graph

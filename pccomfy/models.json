@@ -1,0 +1,251 @@
+{
+ "about": "The model files of the plugin and where to get them. Read at start by pccomfy/manifest.py. Per file: name (as ComfyUI lists it; a LoRA carries its sub-folder), kind (unet, clip, vae, lora, preview, bg_removal, upscale_model), url (direct download link, empty = no public source), note (licence, gated ...), aliases, size in bytes, sha256 as the source publishes it. Which model needs which file is not here (manifest.py TABS).",
+ "files": [
+  {
+   "name": "flux3-image-klein-int8-convrot.safetensors",
+   "kind": "unet",
+   "url": "https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/flux3-image-klein-int8-convrot.safetensors",
+   "note": "gated: Hugging Face login and accepting the FLUX Kommunity License",
+   "size": 5827874779,
+   "sha256": "847d8933548afd93df4af2cac2498e70891bf28d9dae06d695f536992e168fe2"
+  },
+  {
+   "name": "flux-2-klein-9b_int8_convrot.safetensors",
+   "kind": "unet",
+   "url": "https://huggingface.co/obsxrver/ComfyUI-Native-INT8_ConvRot/resolve/main/diffusion_models/flux-2-klein-9b_int8_convrot.safetensors",
+   "size": 9439894544,
+   "sha256": "bd041cec0d7955d6fcbaef952ba6ebe37af9f7d032ec927657e7777f21f5c522"
+  },
+  {
+   "name": "qwen_image_2.1_int8_convrot.safetensors",
+   "kind": "unet",
+   "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_int8_convrot.safetensors",
+   "note": "licence: Qwen research licence",
+   "size": 7256783064,
+   "sha256": "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"
+  },
+  {
+   "name": "fibo2_edit_turbo_int8_convrot.safetensors",
+   "kind": "unet",
+   "url": "https://huggingface.co/Comfy-Org/Fibo-2.0/resolve/main/diffusion_models/fibo2_edit_turbo_int8_convrot.safetensors",
+   "note": "licence: CC BY-NC 4.0",
+   "size": 8408562474,
+   "sha256": "1f6fa7c499191f405467123f655f11762661eaa5bd479d1da8f161398ef72c3b"
+  },
+  {
+   "name": "krea2_turbo_int8_convrot.safetensors",
+   "kind": "unet",
+   "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_int8_convrot.safetensors",
+   "size": 13492686496,
+   "sha256": "8e4eeda70dd5037ab1ba2bef6b417f9f901e26093117cf397f741fc1fdaaf3f1"
+  },
+  {
+   "name": "moss_image_sft_int8_convrot.safetensors",
+   "kind": "unet",
+   "url": "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/diffusion_models/moss_image_sft_int8_convrot.safetensors",
+   "note": "licence: Apache 2.0",
+   "size": 5413698958,
+   "sha256": "b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f"
+  },
+  {
+   "name": "seedvr2_3b_int8_convrot.safetensors",
+   "kind": "unet",
+   "url": "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_3b_int8_convrot.safetensors",
+   "note": "licence: Apache 2.0",
+   "size": 3458259704,
+   "sha256": "c3dec8bcc5916843a8a858572970597462e1f2dc598d6dfd818f6cd40f53a157"
+  },
+  {
+   "name": "qwen_3_8b_fp8mixed.safetensors",
+   "kind": "clip",
+   "url": "https://huggingface.co/Comfy-Org/Flux-2-Klein-9B/resolve/main/split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors",
+   "size": 8664848742,
+   "sha256": "abad16806e0cbabc54e0325d6565847443fe396d5f0be38bb3cd3fe75a1201d6"
+  },
+  {
+   "name": "qwen3vl_4b_int8_convrot.safetensors",
+   "kind": "clip",
+   "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_int8_convrot.safetensors",
+   "note": "also in Comfy-Org/Fibo-2.0 and the FLUX.3 Klein repo",
+   "size": 4858559240,
+   "sha256": "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c"
+  },
+  {
+   "name": "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",
+   "kind": "clip",
+   "url": "https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",
+   "note": "gated: Hugging Face login and accepting the FLUX Kommunity License",
+   "size": 6724090780,
+   "sha256": "e5d85a7421d197bf5a12474511936ecabce19a833252f16e9310a983194a4458"
+  },
+  {
+   "name": "qwen3vl_8b_int8_convrot.safetensors",
+   "kind": "clip",
+   "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors",
+   "note": "licence: Apache 2.0 (also in Comfy-Org/Qwen3-VL)",
+   "size": 9350798360,
+   "sha256": "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f"
+  },
+  {
+   "name": "qwen3.5_9b_w4a8_gptq.safetensors",
+   "kind": "clip",
+   "url": "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_w4a8_gptq.safetensors",
+   "note": "licence: Apache 2.0",
+   "size": 7343591088,
+   "sha256": "4cc6a1543ad2061806da46f35f90cadb4801dcba246c44782cf42ec0feb6407c"
+  },
+  {
+   "name": "qwen3.5_9b_int8_convrot.safetensors",
+   "kind": "clip",
+   "url": "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_int8_convrot.safetensors",
+   "note": "licence: Apache 2.0",
+   "size": 9748121532,
+   "sha256": "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a"
+  },
+  {
+   "name": "flux2-vae.safetensors",
+   "kind": "vae",
+   "url": "https://huggingface.co/Comfy-Org/Flux-2-Dev/resolve/main/split_files/vae/flux2-vae.safetensors",
+   "size": 336213556,
+   "sha256": "d64f3a68e1cc4f9f4e29b6e0da38a0204fe9a49f2d4053f0ec1fa1ca02f9c4b5"
+  },
+  {
+   "name": "flux2-vae_small.safetensors",
+   "kind": "vae",
+   "url": "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/vae/flux2-vae_small.safetensors",
+   "note": "licence: Apache 2.0",
+   "size": 249521340,
+   "sha256": "d8d52ba036475f5fb07c8b435e176d3d97ebfa82f0d1a1c317f9cc1e25bd013b"
+  },
+  {
+   "name": "qwen_image_2.1_vae_bf16.safetensors",
+   "kind": "vae",
+   "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors",
+   "note": "licence: Qwen research licence",
+   "size": 675509688,
+   "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"
+  },
+  {
+   "name": "qwen_image_vae.safetensors",
+   "kind": "vae",
+   "url": "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors",
+   "note": "also in Comfy-Org/Qwen-Image",
+   "size": 253806246,
+   "sha256": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f"
+  },
+  {
+   "name": "seedvr2_ema_vae_fp16.safetensors",
+   "kind": "vae",
+   "url": "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/seedvr2_ema_vae_fp16.safetensors",
+   "note": "licence: Apache 2.0",
+   "aliases": [
+    "ema_vae_fp16.safetensors"
+   ],
+   "size": 501324814,
+   "sha256": "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1"
+  },
+  {
+   "name": "qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors",
+   "kind": "lora",
+   "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors",
+   "note": "licence: Qwen research licence",
+   "size": 913314512,
+   "sha256": "208dd43250e1e01467ba190572ae2e7107a7870ec1ff026bc65f791fa1e80e95"
+  },
+  {
+   "name": "Flux 2\\ultra_real_v4.safetensors",
+   "kind": "lora",
+   "url": "https://civitai.com/api/download/models/2846977",
+   "note": "Civitai 'UltraReal - Moss, Krea2, Klein9b' by vizsumit, version KL9_V4 (Civitai may ask to log in)",
+   "size": 165705592,
+   "sha256": "df2307852d99e103917e6bc60e58da8971769bf716dee443f10b201fcee6ca18"
+  },
+  {
+   "name": "Flux 3\\flux-3-image-klein-restore.safetensors",
+   "kind": "lora",
+   "url": "https://huggingface.co/ausboss/FLUX-3-Image-Klein-Restore-LoRA/resolve/main/flux-3-image-klein-restore.safetensors",
+   "note": "Flux 3 Upscale: ausboss' restore LoRA (on at 0.5)",
+   "size": 160697064,
+   "sha256": "7b758f5c1d494da7675dbebd8309f36c3dcaf4aa67a3349f667403c7a681187e"
+  },
+  {
+   "name": "Flux 3\\flux-3-image-klein-outpaint.safetensors",
+   "kind": "lora",
+   "url": "https://huggingface.co/ausboss/FLUX-3-Image-Klein-Outpaint-LoRA/resolve/main/flux-3-image-klein-outpaint.safetensors",
+   "note": "Flux 3 Expand: ausboss' outpaint LoRA",
+   "size": 160697104,
+   "sha256": "25385da7f6bfac0c18513e52729dc29f96cda543f0d086df9e5dda3842dede83"
+  },
+  {
+   "name": "Moss\\lora_dmd2.safetensors",
+   "kind": "lora",
+   "url": "https://huggingface.co/lodestones/MOSS-Image-Base-8-steps-dmd/resolve/main/lora_dmd2.safetensors",
+   "note": "licence: Apache 2.0",
+   "size": 1189176800,
+   "sha256": "7683fe1fb51f73f5d690f24dd6b7f46f31ab9a9873729a854ac5c9a420ffe6f2"
+  },
+  {
+   "name": "Moss\\lenovo_moss.safetensors",
+   "kind": "lora",
+   "url": "https://huggingface.co/Danrisi/lenovo_moss/resolve/main/lenovo_moss.safetensors",
+   "note": "Lenovo UltraReal by Danrisi (also on Civitai, model 1662740)",
+   "size": 64527960,
+   "sha256": "f28ab12e33e60146c8740a86730385cf5ba488e9f6eda50b14383d6ddbf300fb"
+  },
+  {
+   "name": "4x-UltraSharpV2.safetensors",
+   "kind": "upscale_model",
+   "url": "https://huggingface.co/Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.safetensors",
+   "note": "Flux 3 Upscale and Fibo Upscale, switch \"4x UltraSharp\" (on by default)",
+   "size": 139792588,
+   "sha256": "2b5db674aa8f3864a696dccd1d07d7cc0500fbf220f35044cd30eee9a7f971a7"
+  },
+  {
+   "name": "birefnet.safetensors",
+   "kind": "bg_removal",
+   "url": "https://huggingface.co/Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors",
+   "note": "optional: \"Cut out\" in the reference slots and the footer scissors (Remove background); licence: MIT",
+   "size": 444473596,
+   "sha256": "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154"
+  },
+  {
+   "name": "rmbg-2.0.safetensors",
+   "kind": "bg_removal",
+   "url": "https://huggingface.co/chflame163/ComfyUI_LayerStyle/resolve/main/ComfyUI/models/BiRefNet/RMBG-2.0/model.safetensors",
+   "note": "optional: second model for the footer scissors (Remove background); RMBG-2.0 by Bria AI, Bria RMBG-2.0 licence; this link is a community mirror of briaai/RMBG-2.0",
+   "size": 884878856,
+   "sha256": "566ed80c3d95f87ada6864d4cbe2290a1c5eb1c7bb0b123e984f60f76b02c3a7"
+  },
+  {
+   "name": "taef2_decoder.pth",
+   "kind": "preview",
+   "url": "https://raw.githubusercontent.com/madebyollin/taesd/main/taef2_decoder.pth",
+   "note": "optional: sharper live preview (without it ComfyUI shows coarse colours); licence: MIT (madebyollin/taesd)",
+   "aliases": [
+    "taef2_decoder.safetensors"
+   ],
+   "size": 2704756
+  },
+  {
+   "name": "taeqi2_1_decoder.pth",
+   "kind": "preview",
+   "url": "https://raw.githubusercontent.com/madebyollin/taesd/main/taeqi2_1_decoder.pth",
+   "note": "optional: sharper live preview (without it ComfyUI shows coarse colours); licence: MIT (madebyollin/taesd)",
+   "aliases": [
+    "taeqi2_1_decoder.safetensors"
+   ],
+   "size": 15314938
+  },
+  {
+   "name": "lighttaew2_1.safetensors",
+   "kind": "preview",
+   "url": "https://huggingface.co/lightx2v/Autoencoders/resolve/main/lighttaew2_1.safetensors",
+   "note": "optional: sharper live preview (without it ComfyUI shows coarse colours); licence: Apache 2.0 (lightx2v/Autoencoders)",
+   "aliases": [
+    "lighttaew2_1.pth"
+   ],
+   "size": 45274004,
+   "sha256": "8666e769f449f2d955651564bcadb0c5e12461b50480e67b7241f32c15f11a19"
+  }
+ ]
+}

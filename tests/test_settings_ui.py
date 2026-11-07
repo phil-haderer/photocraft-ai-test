@@ -226,7 +226,7 @@ def test_other_settings():
         app._reset_favourites()
     finally:
         ui_settings.messagebox.askyesno = saved_ask
-    assert cfgmod.favorites() == {} and "ranking is used again" in app.v_status.get()
+    assert cfgmod.favorites() == {} and "order is used again" in app.v_status.get()
 
     # Interface scale (Linux; uiscale.py): the choice is saved as a factor, "Auto" forgets it, the row says when it counts
     class _Var:
@@ -323,7 +323,7 @@ def main():
     app = make_app()
 
     # the hooks: SettingsMixin first, a gear button, a tooltip object per tab
-    assert gui.App.__mro__[1].__name__ == "EasyMixin" and gui.App.__mro__[2].__name__ == "SettingsMixin"
+    assert gui.App.__mro__[1].__name__ == "SettingsMixin"
     assert app.b_gear is not None and set(app.tt_tabs) == {m.key for m in models.MODELS}
     assert app.inv is None
     app.v_model.set("flux3")

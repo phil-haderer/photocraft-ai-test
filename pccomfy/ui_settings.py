@@ -15,7 +15,7 @@ from __future__ import annotations
 import difflib
 import webbrowser
 
-from . import comfyaddr, comfydir, hostos, icons, inventory, manifest, sthead
+from . import comfyaddr, comfydir, hostos, icons, inventory, linkpicker, manifest, namematch, sthead
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 from .gui_theme import ICON_PX
@@ -29,6 +29,7 @@ HINT_INCOMPLETE = "incomplete? shorter than its header says"
 RELINKED_HEAD = "Relinked models:"      # over the list of your own files that stand in for expected ones (user 6.11.)
 GGUF_ALT = "Alternatively:"
 GGUF_LINK = "Download GGUF-weights"      # under the weights of a main model (user 5.11.)
+SIMILAR_FILE = "A file with a similar name (not checked, make sure it is the right one): "      # under a missing file with no renamed copy: same model name, other precision or spelling (user 7.11.)
 PROBABLE_FILE = "This is probably the right file: "      # under a missing file, when a renamed copy of it is in the models folder (user 3.11.)
 HINT_EXPLAIN = "Marked files have the same size and safetensors header as another file this plugin expects."
 DOT_RED = "#e5484d"                   # the dot in front of a model that is not available (nothing in front of a ready one)
@@ -315,10 +316,6 @@ class SettingsMixin(DownloadMixin):
             self.cb_live.pack_forget()
             if show_live:
                 self.cb_live.pack(side="left", padx=FOOT_RESET_PADX)
-                easy = getattr(self, "lbl_easy_model", None)
-                if easy is not None and easy.winfo_manager():       # Easy Mode's model line stays right of it
-                    easy.pack_forget()
-                    easy.pack(side="left", padx=FOOT_RESET_PADX)
         self._update_ready()
         if fit and getattr(self, "_sized", False):
             self._fit_height()
@@ -520,12 +517,14 @@ class SettingsMixin(DownloadMixin):
     def _file_data(self, f, found, level) -> dict:
         """One file row: expected name, path, found (your file's name or None), level, size, url, note, the download state
         (see DownloadMixin._dl_info), "restart" (loaded, ComfyUI does not list it yet) and "browser" (its page opens instead)."""
+        probable = self._probable_file(f) if found is None else ""
         return {"name": f.name, "path": file_path(f), "found": found, "level": level, "size": f.size_text, "url": f.url,
                 "note": f.note if (found is None and not f.note.lower().startswith("licence")) else "", "dl": self._dl_info(f.name),
                 "restart": found is None and f.name in self._dl_restart, "browser": browser_only(f) if f.url else False,
                 "hint": site_hint(f) if (found is None and f.url and browser_only(f)) else "",
                 "other": found is not None and self._is_other_file(f, found),
-                "probable": self._probable_file(f) if found is None else ""}
+                "probable": probable,
+                "similar": self._similar_file(f) if (found is None and not probable) else ""}
 
     def _probable_file(self, f) -> str:
         """A file ComfyUI lists under another name that is the missing ``f`` (same size, complete safetensors header), or "".
@@ -540,6 +539,13 @@ class SettingsMixin(DownloadMixin):
                 same.append(n)
         hints = self._link_hints(f.name, same)
         return next((n for n in same if hints.get(n) == HINT_SAME + f.name), "")
+
+    def _similar_file(self, f) -> str:
+        """A file ComfyUI lists whose NAME is like the missing ``f`` (same model in another precision or spelling: namematch.py), or "".
+        Files the plugin itself knows (another entry of models.json) are no stand-ins. A hint only; a renamed copy found by size
+        and header (``_probable_file``) is named first and wins (the caller asks only when there is none)."""
+        known = [g.name for g in manifest.FILES.values() if g.name != f.name]
+        return namematch.suggest(f.name, self._link_candidates(f.name), known)
 
     @staticmethod
     def _is_other_file(f, found: str) -> bool:
@@ -683,7 +689,7 @@ class SettingsMixin(DownloadMixin):
 
         # on top of "Models": the linked files (they hold for every model), below them one tab per model and "Additional"
         self.f_set_top = ttk.Frame(tab_models)
-        self.f_set_top.pack(fill="x", side="top", padx=12, pady=(10, 0))      # the same margin as the tab Easy mode models (user 6.11.)
+        self.f_set_top.pack(fill="x", side="top", padx=12, pady=(10, 0))      # the same margin as the other tabs (user 6.11.)
         self.f_set_top.bind("<Configure>", lambda e: self._settings_wrap("top", e.width), add="+")
         ttk.Frame(tab_models, style="SepWhite.TFrame", height=1).pack(fill="x", pady=(6, 0))      # white line above the model tabs (user 1.11.)
         self.nb_models = ButtonTabs(tab_models)
@@ -753,7 +759,7 @@ class SettingsMixin(DownloadMixin):
                 ("Reset all modes to default settings", "Forgets every page you saved with “Set as my settings” (right-click on a model chip): "
                  "all models and functions start with their standard settings again. Asks first.", self._reset_all_modes),
                 ("Reset favourite models", "Forgets every favourite you set with the right-click menu of a model chip: "
-                 "Easy Mode and the functions use the default ranking again. Asks first.", self._reset_favourites)):
+                 "The functions use the first usable model of their tabs again. Asks first.", self._reset_favourites)):
             b = ttk.Button(parent, text=text, style="SetSmall.TButton", command=command)
             b.pack(side="top", anchor="w", padx=14, pady=(8, 0))
             Tooltip(b, tip)
@@ -933,17 +939,15 @@ class SettingsMixin(DownloadMixin):
     def _reset_favourites(self):
         favs = cfgmod.favorites()
         if not favs:
-            self._status("No favourite model is set, the default ranking is used everywhere.")
+            self._status("No favourite model is set, the model tabs' order is used everywhere.")
             return
         n = len(favs)
         if not messagebox.askyesno("Reset favourite models", f"Forget the favourite model of {n} function{'s' if n != 1 else ''}?\n\n"      # noqa: F405
-                                   "Easy Mode and the functions will use the default ranking again.",
+                                   "The functions will use the first usable model of their tabs again.",
                                    parent=self._settings_win or self.root):
             return
         cfgmod.set_setting("favorites", None)
-        if getattr(self, "_easy", False):
-            self._easy_refresh()          # Easy Mode picks its models by the ranking again
-        self._status("All favourite models are forgotten: the default ranking is used again.")
+        self._status("All favourite models are forgotten: the model tabs' order is used again.")
 
     def _scroll_page(self, key: str, title: str) -> dict:
         """One tab of the model notebook: a canvas that scrolls, its rows in a frame (the rows: one per file, in a frame each)."""
@@ -953,7 +957,7 @@ class SettingsMixin(DownloadMixin):
         cv.pack(side="left", fill="both", expand=True)
         sb = ThinScrollbar(box, cv, self._px(6), BG, auto=True)
         rows = ttk.Frame(cv)
-        win_id = cv.create_window(self._px(12), 0, window=rows, anchor="nw")      # 12 px from the left edge like the Easy mode tab
+        win_id = cv.create_window(self._px(12), 0, window=rows, anchor="nw")      # 12 px from the left edge like the other tabs
         cv.bind("<Configure>", lambda e: (cv.itemconfigure(win_id, width=max(1, e.width - self._px(12))), self._settings_wrap(key, e.width - self._px(12))), add="+")
         rows.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")), add="+")
         return {"page": box, "cv": cv, "sb": sb, "rows": rows}
@@ -1225,6 +1229,8 @@ class SettingsMixin(DownloadMixin):
                     extra.append((f"your file: {f['found']}", "muted"))
                 if f["probable"]:
                     extra.append((PROBABLE_FILE + f["probable"], "note"))      # the chain symbol links it with one click
+                if f.get("similar") and not f["probable"]:
+                    extra.append((SIMILAR_FILE + f["similar"], "note"))      # the chain symbol links it (the list starts with a search)
                 if f["restart"]:
                     extra.append(("loaded: restart ComfyUI and click the refresh arrow to list it", "note"))
                 if f["note"] and not (f["hint"] and f["note"].lower().startswith("gated")):
@@ -1364,24 +1370,18 @@ class SettingsMixin(DownloadMixin):
             self._status("ComfyUI lists no other file of this kind. Copy yours into its folder and restart ComfyUI.", error=True)
             return
         all_hints = self._link_hints(expected, cands)
-        cands = sorted(cands, key=lambda n: not all_hints.get(n, "").startswith(HINT_SAME + expected))   # a match of the expected file first (sort is stable)
+        pinned = [n for n in cands if all_hints.get(n, "").startswith(HINT_SAME + expected)]      # copies of the expected file: first, a line below them
         hints = self._menu_hints(expected, all_hints)
-        menu = tk.Menu(self._settings_win or self.root, tearoff=0)
-        if any(h.startswith(HINT_SAME) for h in hints.values()):
-            menu.add_command(label=HINT_EXPLAIN, state="disabled")
-            menu.add_separator()
-        for n in cands:
-            tag = f"   ({hints[n]})" if n in hints else ""
-            menu.add_command(label=("✓ " if n == mapped else "") + n + tag, command=lambda n=n: self._link_models(expected, n))
-        if mapped:
-            if cands:
-                menu.add_separator()
-            menu.add_command(label="Unlink (use the expected file again)", command=lambda: self._link_models(expected, ""))
         win = self._settings_win or self.root
-        try:
-            menu.tk_popup(win.winfo_pointerx(), win.winfo_pointery())
-        finally:
-            menu.grab_release()
+        old = getattr(self, "_link_picker", None)
+        if old is not None:
+            old.close()
+        # a search window instead of a menu (user 7.11.): typing filters, the list is alphabetical, the wheel does not close it
+        self._link_picker = linkpicker.LinkPicker(
+            win, (win.winfo_pointerx(), win.winfo_pointery()), cands, pinned, hints, mapped,
+            explain=HINT_EXPLAIN if any(h.startswith(HINT_SAME) for h in hints.values()) else "",
+            unlink="Unlink (use the expected file again)" if mapped else "",
+            on_pick=lambda n: self._link_models(expected, n), scale=getattr(self, "ui", 1.0))
 
     def _link_models(self, expected: str, actual: str):
         """The plugin uses ``actual`` from now on for ``expected`` ("" removes the link)."""

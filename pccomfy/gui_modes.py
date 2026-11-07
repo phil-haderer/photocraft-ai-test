@@ -24,7 +24,7 @@ class ModeMixin:
             self._scale_mode = mode
         self.v_fn.set("scale" if mode in SCALE_MODES else "")
         self._sync_fac()
-        if mode in SCALE_MODES:      # the factor row (with None) for both, in Easy Mode too
+        if mode in SCALE_MODES:      # the factor row (with None) for both
             self.f_scale.pack(fill="x", padx=10, pady=4, after=self._below_prompt())   # under the LLM row, above the LoRA
         else:
             self.f_scale.pack_forget()
@@ -62,8 +62,7 @@ class ModeMixin:
             self._fit_height()
 
     def _update_factor_buttons(self):
-        """The factors need a model with Upscale and stay within its largest factor (Fibo: 2x); Easy Mode asks which model it
-        would pick (gui_easy.py)."""
+        """The factors need a model with Upscale and stay within its largest factor (Fibo: 2x)."""
         mm = self._model()
         for key, rb in getattr(self, "rb_scale", {}).items():
             rb.configure(state="normal" if (mm is None or self._custom_workflow() or self._factor_ok(mm, key)) else "disabled")
@@ -192,7 +191,7 @@ class ModeMixin:
             offered = self._custom_workflow() or any(key in x.modes and x.key not in hidden for x in models.MODELS)
             rb.configure(state="normal" if offered else "disabled")
             self.tt_modes[key].text = MODE_TIPS[key]        # no ranking in the tooltip (user 3.11.: it was for development)
-            if key in SCALE_MODES:      # Upscale and Refine are ONE button (rb_scale_fn, Easy Mode too); these two stay hidden
+            if key in SCALE_MODES:      # Upscale and Refine are ONE button (rb_scale_fn); these two stay hidden
                 rb.grid_remove()
                 if key == "upscale":
                     shown.append("scale")
@@ -278,7 +277,7 @@ class ModeMixin:
 
     def _model_for_mode(self, mode: str) -> str:
         """The model a function opens with when the chosen one cannot do it: the favourite of the function (right-click
-        menu), else the one last used for it, else the first in the fixed order (Easy Mode will choose the best one later).
+        menu), else the one last used for it, else the first in the fixed order of the tabs.
         Hidden models are left out; a model whose files are missing comes last."""
         hidden = cfgmod.hidden_tabs()
         usable = [m.key for m in models.MODELS if mode in m.modes and m.key not in hidden]
@@ -344,9 +343,7 @@ class ModeMixin:
             s["workflow"] = spec.workflow
         elif not force:
             s.pop("enhance", None)       # same workflow: the "Enhance prompt with LLM" checkbox keeps what you set (Expand ignores it)
-        if getattr(self, "_easy", False):
-            s["enhance"] = False       # Easy Mode: always the factory settings, no saved page, no LLM (its row is hidden)
-        elif not getattr(self, "_factory", False):         # Shift + "Reset page": the standard settings, not the saved ones
+        if not getattr(self, "_factory", False):         # Shift + "Reset page": the standard settings, not the saved ones
             s.update(cfgmod.saved_page(m.key, mode))      # settings the user saved for this page (chip menu) replace the starting ones
         self._switch_context(mode)   # first: the context memory belongs to the mode, the defaults below overwrite its value
         self._apply_settings(s)
@@ -378,22 +375,6 @@ class ModeMixin:
         self._update_mode_radios()
         self._update_prompt_choices()
         self._update_prompt_hint()
-
-    def _restore_away_prompt(self):
-        """The window was set to another function without _apply_model_mode (leaving Easy Mode): your own text, which a
-        function with a text of its own pushed aside, comes back when the new function has none."""
-        m = self._model()
-        mode = self.v_mode.get()
-        spec = m.modes.get(mode) if m else None
-        prev, self._prompt_mode = getattr(self, "_prompt_mode", None), mode
-        t = self.t_prompt
-        away = getattr(self, "_away_prompt", "")
-        if prev == mode or spec is None or spec.prompt_hint or spec.prompts or mode == "outpaint" or not away or str(t.cget("state")) == "disabled":
-            return
-        if t.get("1.0", "end").strip() in ("", *models.STOCK_PROMPTS):
-            t.delete("1.0", "end")
-            t.insert("1.0", away)
-            self._away_prompt = ""
 
     def _sync_model(self):
         """The window was set from a preset / the saved state / the workflow list: show the tab that belongs to it."""

@@ -3,7 +3,7 @@
 Checked on 2026-10-27. Every link points straight at the file. For each one the size the server reports matches the
 user's working copy byte for byte. Where the name alone was not unique (the DMD2 LoRA, the two Civitai LoRAs, the
 FLUX.2 Klein model), the SHA256 of the working copy was matched too. Nothing was downloaded for the check.
-`pccomfy/manifest.py` holds the same links (field `url`, `size`, `note`); the settings window (gear) shows them for
+`pccomfy/models.json` holds the same links (field `url`, `size`, `note`; since 7.11., read by `manifest.py` at start); the settings window (gear) shows them for
 missing files.
 
 **Gated** = the file needs a Hugging Face login and accepting the licence on the model page first; the direct link
@@ -35,7 +35,7 @@ answers "401" until then.
 | Moss\lenovo_moss.safetensors | loras\Moss | 65 MB | [Danrisi/lenovo_moss](https://huggingface.co/Danrisi/lenovo_moss/resolve/main/lenovo_moss.safetensors) (also Civitai 1662740) | HF: Apache 2.0; Civitai: credit required, no derivatives | no |
 | Flux 3\flux-3-image-klein-restore.safetensors | loras\Flux 3 | 161 MB | [ausboss/FLUX-3-Image-Klein-Restore-LoRA](https://huggingface.co/ausboss/FLUX-3-Image-Klein-Restore-LoRA/resolve/main/flux-3-image-klein-restore.safetensors) (added 30.10., size matches the user's copy) | FLUX Kommunity License | no |
 | birefnet.safetensors | background_removal | 444 MB | [Comfy-Org/BiRefNet](https://huggingface.co/Comfy-Org/BiRefNet/resolve/main/background_removal/birefnet.safetensors) (added 30.10., size matches the user's copy) | MIT | no |
-| rmbg-2.0.safetensors | background_removal | 885 MB | [chflame163/ComfyUI_LayerStyle](https://huggingface.co/chflame163/ComfyUI_LayerStyle/resolve/main/ComfyUI/models/BiRefNet/RMBG-2.0/model.safetensors) (community mirror of briaai/RMBG-2.0, whose own file needs a Hugging Face login; same SHA-256 `566ed80c3d95f87ada6864d4cbe2290a1c5eb1c7bb0b123e984f60f76b02c3a7`; added 6.11.) | Bria RMBG-2.0 licence: non-commercial only | no |
+| rmbg-2.0.safetensors | background_removal | 885 MB | [chflame163/ComfyUI_LayerStyle](https://huggingface.co/chflame163/ComfyUI_LayerStyle/resolve/main/ComfyUI/models/BiRefNet/RMBG-2.0/model.safetensors) (community mirror of briaai/RMBG-2.0, whose own file needs a Hugging Face login; same SHA-256 `566ed80c3d95f87ada6864d4cbe2290a1c5eb1c7bb0b123e984f60f76b02c3a7`; added 6.11.) | Bria RMBG-2.0 licence | no |
 
 ## Findings
 
@@ -59,5 +59,5 @@ answers "401" until then.
   standard, 3 s Turbo).
 - **flux2-vae**: the copy in `Comfy-Org/Flux-2-Dev` is byte-identical with the user's; the copies in the Klein, MOSS,
   Fibo and FLUX.3 repos are 2264 bytes smaller (a different file header) and load the same way.
-- **Licences for the release**: Fibo 2.0 (CC BY-NC) and the FLUX.2 files are non-commercial; Lenovo UltraReal on
+- **Licences for the release**: Lenovo UltraReal on
   Civitai asks for credit (name Danrisi in the credits).

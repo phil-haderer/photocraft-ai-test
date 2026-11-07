@@ -120,7 +120,7 @@ QWEN = Model(
         # native 2K upscale: no upscaler node and no LoRA, 25 steps; the result is about the scale factor times the picture, up to 24 MP
         "upscale": Mode("qwen-image-21-upscale.json", dict(scale=1.5, turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=DESCRIBE_TIP),
         # the upscale graph at the size of the canvas (factor 1), with the Turbo LoRA as a switch (own file so Upscale stays
-        # as it is); last in the ranking until more tests are done (user 4.11.)
+        # as it is)
         "refine": Mode("qwen-image-21-refine.json", dict(turbo=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=REFINE_TIP),
     },
     requires=(
@@ -248,35 +248,7 @@ FIBO = Model(
 MODELS = [FLUX3, FLUX2, QWEN, FIBO, KREA2, MOSS]      # the order of the tabs
 BY_KEY = {m.key: m for m in MODELS}
 
-# The user's ranking of the models per function (best first), shown at the start of each function's tooltip while
-# testing (user 28.10.: "keep the ranking in view"); the user tells changes. Also the order for Easy Mode (PLAN.md).
-# A function missing here has no ranking yet.
-RANKING = {
-    "inpaint": ("fibo", "qwen"),            # E2 test round 28.10.: "Fibo is better overall"
-    "remove": ("fibo", "qwen"),
-    "outpaint": ("flux2", "flux3", "qwen", "fibo"),   # user 28.10.: Flux 2 very good, Flux 3 and Qwen too; Krea 2 / MOSS off 29.10.
-    # the rest is the order of Easy Mode (user 31.10.); Refine and Multi Image Edit are accepted for now, still being checked (1.11.)
-    "txt2img": ("flux3", "moss", "flux2", "qwen", "fibo"),
-    "edit": ("flux3", "qwen", "flux2", "fibo"),
-    "upscale": ("qwen", "flux3", "flux2", "fibo"),         # Fibo last (6.11., 1.5x and 2x only); user 2.11.: Qwen 2.1 Upscale with the default prompt is perfect, the best one
-    "refine": ("fibo", "flux2", "flux3", "qwen"),     # Qwen last for now: ranked "good", more tests needed (user 4.11.)
-    "multi_edit": ("flux3", "flux2", "qwen", "fibo"),
-}
 SHORT = {"flux3": "Flux 3", "flux2": "Flux 2", "qwen": "Qwen", "fibo": "Fibo", "krea2": "Krea 2", "moss": "MOSS"}
-
-
-def ranking_text(mode: str) -> str:
-    """'Ranking: 1. Fibo, 2. Qwen (not ranked: Flux 3, Flux 2).' for development; '' when no model offers it. Not in the
-    window since 3.11. (user: the ranking in the function tooltips was for development only)."""
-    offered = [m.key for m in MODELS if mode in m.modes]
-    if not offered:
-        return ""
-    ranked = [k for k in RANKING.get(mode, ()) if k in offered]
-    rest = [SHORT[k] for k in offered if k not in ranked]
-    if not ranked:
-        return "Ranking: not set yet."
-    text = "Ranking: " + ", ".join(f"{i}. {SHORT[k]}" for i, k in enumerate(ranked, 1))
-    return text + (f" (not ranked: {', '.join(rest)})." if rest else ".")
 
 
 def model_for_workflow(name: str) -> Model | None:
