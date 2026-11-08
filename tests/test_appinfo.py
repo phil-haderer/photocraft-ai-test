@@ -74,21 +74,22 @@ assert home.lower() not in red.lower() and red.count("~") == 3, red
 assert "config.toml cannot be read" in appinfo.build_report()
 (HOME / "config.toml").unlink()
 
-# ---- the export stamps the version of a release ----
-spec = importlib.util.spec_from_file_location("export_release", ROOT / "tools" / "export_release.py")
-er = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(er)
-init = er.stamp_version("pccomfy/__init__.py", b'"""doc"""\n\n__version__ = "0.21-dev"      # x\nOTHER = "1"\n', "0.22-test").decode()
-assert '__version__ = "0.22-test"' in init and 'OTHER = "1"' in init
-assert b'version = "0.22"' in er.stamp_version("pyproject.toml", b'[project]\nname = "a"\nversion = "0.21"\n', "0.22-test")
-try:
-    er.stamp_version("pccomfy/__init__.py", b"nothing here\n", "1.0")
-    raise AssertionError("a missing version line must raise")
-except ValueError:
-    pass
-real_init = (ROOT / "pccomfy" / "__init__.py").read_bytes()
-assert b'__version__ = "' + __version__.encode() + b'"' in er.stamp_version("pccomfy/__init__.py", real_init, __version__)   # the real file has the line
-assert b"version" in er.stamp_version("pyproject.toml", (ROOT / "pyproject.toml").read_bytes(), "0.99")
+# ---- the export stamps the version of a release (private repo only: the release leaves tools/export_release.py out) ----
+if (ROOT / "tools" / "export_release.py").exists():
+    spec = importlib.util.spec_from_file_location("export_release", ROOT / "tools" / "export_release.py")
+    er = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(er)
+    init = er.stamp_version("pccomfy/__init__.py", b'"""doc"""\n\n__version__ = "0.21-dev"      # x\nOTHER = "1"\n', "0.22-test").decode()
+    assert '__version__ = "0.22-test"' in init and 'OTHER = "1"' in init
+    assert b'version = "0.22"' in er.stamp_version("pyproject.toml", b'[project]\nname = "a"\nversion = "0.21"\n', "0.22-test")
+    try:
+        er.stamp_version("pccomfy/__init__.py", b"nothing here\n", "1.0")
+        raise AssertionError("a missing version line must raise")
+    except ValueError:
+        pass
+    real_init = (ROOT / "pccomfy" / "__init__.py").read_bytes()
+    assert b'__version__ = "' + __version__.encode() + b'"' in er.stamp_version("pccomfy/__init__.py", real_init, __version__)   # the real file has the line
+    assert b"version" in er.stamp_version("pyproject.toml", (ROOT / "pyproject.toml").read_bytes(), "0.99")
 
 # ---- every run line carries the version ----
 assert '"version": __version__' in (ROOT / "pccomfy" / "bridge.py").read_text(encoding="utf-8")

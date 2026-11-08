@@ -122,6 +122,7 @@ jobs:
             hint: sudo pacman -S python tk
             install: pacman -Syu --noconfirm python tk xorg-server-xvfb fontconfig
     env:
+      PLUGIN_DIR: Plugin Ordner Jörg Ä      # no working-directory here: with spaces it breaks docker exec in a container job
       PCCOMFY_NO_TIPS: "1"
     steps:
       - name: Tools for the checkout
@@ -131,11 +132,11 @@ jobs:
           else pacman -Sy --noconfirm git which; fi
       - uses: actions/checkout@v4
         with:
-          path: Plugin Ordner Jörg Ä
+          path: ${{ env.PLUGIN_DIR }}
       - name: Without Python the setup stops with the right hint
-        working-directory: Plugin Ordner Jörg Ä
         shell: bash
         run: |
+          cd "$PLUGIN_DIR"
           set +e; out="$(./setup-linux.sh 2>&1)"; code=$?; set -e
           echo "$out"
           [ "$code" -ne 0 ] && echo "$out" | grep -qF "${{ matrix.hint }}"
@@ -145,12 +146,11 @@ jobs:
         shell: bash
         run: mkdir -p ~/.local/bin && printf '#!/bin/sh\n' > ~/.local/bin/photocraft && chmod +x ~/.local/bin/photocraft
       - name: setup-linux.sh
-        working-directory: Plugin Ordner Jörg Ä
         shell: bash
-        run: ./setup-linux.sh
+        run: cd "$PLUGIN_DIR" && ./setup-linux.sh
       - name: Install checks
-        working-directory: Plugin Ordner Jörg Ä
         shell: bash
         run: |
+          cd "$PLUGIN_DIR"
           Xvfb :99 -screen 0 1280x800x24 & sleep 2
           DISPLAY=:99 .venv/bin/python tests/ci_install_smoke.py --expect-shortcut

@@ -109,9 +109,10 @@ def shortcut_checks():
     folder = tempfile.mkdtemp()
     lnk = launcher.create_shortcut(EXE, folder=folder)
     assert lnk == Path(folder) / "PhotoCraft AI.lnk" and lnk.exists()
-    ps = (f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}'); "
+    ps = (f"[Console]::OutputEncoding = [Text.Encoding]::UTF8; $s = (New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}'); "
           "$s.TargetPath; $s.Arguments; $s.IconLocation; $s.WorkingDirectory")
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60).stdout
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, encoding="utf-8",
+                         timeout=60).stdout
     target, args, icon, workdir = out.strip().splitlines()
     assert target.lower() == spec["target"].lower() and args == spec["args"], (target, args)
     assert re.sub(r",\s*0$", "", icon).lower() == EXE.lower() and workdir.lower() == str(launcher.ROOT).lower()

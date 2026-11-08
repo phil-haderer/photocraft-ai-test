@@ -107,9 +107,10 @@ def my_settings_checks():
     """"Set as my settings" lives in settings.json (key saved_pages) in data/ (Windows) or ~/.config/pccomfy (Linux): never in git."""
     ignore = [l.strip() for l in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()]
     assert "data/" in ignore
-    import export_release as ex
-    for name in ("data/settings.json", "data/state.json", "data/history.json", "data/exchange/runs.jsonl"):
-        assert ex.excluded(name) or "data/" in ignore, name
+    if (ROOT / "tools" / "export_release.py").exists():                # private repo only (the release leaves it out)
+        import export_release as ex
+        for name in ("data/settings.json", "data/state.json", "data/history.json", "data/exchange/runs.jsonl"):
+            assert ex.excluded(name) or "data/" in ignore, name
     try:
         tracked = subprocess.run(["git", "ls-files", "data", "settings.json", "state.json", "config.toml"], cwd=ROOT,
                                  capture_output=True, text=True, timeout=30)

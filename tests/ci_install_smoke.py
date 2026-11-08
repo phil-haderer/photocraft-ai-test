@@ -13,7 +13,6 @@ import os
 import pkgutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,9 +60,10 @@ def config_and_data():
     from pccomfy import config
     cfg = config.load(None)
     assert cfg.get("photocraft") and cfg.get("comfyui") is not None, "config has no photocraft/comfyui part"
-    with tempfile.NamedTemporaryFile(dir=ROOT / "data", delete=True):
-        pass
-    return "config loads, data folder writable"
+    probe = config.CONFIG_DIR / "ci-smoke.json"          # data\ (Windows) or ~/.config/pccomfy (Linux); made on the first write
+    assert config._write_json(probe, {"ok": True}), config.write_error()
+    probe.unlink()
+    return f"config loads, {config.CONFIG_DIR} writable"
 
 
 def tk_window():

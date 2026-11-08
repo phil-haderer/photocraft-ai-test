@@ -129,13 +129,15 @@ def create_shortcut(exe: str, name: str = NAME, folder: str | None = None) -> Pa
     `folder`: somewhere else instead (the tests)."""
     spec = shortcut_spec(exe, name)
     where = _ps_quote(folder) if folder else "[Environment]::GetFolderPath('Desktop')"
-    ps = (f"$d = {where}; "
+    ps = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; "       # the path comes back as UTF-8 (umlauts in the user name)
+          f"$d = {where}; "
           f"$p = Join-Path $d ({_ps_quote(spec['name'])} + '.lnk'); "
           "$s = (New-Object -ComObject WScript.Shell).CreateShortcut($p); "
           f"$s.TargetPath = {_ps_quote(spec['target'])}; $s.Arguments = {_ps_quote(spec['args'])}; "
           f"$s.WorkingDirectory = {_ps_quote(spec['workdir'])}; $s.IconLocation = {_ps_quote(spec['icon'])}; "
           "$s.Description = 'PhotoCraft with the ComfyUI bridge'; $s.Save(); $p")
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60)
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=60)
     if out.returncode != 0:
         raise LaunchError(out.stderr.strip() or "could not create the shortcut")
     return Path(out.stdout.strip().splitlines()[-1])
