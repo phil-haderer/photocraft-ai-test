@@ -29,6 +29,7 @@ if defined PYTHON call :try "%PYTHON%"
 for %%V in (-3.13 -3.12 -3.11 -3.14) do call :tryv %%V
 for %%P in (py python "%USERPROFILE%\miniconda3\python.exe") do call :try "%%~P"
 if not defined PYEXE goto :nopython
+:pyfound
 echo Using Python: %PYEXE%
 
 echo.
@@ -113,7 +114,38 @@ exit /b 0
 
 :nopython
 echo Python 3.11 or newer with tkinter was not found.
-echo Install it from python.org (tick "tcl/tk") or use miniconda, then run this again.
+if defined CHECK (
+    echo Would offer to install Python 3.13 from python.org with winget, for this Windows user only.
+    goto :finish
+)
+rem The offer (user 8.11.): winget installs the official python.org Python 3.13 for this user only (no admin rights,
+rem tkinter included), after a Y. Without winget, after N, or unattended (/nopause): the download page and three steps.
+if defined NOPAUSE goto :pymanual
+where winget >nul 2>&1
+if errorlevel 1 goto :pymanual
+echo.
+echo Setup can install it now: the official Python 3.13 from python.org, for this Windows user only
+echo (no admin rights needed), with winget. Answering Y accepts the Python license:
+echo https://docs.python.org/3/license.html
+choice /c YN /m "Install Python 3.13 now"
+if errorlevel 2 goto :pymanual
+winget install --exact --id Python.Python.3.13 --source winget --scope user --silent --accept-package-agreements --accept-source-agreements
+rem winget's exit code is not reliable here (it is non-zero when Python is there already): look for the new Python itself.
+rem It is not in this window's PATH yet, so try the folder the per-user installer uses.
+call :try "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+call :tryv -3.13
+if defined PYEXE goto :pyfound
+echo Python was not found after the installation.
+goto :pymanual
+
+:pymanual
+echo.
+echo Install Python yourself, it takes two minutes:
+echo   1. On the page that opens, download "Windows installer (64-bit)" of Python 3.13.
+echo   2. Run it and keep the default options (tcl/tk stays ticked).
+echo   3. Then double-click setup-windows.bat again.
+echo Page: https://www.python.org/downloads/windows/
+if not defined NOPAUSE start "" "https://www.python.org/downloads/windows/"
 call :waitkey
 exit /b 1
 

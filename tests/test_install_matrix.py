@@ -20,6 +20,14 @@ def bat_checks():
     assert pauses == ["if not defined NOPAUSE pause"], pauses
     # PYTHON is tried before the py launcher
     assert text.index('if defined PYTHON call :try "%PYTHON%"') < text.index("call :tryv")
+    # no Python: the winget offer (official python.org 3.13, per user, after Y; user 8.11.), else the download page
+    for need in ("winget install --exact --id Python.Python.3.13 --source winget --scope user", "choice /c YN", "https://docs.python.org/3/license.html",
+                 r'%LOCALAPPDATA%\Programs\Python\Python313\python.exe', "https://www.python.org/downloads/windows/", ":pyfound"):
+        assert need in text, need
+    lf = text.replace("\r\n", "\n")
+    nopy = lf[lf.index("\n:nopython\n"):lf.index("\n:pipfail\n")]
+    assert nopy.index("if defined NOPAUSE goto :pymanual") < nopy.index("choice /c YN") < nopy.index("winget install --exact")   # never unattended
+    assert 'if not defined NOPAUSE start ""' in nopy                                  # no browser in unattended runs
     # data\python.txt: written by Python as UTF-8, never by echo (the console code page breaks umlauts; 8.11.)
     assert "write_text(sys.executable, encoding='utf-8')" in text
     assert "python.txt" not in "".join(ln for ln in text.splitlines() if ln.lstrip().lower().startswith("(echo"))
@@ -58,7 +66,8 @@ def workflow_checks():
     text = WF.read_text(encoding="utf-8")
     for need in ("setup-windows.bat /nopause", "./setup-linux.sh", "tests\\ci_install_smoke.py --expect-shortcut",
                  "tests/ci_install_smoke.py --expect-shortcut", "Jörg Ä", "ubuntu-22.04", "ubuntu-24.04",
-                 "debian:12", "fedora:latest", "archlinux:latest", "branches: [main]"):
+                 "debian:12", "fedora:latest", "archlinux:latest", "branches: [main]",
+                 "windows-no-python:", "echo Y| call setup-windows.bat"):
         assert need in text, need
     # the hints the workflow expects are the ones setup-linux.sh prints
     sh = (ROOT / "setup-linux.sh").read_text(encoding="utf-8")

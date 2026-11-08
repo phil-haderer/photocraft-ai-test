@@ -31,7 +31,7 @@ Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.21.0 · ComfyUI version: 0.42.0
 - **[PhotoCraft](https://github.com/storytold/photocraft/releases)**: the image editor where you work. The plugin adds AI functions to it.
 - **[ComfyUI](https://github.com/comfyanonymous/ComfyUI#installing)**: the program that runs the AI models on your graphics card. Install it, start it once, and leave it running while you work.
 - **An NVIDIA graphics card with 16 GB of VRAM** (VRAM is the memory of the graphics card; you can look it up in the Task Manager under Performance ▸ GPU). Released and tested on 16 GB.
-- **[Python](https://www.python.org/downloads/windows/) 3.11 or newer** (a free programming language the plugin is written in; the setup script uses it, you never have to write any code).
+- **[Python](https://www.python.org/downloads/windows/) 3.11 or newer** (a free programming language the plugin is written in; the setup script uses it, you never have to write any code). No Python yet? On Windows the setup offers to install it for you.
 - **About 15 to 20 GB of free disk space per model you want to use** (the models are large files; one model is enough to start).
 - **A custom node pack, only for Upscale with Flux 3 (and the tiles option with Fibo):** [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) (a small add-on for ComfyUI; install it from the ComfyUI Manager or from the link). Everything else works without it. Details: [Model downloads](#model-downloads).
 
@@ -71,7 +71,7 @@ You need Windows 10/11 or Linux, an NVIDIA card with 16 GB VRAM, Python 3.11+ (L
 2. **Set up**: double-click **`setup-windows.bat`**. It shows its four steps as it goes: Python, a private Python environment, the packages, and the desktop shortcut **PhotoCraft AI**. It finds `photocraft.exe` itself and asks once if it can't. (`setup-windows.bat /check` only looks and changes nothing.)
 3. **Start**: start ComfyUI, close PhotoCraft, double-click **PhotoCraft AI** on your desktop. PhotoCraft opens, and a few seconds later the plugin window appears.
 
-When you install Python, keep its default options: "tcl/tk" and "Add python.exe to PATH" must stay ticked.
+No Python yet? The setup offers to install Python 3.13 (the official one from python.org, for your Windows user only, no admin rights) with one key press. Without winget, or if you say no, it opens the download page: install Python 3.13 there with the default options ("tcl/tk" stays ticked) and run `setup-windows.bat` again.
 Then go on with [First start](#first-start).
 
 ## Install on Linux

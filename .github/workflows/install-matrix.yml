@@ -62,6 +62,47 @@ jobs:
           set /p PY=<data\python.txt
           "%PY%" tests\run_all.py -j 4
 
+  windows-no-python:
+    name: Windows without Python (setup offers winget, answer Y)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PLUGIN_DIR: Plugin Ordner Jörg Ä
+      PCCOMFY_NO_TIPS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ${{ env.PLUGIN_DIR }}
+      - name: Hide every Python of the runner (py launcher, PATH)
+        shell: pwsh
+        run: |
+          foreach ($f in "C:\Windows\py.exe", "C:\Windows\pyw.exe") { if (Test-Path $f) { Rename-Item $f "$f.hidden" } }
+          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Error "winget is not available on this runner image"; exit 1 }
+          winget --version
+      - name: Stand-in PhotoCraft (where the MSI installs it)
+        shell: pwsh
+        run: |
+          $d = Join-Path $env:LOCALAPPDATA "Programs\ArtCraft\PhotoCraft"
+          New-Item -ItemType Directory -Force $d | Out-Null
+          New-Item -ItemType File -Force (Join-Path $d "photocraft.exe") | Out-Null
+      - name: setup-windows.bat, answering Y to the Python offer
+        shell: cmd
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          set "PYTHON="
+          set "PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;%LOCALAPPDATA%\Microsoft\WindowsApps"
+          for /f "delims=" %%W in ('where winget 2^>nul') do set "PATH=%PATH%;%%~dpW"
+          where python 2>nul && (echo a Python is still on PATH & exit /b 1)
+          echo Y| call setup-windows.bat
+      - name: The Python the setup installed is used
+        shell: cmd
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          set /p PY=<data\python.txt
+          echo python.txt: %PY%
+          "%PY%" -c "import sys; print(sys.version); assert sys.version_info[:2] == (3, 13), sys.version"
+          "%PY%" tests\ci_install_smoke.py --expect-shortcut
+
   ubuntu:
     name: ${{ matrix.os }}, Python of the distribution
     runs-on: ${{ matrix.os }}
