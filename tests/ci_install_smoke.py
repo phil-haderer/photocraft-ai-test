@@ -96,9 +96,36 @@ def inter_font():
 
 def drag_and_drop():
     from tkinterdnd2 import TkinterDnD
-    root = TkinterDnD.Tk()
+    try:
+        root = TkinterDnD.Tk()
+    except RuntimeError as e:
+        raise RuntimeError(f"{e} Reason: {_tkdnd_reason()}") from None
     try:
         return f"tkdnd {root.tk.call('package', 'require', 'tkdnd')}"
+    finally:
+        root.destroy()
+
+
+def _tkdnd_reason():
+    """tkinterdnd2 hides Tcl's message ("Unable to load tkdnd library."); ask Tcl again for the real one. On Linux it is
+    usually a missing system library: tkdnd needs libX11 and libXcursor (8.11.: missing in the minimal containers)."""
+    import tkinter
+    import tkinterdnd2
+    root = tkinter.Tk()
+    try:
+        tcl9 = int(root.tk.call("info", "tclversion").split(".")[0]) >= 9
+        base = Path(tkinterdnd2.__file__).parent / "tkdnd"
+        import platform
+        system, machine = platform.system(), os.environ.get("PROCESSOR_ARCHITECTURE", platform.machine())
+        rep = {("Linux", "x86_64"): "linux-x64", ("Linux", "aarch64"): "linux-arm64", ("Windows", "AMD64"): "win-x64",
+               ("Windows", "ARM64"): "win-arm64", ("Darwin", "arm64"): "osx-arm64", ("Darwin", "x86_64"): "osx-x64"}.get((system, machine))
+        if not rep:
+            return f"no tkdnd build for {system} {machine}"
+        d = base / (rep + "-tcl9") if tcl9 and (base / (rep + "-tcl9")).is_dir() else base / rep
+        root.tk.call("lappend", "auto_path", str(d))
+        return root.tk.eval("if {[catch {package require tkdnd} msg]} {set msg} else {set msg ok}")
+    except Exception as e:  # noqa: BLE001
+        return f"(no reason found: {e})"
     finally:
         root.destroy()
 

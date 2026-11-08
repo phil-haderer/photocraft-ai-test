@@ -190,6 +190,18 @@ def linux_find_checks():
     app.write_bytes(b"")
     app.chmod(0o755)
     assert launcher._find_photocraft_linux([tmp2]) == str(app)
+    # the binary itself as a plain file (e.g. ~/.local/bin/photocraft, not in PATH on Arch; install matrix 8.11.)
+    tmp3 = Path(tempfile.mkdtemp())
+    plain = tmp3 / "photocraft"
+    plain.write_bytes(b"")
+    plain.chmod(0o755)
+    assert launcher._find_photocraft_linux([tmp3]) == str(plain)
+    (tmp3 / "photocraft.txt").write_bytes(b"")                    # another file with the name in it is not PhotoCraft
+    assert launcher._find_photocraft_linux([tmp3]) == str(plain)
+    assert launcher._find_photocraft_linux([tmp3, tmp2]) == str(app)   # a copy with a version in its name wins
+    if sys.platform != "win32":
+        plain.chmod(0o644)
+        assert launcher._find_photocraft_linux([tmp3]) is None    # not executable: not PhotoCraft
 
 
 def flatpak_checks():

@@ -64,6 +64,9 @@ def workflow_checks():
     sh = (ROOT / "setup-linux.sh").read_text(encoding="utf-8")
     for hint in ("sudo apt install python3 python3-tk python3-venv", "sudo dnf install python3 python3-tkinter", "sudo pacman -S python tk"):
         assert hint in text and hint in sh, hint
+    # the containers install libXcursor as setup-linux.sh tells the user (drag and drop needs it; 8.11.)
+    for pkg in ("libxcursor1", "libXcursor", "libxcursor"):
+        assert pkg in text and pkg in sh, pkg
     assert "\t" not in text, "YAML must not contain tabs"
 
 

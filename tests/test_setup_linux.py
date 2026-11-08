@@ -39,7 +39,11 @@ def function_checks():
         out = bash(f'install_hint "{os_id}" "{like}"').stdout.strip()
         assert cmd in out and "tk" in out, (os_id, out)
         assert cmd in bash(f'clipboard_hint "{os_id}" "{like}"').stdout and "xclip" in bash(f'clipboard_hint "{os_id}" "{like}"').stdout
+        xc = bash(f'xcursor_hint "{os_id}" "{like}"').stdout
+        assert cmd in xc and "xcursor" in xc.lower(), (os_id, xc)
     assert bash('install_hint "plan9" ""').stdout.strip() == ""
+    assert bash('xcursor_hint "plan9" ""').stdout.strip() == ""
+    assert bash('has_xcursor /nonexistent').returncode != 0
     # sourcing does not run main
     r = bash("true")
     assert r.returncode == 0 and r.stdout == ""

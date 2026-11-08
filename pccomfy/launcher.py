@@ -173,8 +173,9 @@ def find_photocraft(roots: list[Path] | None = None) -> str | None:
 
 def _find_photocraft_linux(roots: list[Path] | None = None) -> str | None:
     """The `photocraft` binary: $PHOTOCRAFT, then PATH (/usr/bin ...), then folders with "photocraft" in their name under the
-    usual roots (next to this folder, /opt, ~/Applications, ~/.local/opt, ~/.local/bin, ~/bin, Downloads, Desktop), then a photocraft*.AppImage.
-    With `roots` only those are searched (the tests). Several copies: the highest version in the folder name."""
+    usual roots (next to this folder, /opt, ~/Applications, ~/.local/opt, ~/.local/bin, ~/bin, Downloads, Desktop), then a photocraft*.AppImage
+    or a plain executable file `photocraft` there (~/.local/bin is not in PATH everywhere, e.g. Arch; found by the install matrix 8.11.).
+    With `roots` only those are searched (the tests). Several copies: the highest version in the folder name (a plain file has none)."""
     if roots is None:
         env = os.environ.get("PHOTOCRAFT")
         if env and (is_flatpak(env) or Path(env).is_file()):
@@ -184,7 +185,7 @@ def _find_photocraft_linux(roots: list[Path] | None = None) -> str | None:
             return on_path
         home = Path.home()
         roots = [ROOT.parent, Path("/opt"), home / "Applications", home / ".local" / "opt", home / ".local" / "bin", home / "bin",
-                 home / "Downloads", home / "Desktop"]      # ~/.local/bin and ~/bin: a photocraft-*.AppImage put there
+                 home / "Downloads", home / "Desktop"]      # ~/.local/bin and ~/bin: a photocraft-*.AppImage or the binary itself put there
     found = []
     for root in roots:
         try:
@@ -196,6 +197,8 @@ def _find_photocraft_linux(roots: list[Path] | None = None) -> str | None:
                     found.append((_version(d), d / "photocraft"))
                 elif d.is_file() and name.endswith(".appimage") and os.access(d, os.X_OK):
                     found.append((_version(d), d))
+                elif d.is_file() and name == "photocraft" and os.access(d, os.X_OK):
+                    found.append(((), d))                        # the binary itself, without a version in its name
         except OSError:
             continue
     if found:

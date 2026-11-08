@@ -37,6 +37,24 @@ clipboard_hint() {
     esac
 }
 
+# Command for libXcursor, which drag and drop (tkdnd) needs next to libX11; present on almost every desktop, missing on
+# minimal installs (the install matrix found it missing in the Debian, Fedora and Arch containers, 8.11.). $1 = ID, $2 = ID_LIKE.
+xcursor_hint() {
+    case " $1 $2 " in
+        *" debian "*|*" ubuntu "*) echo "sudo apt install libxcursor1" ;;
+        *" fedora "*|*" rhel "*|*" centos "*) echo "sudo dnf install libXcursor" ;;
+        *" arch "*) echo "sudo pacman -S libxcursor" ;;
+        *" suse "*|*" opensuse "*|*" opensuse-leap "*|*" opensuse-tumbleweed "*) echo "sudo zypper install libXcursor1" ;;
+        *" alpine "*) echo "sudo apk add libxcursor" ;;
+        *) echo "" ;;
+    esac
+}
+
+# True when libXcursor can be loaded ($1 = a Python; ctypes asks the system's loader, like Tcl does for tkdnd).
+has_xcursor() {
+    "$1" -c 'import ctypes; ctypes.CDLL("libXcursor.so.1")' >/dev/null 2>&1
+}
+
 # Prints the first interpreter that is Python 3.10+ (3.10 = Ubuntu 22.04, Mint 21; it gets tomli) with tkinter, venv and ensurepip; nothing if there is none.
 pick_python() {
     local c
@@ -92,7 +110,7 @@ main() {
         os_like="$(. /etc/os-release; echo "${ID_LIKE:-}")"
     fi
 
-    echo "Setup of the bridge: 1 Python, 2 virtual environment, 3 packages, 4 clipboard helpers, 5 menu entry."
+    echo "Setup of the bridge: 1 Python, 2 virtual environment, 3 packages, 4 clipboard and drag and drop, 5 menu entry."
     [ "$check" = 1 ] && echo "(--check: nothing is changed, the steps only say what they would do.)"
 
     step 1 "Python 3.10+ with tkinter and venv"
@@ -135,7 +153,7 @@ main() {
         fi
     fi
 
-    step 4 "Clipboard helpers (optional)"
+    step 4 "Clipboard helpers and drag and drop (optional)"
     if command -v wl-paste >/dev/null 2>&1 || command -v xclip >/dev/null 2>&1; then
         echo "Found, pasting pictures works."
     fi
@@ -143,6 +161,13 @@ main() {
         hint="$(clipboard_hint "$os_id" "$os_like")"
         echo "Missing. Pasting pictures from the clipboard needs wl-clipboard (Wayland) or xclip (X11)."
         [ -n "$hint" ] && echo "  $hint"
+    fi
+    if has_xcursor "$py"; then
+        echo "libXcursor found, dragging pictures onto the reference slots works."
+    else
+        hint="$(xcursor_hint "$os_id" "$os_like")"
+        echo "libXcursor is missing. Dragging pictures onto the reference slots needs it (everything else works without it)."
+        if [ -n "$hint" ]; then echo "  $hint"; else echo "  Install libXcursor from your distribution."; fi
     fi
 
     step 5 "Menu entry \"PhotoCraft AI\""

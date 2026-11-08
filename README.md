@@ -89,6 +89,8 @@ X11 and Wayland. On Linux the window is not docked to PhotoCraft (Wayland does n
    sudo pacman -S python tk
    # optional, to paste pictures from the clipboard: wl-clipboard (Wayland) or xclip (X11)
    sudo apt install wl-clipboard xclip
+   # only if setup-linux.sh says libXcursor is missing (needed to drag pictures onto the reference slots)
+   sudo apt install libxcursor1      # Fedora: libXcursor, Arch: libxcursor
    ```
 
 2. **Get the plugin**: download the ZIP and unpack it, or `git clone <this repository>`.

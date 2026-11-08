@@ -114,13 +114,13 @@ jobs:
         include:
           - image: debian:12
             hint: sudo apt install python3 python3-tk python3-venv
-            install: apt-get update && apt-get install -y python3 python3-tk python3-venv xvfb
+            install: apt-get update && apt-get install -y python3 python3-tk python3-venv libxcursor1 xvfb
           - image: fedora:latest
             hint: sudo dnf install python3 python3-tkinter
-            install: dnf install -y python3 python3-tkinter xorg-x11-server-Xvfb fontconfig
+            install: dnf install -y python3 python3-tkinter libXcursor xorg-x11-server-Xvfb fontconfig
           - image: archlinux:latest
             hint: sudo pacman -S python tk
-            install: pacman -Syu --noconfirm python tk xorg-server-xvfb fontconfig
+            install: pacman -Syu --noconfirm python tk libxcursor xorg-server-xvfb fontconfig
     env:
       PLUGIN_DIR: Plugin Ordner Jörg Ä      # no working-directory here: with spaces it breaks docker exec in a container job
       PCCOMFY_NO_TIPS: "1"
@@ -140,7 +140,7 @@ jobs:
           set +e; out="$(./setup-linux.sh 2>&1)"; code=$?; set -e
           echo "$out"
           [ "$code" -ne 0 ] && echo "$out" | grep -qF "${{ matrix.hint }}"
-      - name: System packages (what README tells the user)
+      - name: System packages (what README tells the user, libXcursor included)
         run: ${{ matrix.install }}
       - name: Stand-in PhotoCraft
         shell: bash
