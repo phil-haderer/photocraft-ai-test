@@ -1,0 +1,10 @@
+# Packages the plugin needs, read by setup-windows.bat and setup-linux.sh (one list for both; user 8.11.).
+# Lower bounds only: the oldest versions the install matrix has run with. No upper bounds, so a new Python
+# (with new package versions) still installs; the weekly matrix run notices when a new version breaks something.
+pillow>=12.3
+numpy>=2.2
+websocket-client>=1.9
+# 0.7 is the first with the tkdnd build for Tk 9 (Python 3.14+); older ones load no drag and drop there
+tkinterdnd2>=0.7
+# Python 3.10 has no tomllib (config.toml); tomli is the same reader
+tomli>=2; python_version < "3.11"

@@ -11,7 +11,7 @@
 # Environment: PYTHON (interpreter to use), VENV_DIR (default: .venv next to this script)
 # Use the Python of your distribution (python3-tk), not one from uv or pyenv: only its Tk draws the Inter font.
 
-PACKAGES="pillow numpy websocket-client tkinterdnd2"
+PACKAGES="pillow numpy websocket-client tkinterdnd2"     # for the messages; the versions are in requirements.txt
 
 # Command that installs Python with tkinter and venv. $1 = ID, $2 = ID_LIKE of /etc/os-release.
 install_hint() {
@@ -141,16 +141,12 @@ main() {
         exit 1
     fi
 
-    step 3 "Packages: $PACKAGES"
+    step 3 "Packages from requirements.txt: $PACKAGES"
     if [ "$check" = 1 ]; then
         echo "Would install them into the virtual environment with pip."
     else
-        "$venv/bin/python" -m pip install $PACKAGES || { echo "pip install failed. Check the messages above."; exit 1; }
-        # Python 3.10 has no tomllib (config.toml): tomli is the same reader as a package
-        if ! "$venv/bin/python" -c 'import tomllib' >/dev/null 2>&1; then
-            echo "Python 3.10: installing tomli"
-            "$venv/bin/python" -m pip install tomli || { echo "pip install failed. Check the messages above."; exit 1; }
-        fi
+        # requirements.txt also brings tomli on Python 3.10 (no tomllib there)
+        "$venv/bin/python" -m pip install -r "$here/requirements.txt" || { echo "pip install failed. Check the messages above."; exit 1; }
     fi
 
     step 4 "Clipboard helpers and drag and drop (optional)"

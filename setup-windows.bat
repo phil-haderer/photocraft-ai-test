@@ -53,13 +53,13 @@ set "PIPARGS=--user"
 
 :step3
 echo.
-echo [3/4] Packages: pillow numpy websocket-client tkinterdnd2
+echo [3/4] Packages from requirements.txt: pillow numpy websocket-client tkinterdnd2
 if defined CHECK (
     echo Would install them with pip.
     goto :step4
 )
 if not exist data mkdir data
-"%PYRUN%" -m pip install %PIPARGS% pillow numpy websocket-client tkinterdnd2
+"%PYRUN%" -m pip install %PIPARGS% -r "%HERE%requirements.txt"
 if errorlevel 1 goto :pipfail
 rem Python writes the file, always as UTF-8 (an echo would use the console code page, 850 on German Windows, and break folder names with umlauts)
 "%PYRUN%" -c "import sys, pathlib; pathlib.Path(sys.argv[1]).write_text(sys.executable, encoding='utf-8')" "%HERE%data\python.txt"

@@ -45,9 +45,11 @@ def python310_checks():
     assert r.returncode == 0 and r.stdout.strip() == "ok", r.stderr
     # 3. the packaging says the same
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'requires-python = ">=3.10"' in pyproject and "tomli; python_version < '3.11'" in pyproject
+    assert 'requires-python = ">=3.10"' in pyproject and "tomli>=2; python_version < '3.11'" in pyproject
+    # tomli comes from requirements.txt (both setup scripts install it since 8.11.)
+    assert 'tomli>=2; python_version < "3.11"' in (ROOT / "requirements.txt").read_text(encoding="utf-8")
     sh = (ROOT / "setup-linux.sh").read_text(encoding="utf-8")
-    assert "python3.10" in sh and "(3, 10)" in sh and "pip install tomli" in sh and "(3, 11)" not in sh
+    assert "python3.10" in sh and "(3, 10)" in sh and "requirements.txt" in sh and "(3, 11)" not in sh
 
 
 def find_checks():

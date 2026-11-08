@@ -44,6 +44,48 @@ def packages():
     return f"pillow {PIL.__version__}, numpy {numpy.__version__}"
 
 
+def _num(v):
+    """'2.2.6' -> (2, 2, 6); a part with letters counts with its leading digits and ends it ('13.0.0rc1' -> (13, 0, 0))."""
+    import re
+    out = []
+    for part in v.split("."):
+        m = re.match(r"\d+", part)
+        if not m:
+            break
+        out.append(int(m.group()))
+        if m.group() != part:
+            break
+    return tuple(out)
+
+
+def requirements_met():
+    """Every line of requirements.txt that applies here is installed in at least that version (pip honoured the file)."""
+    from importlib.metadata import PackageNotFoundError, version
+    seen, bad = [], []
+    for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        spec, _, marker = line.partition(";")
+        if "python_version" in marker:                           # only the form requirements.txt uses: python_version < "3.11"
+            assert "<" in marker and ">" not in marker and "=" not in marker, f"unknown marker: {marker}"
+            want_py = _num(marker.split("<", 1)[1].strip().strip("'\""))
+            if not sys.version_info[:2] < want_py:
+                continue
+        name, _, low = spec.partition(">=")
+        name, low = name.strip(), low.strip()
+        try:
+            have = version(name)
+        except PackageNotFoundError:
+            bad.append(f"{name} missing")
+            continue
+        seen.append(f"{name} {have}")
+        if _num(have) < _num(low):
+            bad.append(f"{name} {have} < {low}")
+    assert not bad, "; ".join(bad)
+    return ", ".join(seen)
+
+
 def import_all():
     import pccomfy
     bad = []
@@ -154,6 +196,7 @@ def shortcut():
 def main(argv):
     check("Python", python_version)
     check("Packages", packages)
+    check("requirements.txt met", requirements_met)
     check("All plugin modules import", import_all)
     check("Config and data folder", config_and_data)
     if sys.platform == "win32":

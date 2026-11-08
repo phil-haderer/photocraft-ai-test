@@ -79,6 +79,38 @@ def workflow_checks():
     assert "\t" not in text, "YAML must not contain tabs"
 
 
+def requirements_checks():
+    """One package list with lower bounds only (user 8.11.): requirements.txt, read by both setup scripts; pyproject agrees."""
+    import re
+    req = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    lines = [l.split("#", 1)[0].strip() for l in req.splitlines() if l.split("#", 1)[0].strip()]
+    bounds = {}
+    for l in lines:
+        spec = l.split(";", 1)[0]
+        assert ">=" in spec and "<" not in spec and "==" not in spec, f"lower bounds only: {l}"
+        name, low = spec.split(">=")
+        bounds[name.strip()] = low.strip()
+    assert set(bounds) == {"pillow", "numpy", "websocket-client", "tkinterdnd2", "tomli"}, bounds
+    assert bounds["tkinterdnd2"] == "0.7"                      # the first with the Tk 9 build of tkdnd
+    assert 'tomli>=2; python_version < "3.11"' in req
+    bat = BAT.read_text(encoding="utf-8")
+    sh = (ROOT / "setup-linux.sh").read_text(encoding="utf-8")
+    assert '-r "%HERE%requirements.txt"' in bat and '-r "$here/requirements.txt"' in sh
+    for text in (bat, sh):                                      # no second package list that pip would use
+        assert not re.search(r"pip install[^\n]*\bpillow\b", text), "pip installs a package list besides requirements.txt"
+    py = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    for name in ("pillow", "numpy", "websocket-client", "tkinterdnd2"):
+        assert f'"{name}>={bounds[name]}"' in py, name
+    import importlib.util
+    exp = ROOT / "tools" / "export_release.py"
+    if exp.exists():                                            # private repo only
+        spec = importlib.util.spec_from_file_location("export_release", exp)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        assert "requirements.txt" in mod.REQUIRED
+    assert 'cron: "17 4 * * 1"' in WF.read_text(encoding="utf-8")     # the weekly run
+
+
 def smoke_checks():
     # not a test_*.py file: tests/run_all.py must not run it (it needs a display and an installed setup)
     assert not SMOKE.name.startswith("test_")
@@ -90,5 +122,6 @@ if __name__ == "__main__":
     bat_checks()
     autostart_reads_old_and_new()
     workflow_checks()
+    requirements_checks()
     smoke_checks()
     print("install matrix: ok")

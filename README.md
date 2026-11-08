@@ -320,7 +320,7 @@ cd <this repository>
 
 ```bat
 py -3.13 -m venv .venv
-.venv\Scripts\python.exe -m pip install pillow numpy websocket-client tkinterdnd2
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 :: desktop shortcut (optional)
 .venv\Scripts\python.exe -m pccomfy shortcut --photocraft "C:\path\to\photocraft.exe"
 :: start without the shortcut (ComfyUI running, PhotoCraft closed)
@@ -335,8 +335,7 @@ The shortcut starts PhotoCraft with a control channel for the plugin (local only
 ```bash
 # create the venv with the system Python: a Python from uv or pyenv brings a Tk that does not draw the Inter font
 /usr/bin/python3 -m venv .venv
-.venv/bin/pip install pillow numpy websocket-client tkinterdnd2
-# Python 3.10 (Ubuntu 22.04) also needs: .venv/bin/pip install tomli
+.venv/bin/pip install -r requirements.txt
 ./photocraft-ai.sh
 # menu entry (optional)
 .venv/bin/python -m pccomfy shortcut --photocraft /path/to/photocraft
