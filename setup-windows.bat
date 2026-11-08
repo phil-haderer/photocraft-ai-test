@@ -4,15 +4,18 @@ cd /d "%~dp0"
 set "HERE=%~dp0"
 set "CHECK="
 set "NOMENU="
+set "NOPAUSE="
 :args
 if "%~1"=="" goto :argsdone
-if /i "%~1"=="/check" (set "CHECK=1") else if /i "%~1"=="/nomenu" (set "NOMENU=1") else if "%~1"=="/?" (goto :usage) else (echo Unknown option: %~1& goto :usage)
+if /i "%~1"=="/check" (set "CHECK=1") else if /i "%~1"=="/nomenu" (set "NOMENU=1") else if /i "%~1"=="/nopause" (set "NOPAUSE=1") else if "%~1"=="/?" (goto :usage) else (echo Unknown option: %~1& goto :usage)
 shift
 goto :args
 :usage
-echo Usage: setup-windows.bat [/check] [/nomenu] [/?]
+echo Usage: setup-windows.bat [/check] [/nomenu] [/nopause] [/?]
 echo   /check   only look: shows the steps and what each would do, changes nothing
 echo   /nomenu  skips the desktop shortcut "PhotoCraft AI" (step 4)
+echo   /nopause does not wait for a key at the end (for scripts and the automatic install check)
+echo Environment: PYTHON = the Python to use (tried first)
 exit /b 1
 :argsdone
 echo Setup of the bridge: 1 Python, 2 virtual environment, 3 packages, 4 desktop shortcut.
@@ -21,7 +24,8 @@ if defined CHECK echo (/check: nothing is changed, the steps only say what they 
 echo.
 echo [1/4] Python 3.11 or newer with tkinter
 set "PYEXE="
-rem Tested with Python 3.13 and 3.14 (3.14 brings Tk 9). The versions we know come first: 3.13, 3.12, 3.11, then 3.14; then any other.
+rem Tested with Python 3.13 and 3.14 (3.14 brings Tk 9). PYTHON (if set) first, then the versions we know: 3.13, 3.12, 3.11, then 3.14; then any other.
+if defined PYTHON call :try "%PYTHON%"
 for %%V in (-3.13 -3.12 -3.11 -3.14) do call :tryv %%V
 for %%P in (py python "%USERPROFILE%\miniconda3\python.exe") do call :try "%%~P"
 if not defined PYEXE goto :nopython
@@ -56,7 +60,9 @@ if defined CHECK (
 if not exist data mkdir data
 "%PYRUN%" -m pip install %PIPARGS% pillow numpy websocket-client tkinterdnd2
 if errorlevel 1 goto :pipfail
-(echo %PYRUN%)>"%HERE%data\python.txt"
+rem Python writes the file, always as UTF-8 (an echo would use the console code page, 850 on German Windows, and break folder names with umlauts)
+"%PYRUN%" -c "import sys, pathlib; pathlib.Path(sys.argv[1]).write_text(sys.executable, encoding='utf-8')" "%HERE%data\python.txt"
+if errorlevel 1 goto :pipfail
 
 :step4
 echo.
@@ -85,7 +91,11 @@ if defined NOMENU (
 ) else (
     echo Setup done. Start PhotoCraft with the desktop shortcut "PhotoCraft AI".
 )
-pause
+call :waitkey
+exit /b 0
+
+:waitkey
+if not defined NOPAUSE pause
 exit /b 0
 
 :tryv
@@ -104,10 +114,10 @@ exit /b 0
 :nopython
 echo Python 3.11 or newer with tkinter was not found.
 echo Install it from python.org (tick "tcl/tk") or use miniconda, then run this again.
-pause
+call :waitkey
 exit /b 1
 
 :pipfail
 echo pip install failed. Check the messages above.
-pause
+call :waitkey
 exit /b 1

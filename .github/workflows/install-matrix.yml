@@ -1,0 +1,156 @@
+# Install matrix: runs setup-windows.bat / setup-linux.sh on fresh machines the way a new user would, then checks that the
+# plugin starts (tests/ci_install_smoke.py) and runs the tests. No GPU, no ComfyUI, no PhotoCraft (a stand-in file only):
+# it finds install problems (Python versions, folders with spaces and umlauts, distributions, packages), not image quality.
+name: Install matrix
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows, Python ${{ matrix.python }}${{ matrix.own_pick && ' (setup picks Python itself)' || '' }}
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13", "3.14"]
+        own_pick: [false]
+        include:
+          - python: "3.13"
+            own_pick: true
+    env:
+      PLUGIN_DIR: Plugin Ordner Jörg Ä
+      PCCOMFY_NO_TIPS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ${{ env.PLUGIN_DIR }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+      - name: Stand-in PhotoCraft (where the MSI installs it)
+        shell: pwsh
+        run: |
+          $d = Join-Path $env:LOCALAPPDATA "Programs\ArtCraft\PhotoCraft"
+          New-Item -ItemType Directory -Force $d | Out-Null
+          New-Item -ItemType File -Force (Join-Path $d "photocraft.exe") | Out-Null
+      - name: setup-windows.bat
+        shell: cmd
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          if "${{ matrix.own_pick }}"=="false" set "PYTHON=%pythonLocation%\python.exe"
+          call setup-windows.bat /nopause
+      - name: Install checks
+        shell: cmd
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          set /p PY=<data\python.txt
+          "%PY%" -c "import sys; print(sys.version)"
+          "%PY%" tests\ci_install_smoke.py --expect-shortcut
+      - name: Tests
+        if: ${{ !cancelled() }}
+        shell: cmd
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          set /p PY=<data\python.txt
+          "%PY%" tests\run_all.py -j 4
+
+  ubuntu:
+    name: ${{ matrix.os }}, Python of the distribution
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    env:
+      PLUGIN_DIR: Plugin Ordner Jörg Ä
+      PCCOMFY_NO_TIPS: "1"
+      PYTHON: /usr/bin/python3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ${{ env.PLUGIN_DIR }}
+      - name: Without python3-tk the setup stops with the right hint
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          if /usr/bin/python3 -c 'import tkinter' 2>/dev/null; then echo "tkinter is already there, nothing to check"; exit 0; fi
+          set +e; out="$(./setup-linux.sh 2>&1)"; code=$?; set -e
+          echo "$out"
+          [ "$code" -ne 0 ] && echo "$out" | grep -q "sudo apt install python3 python3-tk python3-venv"
+      - name: System packages (what README tells the user)
+        run: sudo apt-get update && sudo apt-get install -y python3 python3-tk python3-venv xvfb
+      - name: Stand-in PhotoCraft
+        run: |
+          mkdir -p ~/.local/bin && printf '#!/bin/sh\n' > ~/.local/bin/photocraft && chmod +x ~/.local/bin/photocraft
+      - name: setup-linux.sh
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: ./setup-linux.sh
+      - name: Install checks
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          Xvfb :99 -screen 0 1280x800x24 & sleep 2
+          DISPLAY=:99 .venv/bin/python tests/ci_install_smoke.py --expect-shortcut
+      - name: Tests
+        if: ${{ !cancelled() }}
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: .venv/bin/python tests/run_all.py -j 4
+
+  distro:
+    name: ${{ matrix.image }} (container)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: debian:12
+            hint: sudo apt install python3 python3-tk python3-venv
+            install: apt-get update && apt-get install -y python3 python3-tk python3-venv xvfb
+          - image: fedora:latest
+            hint: sudo dnf install python3 python3-tkinter
+            install: dnf install -y python3 python3-tkinter xorg-x11-server-Xvfb fontconfig
+          - image: archlinux:latest
+            hint: sudo pacman -S python tk
+            install: pacman -Syu --noconfirm python tk xorg-server-xvfb fontconfig
+    env:
+      PCCOMFY_NO_TIPS: "1"
+    steps:
+      - name: Tools for the checkout
+        run: |
+          if command -v apt-get >/dev/null; then apt-get update && apt-get install -y git ca-certificates
+          elif command -v dnf >/dev/null; then dnf install -y git which
+          else pacman -Sy --noconfirm git which; fi
+      - uses: actions/checkout@v4
+        with:
+          path: Plugin Ordner Jörg Ä
+      - name: Without Python the setup stops with the right hint
+        working-directory: Plugin Ordner Jörg Ä
+        shell: bash
+        run: |
+          set +e; out="$(./setup-linux.sh 2>&1)"; code=$?; set -e
+          echo "$out"
+          [ "$code" -ne 0 ] && echo "$out" | grep -qF "${{ matrix.hint }}"
+      - name: System packages (what README tells the user)
+        run: ${{ matrix.install }}
+      - name: Stand-in PhotoCraft
+        shell: bash
+        run: mkdir -p ~/.local/bin && printf '#!/bin/sh\n' > ~/.local/bin/photocraft && chmod +x ~/.local/bin/photocraft
+      - name: setup-linux.sh
+        working-directory: Plugin Ordner Jörg Ä
+        shell: bash
+        run: ./setup-linux.sh
+      - name: Install checks
+        working-directory: Plugin Ordner Jörg Ä
+        shell: bash
+        run: |
+          Xvfb :99 -screen 0 1280x800x24 & sleep 2
+          DISPLAY=:99 .venv/bin/python tests/ci_install_smoke.py --expect-shortcut

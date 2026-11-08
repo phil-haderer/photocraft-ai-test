@@ -54,10 +54,15 @@ def pythonw() -> str:
 
 
 def _python_txt() -> str:
+    """UTF-8 since 8.11.; an older setup-windows.bat wrote it in the console code page (oem), read that too."""
     try:
-        return (cfgmod.CONFIG_DIR / "python.txt").read_text(encoding="utf-8").strip()
+        raw = (cfgmod.CONFIG_DIR / "python.txt").read_bytes()
     except OSError:
         return ""
+    try:
+        return raw.decode("utf-8-sig").strip()
+    except UnicodeDecodeError:
+        return raw.decode("oem" if sys.platform == "win32" else "latin-1", errors="replace").strip()
 
 
 def run_command() -> str:
