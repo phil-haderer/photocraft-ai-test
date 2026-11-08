@@ -92,7 +92,8 @@ jobs:
           set "PYTHON="
           set "PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;%LOCALAPPDATA%\Microsoft\WindowsApps"
           for /f "delims=" %%W in ('where winget 2^>nul') do set "PATH=%PATH%;%%~dpW"
-          where python 2>nul && (echo a Python is still on PATH & exit /b 1)
+          rem WindowsApps\python.exe is Windows' Store stub (every new user has it): it is no Python, so only a working one counts
+          python -c "import sys" >nul 2>&1 && (echo a working Python is still on PATH & exit /b 1)
           echo Y| call setup-windows.bat
       - name: The Python the setup installed is used
         shell: cmd
