@@ -31,7 +31,17 @@ def shown(w) -> bool:
     return bool(w.winfo_manager())
 
 
+def no_licence_notes():
+    """No stage tooltip of a workflow warns about a licence any more (user 7.11.: licence warnings removed; 8.11.: the
+    UltraSharp tips of Flux 3 and Fibo Upscale still said "non-commercial")."""
+    from pccomfy import workflows
+    for wf in sorted((ROOT / "workflows").glob("*.json")):
+        for st in workflows.stage_info(workflows.load_template(wf)):
+            assert "commercial" not in st["tip"].lower() and "licen" not in st["tip"].lower(), (wf.name, st["tip"])
+
+
 def main():
+    no_licence_notes()
     gui.winlink.available = lambda: False
     cfg = cfgmod.load()
     cfg["comfyui"]["url"] = "http://127.0.0.1:1"
@@ -92,6 +102,12 @@ def main():
     app._on_model()
     assert app.v_mode.get() == "upscale" and app._scale() == 1.5, (app.v_mode.get(), app._scale())
     assert [str(app.rb_scale[k]["state"]) for k in ("x 1.5", "x 2", "x 3", "x 4")] == ["normal", "normal", "disabled", "disabled"]
+    # ... and they look greyed out like a greyed-out model chip (8.11.): grey text, no fill, a dark outline
+    st = gui.ttk.Style(app.root)
+    assert st.lookup("Small.Toolbutton", "foreground", ["disabled"]) == gui.DISABLED
+    assert st.lookup("Small.Toolbutton", "background", ["disabled"]) == gui.BG
+    assert st.lookup("Small.Toolbutton", "bordercolor", ["disabled"]) == st.lookup("Chip.Toolbutton", "bordercolor", ["disabled"])
+    assert st.lookup("Small.Toolbutton", "foreground", ["disabled"]) == st.lookup("Chip.Toolbutton", "foreground", ["disabled"])
     assert str(app.rb_refine["Default"]["state"]) == "normal" and list(app.rb_refine) == ["Default"]
     assert app.t_prompt.get("1.0", "end").strip() == models.QWEN_UPSCALE_DEFAULT and app._request().mode == "upscale"
     assert app.v_workflow.get() == "fibo2-upscale.json"
@@ -105,12 +121,38 @@ def main():
     app.stage_vars[0].set(True)
     app._on_stage(0)
     assert [v.get() for v in app.stage_vars[:2]] == [True, False]
+    # the stages in ONE row between "Upscale factor" and "Refine" with a line under it (8.11.), not in the box under the prompt
+    app.root.update()
+    assert shown(app.f_stage_row) and shown(app.sep_stage_row)
+    assert app.f_stage_row.grid_info()["row"] == 1 and app.sep_stage_row.grid_info()["row"] == 2
+    assert [cb["text"] for cb in app.stage_row_cbs if shown(cb)] == ["4x UltraSharp first", "Tiles"]
+    assert all(str(cb["state"]) == "normal" for cb in app.stage_row_cbs[:2])
+    assert not any(shown(cb) for cb in app.stage_cbs) and not shown(app.f_opts)
+    assert app.stage_row_cbs[0]["variable"] == app.stage_cbs[0]["variable"]      # the same switch: the request follows the row
+    app.stage_row_cbs[1].invoke()           # a click on "Tiles" in the row switches "4x UltraSharp first" off
+    assert [v.get() for v in app.stage_vars[:2]] == [False, True] and app._request().stages_off == []
+    app.stage_row_cbs[0].invoke()
+    assert [v.get() for v in app.stage_vars[:2]] == [True, False]
+    # Refine (the edit workflow, no stages): the row stays where it is, greyed out
+    app.v_fac.set("r:Default")
+    app._on_factor()
+    app.root.update()
+    assert app.v_mode.get() == "refine" and app.v_workflow.get() == "fibo2-edit.json"
+    assert shown(app.f_stage_row) and shown(app.sep_stage_row)
+    assert [cb["text"] for cb in app.stage_row_cbs if shown(cb)] == ["4x UltraSharp first", "Tiles"]
+    assert all(str(cb["state"]) == "disabled" for cb in app.stage_row_cbs if shown(cb))
+    app.v_fac.set("x 1.5")
+    app._on_factor()
+    app.root.update()
+    assert app.v_mode.get() == "upscale" and all(str(cb["state"]) == "normal" for cb in app.stage_row_cbs if shown(cb))
     app.v_model.set("qwen")
     app._on_model()
     assert all(str(rb["state"]) == "normal" for rb in app.rb_scale.values())
     app.v_mode.set("upscale")
     app._on_mode()
-    assert str(app.rb_tabs["fibo"]["state"]) == "normal"                     # the chip stays clickable (falls back to None)
+    app.root.update()
+    assert not shown(app.f_stage_row) and not shown(app.sep_stage_row)       # the stage row is Fibo's only, until test round 2.3/1
+    assert str(app.rb_tabs["fibo"]["state"]) == "normal"                  # the chip stays clickable (falls back to None)
 
     # the request through the new buttons is the request of the old way (function Upscale / Refine, then the factor) - PLAN.md 5.3
     import dataclasses

@@ -74,12 +74,12 @@ def main():
 
     # the menu: favourite for the chosen function (ticked when it is the favourite), hide
     app._chip_menu("fibo", Ev())
-    assert [(kind, it.get("label")) for kind, it in app.m_chip.items] == [        # Fibo is not the chosen model: no "Set as my settings" (user 1.11.)
+    assert [(kind, it.get("label")) for kind, it in app.m_chip.items] == [        # Fibo is not the chosen model: no "Set current settings as my standard settings" (user 1.11.)
         ("check", "Favourite for Fill Selection"), ("command", "Hide this model")]
     fav = app.m_chip.items[0][1]
     assert fav["state"] == "normal"
     app._chip_menu(app.v_model.get(), Ev())                # the chosen model offers it
-    assert app.m_chip.items[0] == ("command", app.m_chip.items[0][1]) and "Set as my settings" in app.m_chip.items[0][1]["label"]
+    assert app.m_chip.items[0] == ("command", app.m_chip.items[0][1]) and app.m_chip.items[0][1]["label"] == "Set current settings as my standard settings (for this mode and model)"   # renamed 8.11.
     app._chip_menu("fibo", Ev())
     assert app.v_chip_fav.get() is False
     app.v_chip_fav.set(True)

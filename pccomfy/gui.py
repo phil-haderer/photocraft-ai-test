@@ -511,12 +511,24 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
             self.rb_scale[scale_text(f)] = rb
         # the Refine row under it (user 6.11.): the ready-made prompts of the model (Default, Neutral ...) are the Refine modes; one
         # choice over both rows (v_fac): a factor runs Upscale, a Refine button runs Refine (same size, new layer)
+        # the stages of the Upscale workflow in one row under the factors (Fibo, 8.11.): twins of the stage checkboxes (same variables),
+        # grey but in place while Refine is on, so nothing moves; a line under them like the one above "Advanced settings"
+        self.f_stage_row = ttk.Frame(self.f_scale)
+        self.f_stage_row.grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        self.stage_row_cbs = [ttk.Checkbutton(self.f_stage_row, text="Stage", variable=var, command=lambda i=i: self._on_stage(i))
+                              for i, var in enumerate(self.stage_vars)]
+        self.stage_row_tips = [Tooltip(cb, STAGE_TIP) for cb in self.stage_row_cbs]
+        self.sep_stage_row = ttk.Frame(self.f_scale, style="Sep.TFrame", height=1)
+        self.sep_stage_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 2))
+        self.f_stage_row.grid_remove()
+        self.sep_stage_row.grid_remove()
+        self._stage_row_live = False    # the row holds the stages of the running workflow (Upscale), not grey copies (Refine)
         refine_tip = "Refine keeps the size and redraws fine detail, as a new layer."
         lb2 = ttk.Label(self.f_scale, text="Refine")
-        lb2.grid(row=1, column=0, sticky="w", pady=(4, 0))
+        lb2.grid(row=3, column=0, sticky="w", pady=(4, 0))
         Tooltip(lb2, refine_tip)
         self.f_refine = ttk.Frame(self.f_scale)
-        self.f_refine.grid(row=1, column=1, sticky="e", pady=(4, 0))
+        self.f_refine.grid(row=3, column=1, sticky="e", pady=(4, 0))
         self.rb_refine = {}             # label -> button, built by _update_prompt_choices for the model
         self._rpick = ""                # the Refine button that was chosen ("" = the first one)
         self.f_scale.columnconfigure(0, weight=1)
@@ -664,6 +676,10 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
         self.lbl_err = ttk.Label(st, text="!", style="Badge.TLabel", width=2, anchor="center")
         self.lbl_status = ttk.Label(st, textvariable=self.v_status, wraplength=self._px(MIN_W - 40), justify="left")
         self.lbl_status.pack(side="left", fill="x", expand=True)
+        # an empty status line takes no room (user 8.11., decision D: b): the frame stays packed as the anchor the preview and the
+        # tabs are placed before, but 1 px high and without its gap; it opens again with the next message (_show_status_line)
+        self.v_status.trace_add("write", lambda *a: self._show_status_line())
+        self._show_status_line()
         foot = self.f_foot = ttk.Frame(self.root)
         foot.pack(fill="x", side="bottom", padx=10, pady=6)
         self.lbl_conn, self.lbl_dot = conn_status(foot, dot_first=True)        # "● ComfyUI": green = connected, red = not (the dot in front, user 6.11.)
@@ -719,6 +735,7 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
         else:
             self.f_foot.pack(fill="x", side="bottom", padx=10, pady=6)
             self.f_status.pack(fill="x", padx=10, pady=(4, 0))
+            self._show_status_line()
             self._apply_start_state()
 
     def copy_canvas(self):

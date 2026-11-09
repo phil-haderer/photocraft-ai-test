@@ -738,7 +738,7 @@ CLIP_DEFAULT = "(workflow default)"
 
 
 
-PAGE_NOT_SAVED = ("mode", "workflow", "clip", "checkpoint", "seed", "prompt", "negative", "variants")   # what "Set as my settings" leaves out: the page itself, the text, the seed and the number of variants
+PAGE_NOT_SAVED = ("mode", "workflow", "clip", "checkpoint", "seed", "prompt", "negative", "variants")   # what "Set current settings as my standard settings" leaves out: the page itself, the text, the seed and the number of variants
 ON_ACCENT = "#ffffff"       # text and icons on the blue fill (chosen function, Generate): white, bold (user 3.11.)
 BG, PANEL, FG, MUTED, ACCENT = "#535353", "#282828", "#eeeeee", "#cfcfcf", "#378ef0"   # PhotoCraft grey and blue (both measured from a screenshot); PANEL = inactive tab, fields, buttons, slots
 SLOT_BG = "#e4edf9"     # the reference-image slots: nearly white with a touch of the accent blue (user 7.11.); keep refslots.thumbnail_png's default in step

@@ -106,7 +106,7 @@ def version_checks():
 
 
 def my_settings_checks():
-    """"Set as my settings" lives in settings.json (key saved_pages) in data/ (Windows) or ~/.config/pccomfy (Linux): never in git."""
+    """"Set current settings as my standard settings" lives in settings.json (key saved_pages) in data/ (Windows) or ~/.config/pccomfy (Linux): never in git."""
     ignore = [l.strip() for l in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()]
     assert "data/" in ignore
     if (ROOT / "tools" / "export_release.py").exists():                # private repo only (the release leaves it out)

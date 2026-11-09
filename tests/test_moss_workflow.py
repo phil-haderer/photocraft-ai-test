@@ -80,6 +80,10 @@ def main():
     assert tg["11"]["inputs"]["prompt"] == "a cat"
     plain = workflows.bypass_prompt_writer(t, "a cat")
     assert plain["4"]["inputs"]["text"] == "a cat" and "11" not in plain and links_resolve(plain)
+    # Text to image runs sa_solver / sgm_uniform (user 8.11.; was er_sde / simple); the parked Expand and the Fill graphs keep er_sde
+    sv = workflows.sampler_values(t)
+    assert (sv["sampler"], sv["scheduler"]) == ("sa_solver", "sgm_uniform"), sv
+    assert (workflows.sampler_values(tpl)["sampler"], workflows.sampler_values(tpl)["scheduler"]) == ("er_sde", "simple")
     print("ALL OK (MOSS workflow)")
 
 

@@ -187,7 +187,7 @@
       ]
      }
     },
-    "tip": "A model enlarges the picture first, then Fibo redraws it: sharper detail (best of the tests at 1.5x and 2x). Not together with Tiles. Licence of the model: non-commercial."
+    "tip": "A model enlarges the picture first, then Fibo redraws it: sharper detail (best of the tests at 1.5x and 2x). Not together with Tiles."
    }
   }
  },

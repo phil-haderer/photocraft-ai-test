@@ -23,6 +23,7 @@ class Mode:
     describe: bool = False          # Expand with Krea 2 / MOSS: a prompt is required, the Describe button under the field writes one
     steps_tip: str = ""             # the tooltip of the Steps field in this mode ("" = none)
     max_scale: float = 0.0          # Upscale: the largest factor this model is offered for (0 = all four; the others are greyed out)
+    stage_row: bool = False         # Upscale: its stages sit in one row between "Upscale factor" and "Refine" (grey while Refine is on)
 
 
 @dataclass(frozen=True)
@@ -233,7 +234,8 @@ FIBO = Model(
         # 1.5x to 2x only, so the larger factors are greyed out until a test run says otherwise (docs/tests/fibo-upscale-ergebnis.md)
         # Prompt C (the Qwen upscale text) is the standard since 7.11. (rounds 3 and 4: truest to the original); the stage "4x UltraSharp first"
         # starts on (best at 1.5x and 2x), "Tiles" is a second stage that excludes it; above 3 MP the result is made in tiles by itself (auto_on_above_mp)
-        "upscale": Mode("fibo2-upscale.json", dict(scale=1.5, layer_mask="none", enhance=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=DESCRIBE_TIP, max_scale=2.0),
+        "upscale": Mode("fibo2-upscale.json", dict(scale=1.5, layer_mask="none", enhance=False, context=0.0), QWEN_UPSCALE_DEFAULT, prompt_tip=DESCRIBE_TIP, max_scale=2.0,
+                        stage_row=True),   # the stages in one row of the Upscale / Refine box (8.11.; Fibo first, the others after test round 2.3/1)
         "inpaint": Mode("fibo2-edit.json", dict(base_res=1024, context=0.1, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=FILL_TIP),   # Context 0.1 chosen by the user 1.11. (was 0.4 from the test round 28.10.); Edge feather 10 % stays
         "outpaint": Mode("fibo2-edit.json", dict(base_res=1024, context=1.0, layer_mask="soft", enhance=False)),   # Context 100 %: with 40 % Fibo saw mostly the white margin and drew bars (user 4.11.); soft mask: only the new area is returned
         "remove": Mode("fibo2-edit.json", dict(base_res=1024, layer_mask="soft", feather_pct=10.0, enhance=False), prompt_tip=REMOVE_TIP, remove_text=True),

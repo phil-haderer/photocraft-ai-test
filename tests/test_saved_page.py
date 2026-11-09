@@ -1,4 +1,4 @@
-"""Right-click on a model chip: "Set as my settings for this mode and model" (user 30.10., renamed 31.10.; "Load default settings" was dropped).
+"""Right-click on a model chip: "Set current settings as my standard settings (for this mode and model)" (user 30.10., renamed 31.10. and 8.11.; "Load default settings" was dropped).
 The saved settings (not the prompt, the seed or the page itself) are the starting settings of that model and function:
 they come back when the page opens and with "Reset page". Stubbed Tk.
 

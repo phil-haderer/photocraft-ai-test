@@ -774,7 +774,7 @@ class SettingsMixin(DownloadMixin):
         for text, tip, command in (
                 ("Show all hidden models", "Brings back every model chip that was hidden (right-click menu of a chip or the tick in the model tab).",
                  self._show_hidden_models),
-                ("Reset all modes to default settings", "Forgets every page you saved with “Set as my settings” (right-click on a model chip): "
+                ("Reset all modes to default settings", "Forgets every page you saved with “Set current settings as my standard settings” (right-click on a model chip): "
                  "all models and functions start with their standard settings again. Asks first.", self._reset_all_modes),
                 ("Reset favourite models", "Forgets every favourite you set with the right-click menu of a model chip: "
                  "The functions use the first usable model of their tabs again. Asks first.", self._reset_favourites),

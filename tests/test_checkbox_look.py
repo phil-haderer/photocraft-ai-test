@@ -27,7 +27,9 @@ def hexrgb(h):
 
 
 def main():
-    for px in (gui_theme.CHECK_PX, round(gui_theme.CHECK_PX * 1.5)):
+    # 90 % of PhotoCraft's 16 px (user 8.11.): 14 px at 100 %, 22 px at 150 % (was 24)
+    assert (round(gui_theme.CHECK_PX), round(gui_theme.CHECK_PX * 1.5)) == (14, 22)
+    for px in (round(gui_theme.CHECK_PX), round(gui_theme.CHECK_PX * 1.5)):
         off = icons.checkbox("#454545", "#a0a0a0", None, px)
         assert off.size == (px, px)
         assert off.getpixel((0, 0))[3] < 255, "rounded corner"

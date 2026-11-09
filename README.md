@@ -9,7 +9,7 @@ Pick a function, type a prompt, press Generate: the result arrives as a new laye
 
 <img src="readme-images/plugin-window.png" alt="The plugin window: six functions, six models, prompt box and Generate button" width="330">
 
-Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.21.0 · ComfyUI version: 0.42.0 
+Tested: Windows 11 · 16 GB VRAM · PhotoCraft 0.22.0 · ComfyUI version: 0.42.0 
 
 [Quick start](#quick-start) · [Install on Windows](#install-on-windows) · [Install on Linux](#install-on-linux) · [First start](#first-start) · [Model downloads](#model-downloads) · [Functions](#functions) · [Help](#help) · [Technical details](#technical-details) · [Licences](#licences-of-the-models)
 
@@ -63,7 +63,7 @@ PhotoCraft  <-->  this plugin (a small window)  <-->  ComfyUI (your graphics car
 - **ComfyUI** runs the AI models on your graphics card.
 - **This plugin** sits between them: it sends your picture or selection to ComfyUI and puts the result back as a layer.
 
-You need Windows 10/11 or Linux, an NVIDIA card with 16 GB VRAM, Python 3.11+ (Linux: 3.10+), PhotoCraft 0.21.0, and ComfyUI 0.42 or newer.
+You need Windows 10/11 or Linux, an NVIDIA card with 16 GB VRAM, Python 3.11+ (Linux: 3.10+), PhotoCraft 0.22.0, and ComfyUI 0.42 or newer.
 
 ## Install on Windows
 
@@ -299,7 +299,7 @@ More in the window: **variants** (several results as layers in one group), promp
 | A Flux 3 download is refused | Log in to Hugging Face and accept the licence on the model page first. |
 | On Linux nothing appears | Run `./photocraft-ai.sh` in a terminal; the message tells you what is missing. |
 
-**Update.** Download the new ZIP and unpack it over the old folder, or run `git pull` in the plugin folder if you used `git clone`; then run the setup script again and restart the plugin. Your settings, including "Set as my settings", stay in `data\` (Linux: `~/.config/pccomfy/`) and are not touched.
+**Update.** Download the new ZIP and unpack it over the old folder, or run `git pull` in the plugin folder if you used `git clone`; then run the setup script again and restart the plugin. Your settings, including "Set current settings as my standard settings", stay in `data\` (Linux: `~/.config/pccomfy/`) and are not touched.
 
 **Report a problem.** Open an issue on this repository's **Issues** page and tell us:
 - what you did, what you expected and what happened (the status line at the bottom of the window is useful);

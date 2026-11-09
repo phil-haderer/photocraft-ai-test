@@ -244,7 +244,7 @@ class ModeMixin:
         self.v_chip_fav.set(cfgmod.favorites().get(mode) == key)
         here = self.v_model.get() == key and mode in m.modes          # saving takes the window as it is: only for the chosen model
         if here:                      # not offered on any other chip (user 1.11.)
-            menu.add_command(label="Set as my settings for this mode and model", command=lambda: self._save_page(key))
+            menu.add_command(label="Set current settings as my standard settings (for this mode and model)", command=lambda: self._save_page(key))
             menu.add_separator()
         menu.add_checkbutton(label=f"Favourite for {dict(MODE_LABELS).get(mode, mode)}", variable=self.v_chip_fav,
                              state="normal" if mode in m.modes else "disabled",
@@ -470,7 +470,7 @@ class ModeMixin:
 
     def _reset_click(self, event=None):
         """The footer button: a click resets to the saved settings of the page (else the standard ones); Shift + click always
-        to the standard ones (the way back after "Set as my settings"; PLAN.md, user 31.10. option B)."""
+        to the standard ones (the way back after "Set current settings as my standard settings"; PLAN.md, user 31.10. option B)."""
         self.reset_settings(factory=bool(getattr(self, "_shift_down", False)))
 
     def reset_settings(self, factory: bool = False):
@@ -487,7 +487,7 @@ class ModeMixin:
 
     def _start_fresh(self):
         """At every start the sliders, sampler, steps, LoRAs and the other starting settings are the standard ones of the
-        function and model, not what the last run left; "Set as my settings" is loaded, as before (user 4.11., evening: the factory
+        function and model, not what the last run left; "Set current settings as my standard settings" is loaded, as before (user 4.11., evening: the factory
         start had ignored it). Model, function, prompt, the number of variants and the chosen workflow stay as they were. The
         settings window is not touched."""
         t = self.t_prompt
@@ -684,6 +684,9 @@ class ModeMixin:
         for i, cb in enumerate(self.stage_cbs):     # the twin in the Advanced settings looks the same (state and tip)
             self.stage_adv_cbs[i].configure(state=str(cb.cget("state")))
             self.stage_adv_tips[i].text = self.stage_tips[i].text
+            if getattr(self, "_stage_row_live", False):     # so does the one in the stage row of Upscale (Fibo)
+                self.stage_row_cbs[i].configure(state=str(cb.cget("state")))
+                self.stage_row_tips[i].text = self.stage_tips[i].text
         if notes:
             self._on_turbo()
             self._update_stage_scales()
@@ -697,6 +700,46 @@ class ModeMixin:
                 return info[:3]
         return []
 
+    def _stage_row(self) -> tuple[list[dict], bool]:
+        """The stages shown in one row of the Upscale / Refine box (a model whose Upscale mode says `stage_row`, Fibo 8.11.) and whether
+        they are live: Upscale runs them (the row works), Refine runs another workflow (the same row, greyed out, so nothing moves).
+        ([], False) everywhere else."""
+        mm = self._model()
+        spec = mm.modes.get("upscale") if mm else None
+        mode = self.v_mode.get()
+        if spec is None or not spec.stage_row or mode not in SCALE_MODES or self._custom_workflow():
+            return [], False
+        if mode == "upscale":
+            return self._stages(), True
+        try:
+            for t in (load_template(w) for w in resolve(self.workflows_dir / spec.workflow)):
+                info = stage_info(t)
+                if info:
+                    return info[:3], False
+        except (OSError, ValueError, KeyError):
+            pass
+        return [], False
+
+    def _show_stage_row(self):
+        """Fills the stage row of the Upscale / Refine box (see _stage_row) or hides it with its line."""
+        row, live = self._stage_row()
+        self._stage_row_live = live and bool(row)
+        was = bool(self.f_stage_row.winfo_manager())
+        for i, cb in enumerate(self.stage_row_cbs):
+            if i < len(row):
+                cb.configure(text=row[i]["label"], state="normal" if live else "disabled")
+                self.stage_row_tips[i].text = row[i]["tip"] or STAGE_TIP
+                cb.pack(side="left", padx=(0, 12))
+            else:
+                cb.pack_forget()
+        for w in (self.f_stage_row, self.sep_stage_row):
+            if row:
+                w.grid()
+            else:
+                w.grid_remove()
+        if was != bool(row) and getattr(self, "_sized", False):
+            self._fit_height()
+
     def _update_stage_scales(self, reset: bool = False):
         """The strength slider of a stage that is a LoRA: shown beside its checkbox, usable while the stage is on.
         `reset`: another workflow, the slider starts at the strength the workflow ships with."""
@@ -705,10 +748,10 @@ class ModeMixin:
             st = stages[i] if i < len(stages) else None
             if st is None or st.get("strength") is None:
                 sf.grid_remove()
-                if st is not None and not st.get("advanced"):      # (a stage in the Advanced settings has no place in this box: grid_configure would show it again)
+                if st is not None and not st.get("advanced") and not self._stage_row_live:      # (a stage in the Advanced settings or in the stage row has no place in this box: grid_configure would show it again)
                     self.stage_cbs[i].grid_configure(columnspan=2)     # no slider: its text may use the slider's room
                 continue
-            if not st.get("advanced"):
+            if not st.get("advanced") and not self._stage_row_live:
                 self.stage_cbs[i].grid_configure(columnspan=1)
             if reset:
                 self.v_sstr[i].set(min(1.0, st["strength"]))
@@ -896,6 +939,7 @@ class ModeMixin:
             reset_str = True
             for var, st in zip(self.stage_vars, stages):
                 var.set(st["default_on"])
+        self._show_stage_row()
         moved = False
         for i, cb in enumerate(self.stage_cbs):
             twin = self.stage_adv_cbs[i]
@@ -908,6 +952,9 @@ class ModeMixin:
                     twin.configure(state="normal", text=stages[i]["label"])
                     self.stage_adv_tips[i].text = self.stage_tips[i].text
                     twin.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+                elif self._stage_row_live:      # the checkbox sits in the row of the Upscale / Refine box (Fibo, 8.11.)
+                    cb.grid_remove()
+                    twin.grid_remove()
                 else:
                     twin.grid_remove()
                     cb.grid()
@@ -920,7 +967,7 @@ class ModeMixin:
             self._fit_height()
         self._update_stage_scales(reset=reset_str)
         self._enforce_switch_files()
-        self._update_options_box(has_lora, stages)
+        self._update_options_box(has_lora, [] if self._stage_row_live else stages)
         self.w_detail.configure(state="normal" if self._run_mode() in SCALE_MODES else "disabled")
         enhancing = has_writer and bool(self.v_enhance.get())
         self.cb_clip.configure(state="readonly" if (state == "disabled" and enhancing) else "disabled")

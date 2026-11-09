@@ -12,12 +12,31 @@ from .listpopup import ListPopup
 class RunMixin:
     def _status(self, msg: str, error: bool = False):
         """The status line. An error gets a red "!" badge and red text, it never opens a dialog."""
-        self.v_status.set(msg)
+        self._status_error = bool(error and msg)
         self.lbl_status.configure(style="Error.TLabel" if error else "TLabel")
-        if error:
-            self.lbl_err.pack(side="left", anchor="n", padx=(0, 8), before=self.lbl_status)
+        self.v_status.set(msg)          # shows or hides the line (_show_status_line, a trace on v_status)
+
+    def _show_status_line(self):
+        """The status line between the progress bar and the footer is shown only while it has text (user 8.11.): empty, it
+        shrinks to 1 px without its gap, so the footer sits right under the bar; the window is one line higher during a message."""
+        if not hasattr(self, "f_status"):
+            return
+        text = bool(str(self.v_status.get()).strip())
+        packed = bool(self.lbl_status.winfo_manager())
+        if text:
+            if getattr(self, "_status_error", False):
+                self.lbl_err.pack(side="left", anchor="n", padx=(0, 8), before=self.lbl_status if packed else None)
+            else:
+                self.lbl_err.pack_forget()
+            if not packed:
+                self.lbl_status.pack(side="left", fill="x", expand=True)
         else:
+            self._status_error = False          # the error is over: a later plain text (a direct set) gets no red "!"
             self.lbl_err.pack_forget()
+            self.lbl_status.pack_forget()
+            self.f_status.configure(height=1)       # a frame keeps its last size when its last child goes (Tk)
+        if self.f_status.winfo_manager():       # (the window follows by itself: <Configure> -> _on_content_size)
+            self.f_status.pack_configure(pady=(4, 0) if text else 0)
 
     # ---------- generation ----------
 

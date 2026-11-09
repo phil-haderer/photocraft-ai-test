@@ -17,7 +17,7 @@ HINT_ICON_PX = 14  # the info icon in front of the tip under the prompt: about o
 FN_GAP = 8         # room between a function symbol and its text (ttk has no gap option: the symbol gets it on its right)
 SPIN_PX = 19       # the chevrons of the spin boxes (90 % of the former 21, user 30.10.): cut flat, so the field keeps its height
 SPIN_GAP = 3       # px between the up and the down chevron (user 30.10.: 2 to 3)
-CHECK_PX = 16      # the checkbox square (PhotoCraft's, measured from docs/design/photocraft-checkbox.png at 150 %)
+CHECK_PX = 14.4    # the checkbox square: 90 % of PhotoCraft's 16 (measured from docs/design/photocraft-checkbox.png at 150 %; user 8.11.): 14 px at 100 %, 22 at 150 %
 CHECK_GAP = 6      # room between the checkbox and its text
 
 
@@ -117,10 +117,15 @@ class ThemeMixin:
         s.configure("Narrow.TButton", padding=(3, 2), width=0, font=font(9))     # "Reset page": as narrow as its text (user 6.11.), the footer is tight
         s.configure("Small.TButton", padding=(8, 2), font=font(9))   # "Show feather" beside the layer mask menu: a button in the size of the slider texts
         # small switches in the look of "Show feather", the chosen one filled orange like the functions (Upscale factor)
-        s.configure("Small.Toolbutton", background=PANEL, foreground=FG, padding=(8, 2), font=font(9), anchor="center",
-                    relief="flat", borderwidth=0)
-        s.map("Small.Toolbutton", background=[("selected", ACCENT), ("active", "#5f5f5f")],
-              foreground=[("selected", ON_ACCENT)], font=[("selected", font(9, bold=True))])
+        # greyed out (Fibo's 3x and 4x, 8.11.) it looks like a greyed-out model chip: grey text, no fill, a dark outline. The 1 px
+        # border is always there (in the fill colour otherwise); clam's solid border takes 2 px a side, so the padding is 2 px
+        # smaller and the size stays the same (measured: 38 x 21 both ways)
+        s.configure("Small.Toolbutton", background=PANEL, foreground=FG, padding=(6, 0), font=font(9), anchor="center",
+                    relief="solid", borderwidth=1, bordercolor=PANEL, lightcolor=PANEL, darkcolor=PANEL)
+        fill = [("disabled", BG), ("selected", ACCENT), ("active", "#5f5f5f")]
+        s.map("Small.Toolbutton", background=fill, lightcolor=fill, darkcolor=fill,
+              bordercolor=[("disabled", "#4a4a4a"), ("selected", ACCENT), ("active", "#5f5f5f")],
+              foreground=[("disabled", DISABLED), ("selected", ON_ACCENT)], font=[("selected", font(9, bold=True))])
         # the model chips under the functions: outlined, no fill; chosen = filled blue with white text (user 3.11.; Tab.Toolbutton is the
         # look of the functions above them)
         s.configure("Chip.Toolbutton", background=BG, foreground=FG, padding=(2, 3), anchor="center", relief="solid",

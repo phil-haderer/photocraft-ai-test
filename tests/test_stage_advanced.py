@@ -55,9 +55,10 @@ def main():
     app.stage_adv_cbs[1].invoke()
     assert not app.v_stage2.get()
 
-    pick(app, "fibo", "upscale")        # two stages in the box, none in the Advanced settings; they exclude each other
-    assert shown(app.stage_cbs[0]) and shown(app.stage_cbs[1]) and not shown(app.stage_adv_cbs[0]) and not shown(app.stage_adv_cbs[1])
-    assert [c["text"] for c in app.stage_cbs[:2]] == ["4x UltraSharp first", "Tiles"]
+    pick(app, "fibo", "upscale")        # two stages in the row of the Upscale / Refine box (8.11.), none in the box or the Advanced settings
+    assert shown(app.stage_row_cbs[0]) and shown(app.stage_row_cbs[1]) and not shown(app.stage_cbs[0]) and not shown(app.stage_cbs[1])
+    assert not shown(app.stage_adv_cbs[0]) and not shown(app.stage_adv_cbs[1])
+    assert [c["text"] for c in app.stage_row_cbs[:2]] == ["4x UltraSharp first", "Tiles"]
 
     pick(app, "flux2", "multi_edit")
     app._refs_update()

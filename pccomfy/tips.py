@@ -13,7 +13,7 @@ TIPS = (
     "Edge feather softens the seam, in % of the selection's shorter side. It shows up with the soft layer mask (Fill, Remove); 0 = hard edge.",
     "\"Show feather\" paints the blend area red in PhotoCraft (Quick Mask). Click it again, or Generate, to get your selection back.",
     "Qwen Image 2.1 fills small selections badly. Use a larger selection, or try Fibo 2.0 Edit Turbo.",
-    "Right-click the chosen model chip and pick \"Set as my settings…\": the current sliders, sampler, steps and LoRAs become your start for this function and model, and \"Reset page\" returns to them. Shift-click \"Reset page\" for the standard settings.",
+    "Right-click the chosen model chip and pick \"Set current settings as my standard settings…\": the current sliders, sampler, steps and LoRAs become your start for this function and model, and \"Reset page\" returns to them. Shift-click \"Reset page\" for the standard settings.",
     "Right-click a model chip and tick \"Favourite for ...\": that function then opens with this model. \"Reset favourite models\" (gear window, Other settings) forgets all favourites.",
     "MOSS does text to image only; Krea 2 is the fast text to image model.",
     "The gear window lists the files each model needs. The chain icon links a file ComfyUI already has under another name.",

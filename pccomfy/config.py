@@ -214,7 +214,7 @@ def set_favorite(mode: str, tab: str | None) -> None:
     set_setting("favorites", f or None)
 
 
-# Saved page settings: the right-click menu on a model chip ("Set as my settings for this mode and model").
+# Saved page settings: the right-click menu on a model chip ("Set current settings as my standard settings (for this mode and model)", renamed 8.11.).
 
 def saved_page(model: str, mode: str) -> dict:
     """The settings the user saved for this model and function ({} = none); they replace the starting settings."""

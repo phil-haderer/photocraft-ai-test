@@ -60,7 +60,7 @@ def main():
         assert app.v_status.get() == "Ready"
     finally:
         app.root.destroy()
-    # "Set as my settings" is loaded at the start (user 4.11., evening); a value not saved stays at the standard
+    # "Set current settings as my standard settings" is loaded at the start (user 4.11., evening); a value not saved stays at the standard
     cfgmod.set_saved_page("qwen", "inpaint", {"sharpen": 0.4, "context": 0.65})
     app = start(left_over)
     try:
