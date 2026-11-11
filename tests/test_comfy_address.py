@@ -126,6 +126,13 @@ def window_tests(u_comfy, u_other):
     app._comfy_address_check()
     pump()
     assert app.lbl_comfy_mark["text"] == "✓" and "ComfyUI found" in app.lbl_comfy_msg["text"]
+    # Refresh and Reset to default side by side and equally high, the result in its own line under them (window test F, 11.11.)
+    rf, rs = app.b_comfy_refresh, app.b_comfy_reset         # (the tab is not shown here: the packing is checked, not pixels)
+    assert rf.master is rs.master and rf.master.pack_slaves() == [rf, rs]
+    assert all(w.pack_info()["fill"] == "y" for w in (rf, rs, rf.master))      # equally high: both fill the row
+    row, found = rf.master.master, app.lbl_comfy_mark.master
+    box = row.master
+    assert found.master is box and box.pack_slaves().index(found) == box.pack_slaves().index(row) + 1
     assert app.comfy.url == u_comfy and cfgmod.get_setting("comfyui_url") == u_comfy and app.bridge.comfy is app.comfy
     assert comfyaddr.is_local(app.comfy.url) and app.lbl_comfy_note["text"] == ""
     # the address that answered is kept in a history (newest first, no doubles) and is the drop-down list of the field (user 6.11.)
@@ -159,8 +166,41 @@ def window_tests(u_comfy, u_other):
     app.root.destroy()
 
 
+def switch_while_waiting_tests():
+    """Window test E (11.11.): switching from a network address back to the local one froze the window for about a minute.
+    A thread still waiting for the old server held the lock that set_url needed. Now set_url returns at once, the new address
+    is read without waiting for the old request, and the old answer is not kept for the new server."""
+    import socket
+    silent = socket.socket()
+    silent.bind(("127.0.0.1", 0))
+    silent.listen(5)                       # accepts and never answers: an old server that hangs
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), type("H", (Handler,), {"kind": "comfy"}))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        c = ComfyUI(f"http://127.0.0.1:{silent.getsockname()[1]}", timeout=4.0)
+        threading.Thread(target=lambda: _swallow(c.system_stats), daemon=True).start()
+        time.sleep(0.3)                    # the reader is inside the request now
+        t0 = time.monotonic()
+        c.set_url(f"http://127.0.0.1:{srv.server_address[1]}")
+        assert time.monotonic() - t0 < 0.5, "set_url waited for a request to the old server"
+        t0 = time.monotonic()
+        stats = c.system_stats()
+        assert time.monotonic() - t0 < 2.0 and stats["system"]["comfyui_version"] == "0.42.0", stats
+    finally:
+        srv.shutdown()
+        silent.close()
+
+
+def _swallow(fn):
+    try:
+        fn()
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     format_tests()
+    switch_while_waiting_tests()
     u1, u2 = probe_tests()
     window_tests(u1, u2)
     print("ALL OK (comfy address)")

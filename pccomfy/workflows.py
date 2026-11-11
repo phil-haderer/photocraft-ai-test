@@ -171,7 +171,8 @@ def apply_template(graph: dict, p: GenParams, image_name: str | None, mask_name:
     """Fill parameters into `pc:*` nodes. Returns (graph, output node id or None).
 
     A title may carry several tags (e.g. "pc:prompt pc:size" for one node that takes the prompt and the size).
-    `pc:prompt` fills the node's `text` field, else its `prompt` field
+    `pc:prompt` fills the field `pc_prompt_key` of its _meta names (MiniMax: "replace" of the StringReplace that puts the
+    typed text into the writer's task prompt), else the node's `text` field, else its `prompt` field
     (TextGenerate, TextEncodeFibo2, ...).
     `pc:ref` is the slot for a reference image (a LoadImage feeding TextEncodeFibo2's `images.image_2`). The slot is
     always in the workflow; with no reference (`ref_name` None) the node and the links to it are dropped, so the run
@@ -201,7 +202,7 @@ def apply_template(graph: dict, p: GenParams, image_name: str | None, mask_name:
                 if mask_name is not None:
                     inp["image"] = mask_name
             elif tag == "prompt":
-                key = next((k for k in ("text", "prompt") if k in inp), "prompt")
+                key = str(node.get("_meta", {}).get("pc_prompt_key", "")) or next((k for k in ("text", "prompt") if k in inp), "prompt")
                 inp[key] = with_image_tag(p.prompt.strip() and p.prompt or default_prompt(node) or p.prompt, node)
             elif tag == "negative":
                 key = "text" if "text" in inp else "negative_prompt"
@@ -264,12 +265,6 @@ def add_layout(graph: dict, box: tuple[int, int, int, int], canvas: tuple[int, i
     return graph
 
 
-def full_canvas(graph: dict) -> bool:
-    """True when the workflow cuts out the part to redraw itself (`pc_full_canvas` in the _meta of a node: MOSS Inpainting v10):
-    it gets the whole picture and the selection as they are, at their own size, and no mask softening from the window."""
-    return any(isinstance(n, dict) and n.get("_meta", {}).get("pc_full_canvas") for n in graph.values())
-
-
 def has_upscale_slot(graph: dict) -> bool:
     """True when the workflow can enlarge or refine a picture (a node titled pc:upscale sets the result's size)."""
     return any("upscale" in _tags(n) for n in graph.values() if isinstance(n, dict))
@@ -301,6 +296,16 @@ def with_image_tag(prompt: str, node: dict) -> str:
     if not tag or not text or tag.lower() in text.lower():
         return prompt
     return f"{tag} {text}"
+
+
+def tagged_for_writer_off(graph: dict, prompt: str) -> str:
+    """Prompt writer off: the typed text goes straight into the model's conditioning node, which has no pc_image_tag of its
+    own. A prompt writer node (the pc:prompt text model, e.g. MiniMax' StringReplace) may carry `pc_image_tag`; the text gets
+    that tag in front here, as with_image_tag does for a plain text encoder."""
+    for nid in prompt_writers(graph):
+        if image_tag(graph[nid]):
+            return with_image_tag(prompt, graph[nid])
+    return prompt
 
 
 def has_ref_slot(graph: dict) -> bool:
@@ -391,28 +396,63 @@ def prompt_writers(graph: dict) -> list[str]:
             if "prompt" in _tags(n) and not n.get("class_type", "").startswith(TEXT_ENCODERS)]
 
 
+def _upstream(graph: dict, nid: str) -> set[str]:
+    """The node and every node it reads from, directly or further up."""
+    seen: set[str] = set()
+    todo = [str(nid)]
+    while todo:
+        cur = todo.pop()
+        if cur in seen or cur not in graph:
+            continue
+        seen.add(cur)
+        for v in graph[cur].get("inputs", {}).values():
+            if isinstance(v, list) and v and isinstance(v[0], (str, int)):
+                todo.append(str(v[0]))
+    return seen
+
+
+def writer_end(graph: dict, nid: str) -> str:
+    """The node whose output is the written prompt: `pc_prompt_out` in the writer's _meta, else the writer itself.
+    MiniMax H3 Image writes in three nodes: the pc:prompt node is a StringReplace that puts the typed text into the
+    official task prompt, a TextGenerateV2 writes JSON, and a JsonExtractString (the end) takes "expanded_caption" out."""
+    end = str(graph.get(str(nid), {}).get("_meta", {}).get("pc_prompt_out", "") or nid)
+    return end if end in graph else str(nid)
+
+
+def writer_chain(graph: dict) -> set[str]:
+    """Every node between a prompt writer and its end (both included): the nodes that drop out when the writer is off."""
+    out: set[str] = set()
+    for w in (str(x) for x in prompt_writers(graph)):
+        end = writer_end(graph, w)
+        out |= {n for n in _upstream(graph, end) if w in _upstream(graph, n)}
+    return out
+
+
 def bypass_prompt_writer(graph: dict, prompt: str) -> dict:
     """Prompt enhancement off: whatever consumed the text model's output gets the typed prompt itself.
 
-    The text model, the pc:vgl preview and (because ComfyUI only runs what an output needs) everything that only fed
-    the text model drop out of the run. Graphs without a text model are returned unchanged.
+    The text model (with the nodes up to its end, `writer_end`), the pc:vgl preview and (because ComfyUI only runs what
+    an output needs) everything that only fed the text model drop out of the run. Graphs without a text model are
+    returned unchanged.
     """
     g = json.loads(json.dumps(graph))
-    writers = {str(w) for w in prompt_writers(g)}
-    if not writers:
+    chain = writer_chain(g)
+    if not chain:
         return g
 
     def uses_writer(node):
-        return any(isinstance(v, list) and v and str(v[0]) in writers for v in node.get("inputs", {}).values())
+        return any(isinstance(v, list) and v and str(v[0]) in chain for v in node.get("inputs", {}).values())
 
-    for nid in [nid for nid, n in g.items() if "vgl" in _tags(n) and uses_writer(n)]:
+    for nid in [nid for nid, n in g.items() if nid not in chain and "vgl" in _tags(n) and uses_writer(n)]:
         del g[nid]
-    for n in g.values():
+    for nid, n in g.items():
+        if nid in chain:
+            continue
         inp = n.get("inputs", {})
         for k, v in inp.items():
-            if isinstance(v, list) and v and str(v[0]) in writers:
+            if isinstance(v, list) and v and str(v[0]) in chain:
                 inp[k] = prompt
-    for w in writers:
+    for w in chain:
         g.pop(w, None)
     return g
 
@@ -772,9 +812,11 @@ def lora_file(name: str, available) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
-def fix_lora_names(graph: dict, available) -> tuple[dict, list[str]]:
+def fix_lora_names(graph: dict, available, find=None) -> tuple[dict, list[str]]:
     """Every LoRA loader gets the file name the ComfyUI server lists (Windows: "Moss\\lenovo_moss.safetensors"). Returns
-    (graph, names that were not found)."""
+    (graph, names that were not found). ``find(name, available)`` looks a name up; the bridge passes one that also knows
+    the files the user linked in the settings window (inventory.resolve); the default is lora_file."""
+    find = find or lora_file
     g = json.loads(json.dumps(graph))
     missing = []
     for n in g.values():
@@ -782,7 +824,7 @@ def fix_lora_names(graph: dict, available) -> tuple[dict, list[str]]:
         if n.get("class_type") in ("LoraLoader", "LoraLoaderModelOnly") if isinstance(n, dict) else False:
             name = inp.get("lora_name")
             if isinstance(name, str):
-                real = lora_file(name, available)
+                real = find(name, available)
                 if real:
                     inp["lora_name"] = real
                 else:
@@ -794,7 +836,7 @@ def fix_lora_names(graph: dict, available) -> tuple[dict, list[str]]:
                 continue
             for row in rows if isinstance(rows, list) else []:
                 if isinstance(row, dict) and row.get("enabled", True) and row.get("name"):
-                    real = lora_file(str(row["name"]), available)
+                    real = find(str(row["name"]), available)
                     if real:
                         row["name"] = real
                     else:

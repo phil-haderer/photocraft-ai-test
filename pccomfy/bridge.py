@@ -33,14 +33,16 @@ from typing import Callable
 import numpy as np
 from PIL import Image
 
-from . import __version__, fillmask, imaging, refslots, workflows
+from . import __version__, config, fillmask, imaging, inventory, manifest, models, refslots, scribble, workflows
 from .comfy import Cancelled, ComfyUI
 from .photocraft import PhotoCraft, PhotoCraftError
 
 MODES = ("inpaint", "remove", "outpaint", "img2img", "edit", "txt2img", "upscale", "refine")
 REF_MODES = ("edit",)      # the bridge modes that take reference images: Multi Image Edit runs as a whole-image edit
 SCALE_MODES = ("upscale", "refine")   # the picture goes to the workflow at its own size; the workflow sets the result's size
-MAX_RESULT_MP = 24.0                  # Upscale: refuse results above this many megapixels
+MAX_RESULT_MP = 24.0                  # Original size: refuse pictures above this many megapixels
+MAX_SCALE_MP = 16.0                   # Upscale and Refine: their graphs size the result with ComfyUI's ImageScaleToTotalPixels,
+                                      # which refuses more than 16 megapixels (found in the upscale stage round, 9.11.; user 10.11.)
 LAYER_MASKS = ("auto", "soft", "selection", "none")
 
 
@@ -82,6 +84,10 @@ class Request:
     native: bool = False                 # "Original size": a crop larger than base_res² goes to the model as it is (up to native_mp)
     full_size: bool = False              # Refine that runs as Edit (Fibo): the picture goes in at its own size, never scaled down
     native_mp: float = 4.0               # megapixels: the most that "Original size" sends to the model
+    gen_mp: float = 0.0                  # Text to image with MiniMax H3 Image (PLAN 2.0b): the area the model draws, in megapixels,
+                                         # in the canvas' aspect ratio (larger or smaller than the canvas); 0 = the usual canvas rule
+    new_document: bool = False           # Text to image with gen_mp: the result opens as a new document in its full size (the tick
+                                         # "Downsize to canvas" off); False = a layer scaled down to the canvas (LANCZOS, the official rule)
     context: float = 0.4                 # context around the mask (fraction of the selection's longer side)
     mask_grow: int = 8                   # px (document scale) the model mask is grown by
     mask_blur: int = 8                   # px the model mask is blurred by
@@ -122,11 +128,24 @@ class Request:
     bbox: bool = False                   # Multi Image Edit (Flux 3): the selection is the box <obj_1> (BBOX switch); no selection = a normal run
     group_name: str = ""                 # several results: the name of the layer group they go into ("Fill Selection 3");
                                          # empty = "<mode> variants"
+    scribble: bool = False               # Sketch, "Scribble on photo" (runs as edit): find the scribble, generate only a crop
+                                         # around it and put it back there with a fading layer mask (scribble.py)
 
 
 BBOX_MARGIN = 0.15  # BBOX layer mask: the box grown by this share of its size on every side (user 30.10.: 50 % was far too big; big test: 40 % kept nearly every object whole, 0 % cut larger ones)
 BBOX_SENTENCE = "Place the result in <obj_1>."   # added to the prompt when BBOX is on and the text has no <obj_1> (user 30.10.)
 PLACEHOLDER = "<DESCRIBE THE IMAGE>"
+
+
+def sketch_text(text: str) -> str:
+    """The Sketch templates stand in the prompt field with models.SKETCH_MARK where the subject goes (user 10.11.: the
+    prompt is always visible and editable). Left in, it becomes the generic sentence of the test rounds: "Turn this sketch
+    into ...", "Replace the coloured scribbles with what they show, ..."; anywhere else it is dropped."""
+    mark = models.SKETCH_MARK
+    if mark not in (text or ""):
+        return text
+    text = text.replace("sketch of " + mark + " into", "sketch into").replace("with " + mark, "with what they show")
+    return re.sub(r"[ \t]{2,}", " ", text.replace(mark, "")).strip()
 
 
 def strip_placeholder(text: str) -> str:
@@ -140,16 +159,12 @@ def strip_placeholder(text: str) -> str:
 #   phase_fraction is -1 when the phase has no real progress (the UI then shows elapsed time / an estimate).
 Progress = Callable[..., None]
 
-WRITER_SKIP = ("TextEncode", "CLIPTextEncode", "AUSBOSS_NODES_Text")
-
 
 def prompt_phase_nodes(graph: dict) -> set[str]:
     """Ids of the nodes that belong to "writing the prompt": a pc:prompt node that is a text model
-    (not a plain text encoder) and everything upstream of it (loaders, image, system prompt)."""
-    import re
-    writers = [nid for nid, n in graph.items()
-               if "prompt" in re.findall(r"pc:\s*([a-z]+)", n.get("_meta", {}).get("title", "").lower())
-               and not n.get("class_type", "").startswith(WRITER_SKIP)]
+    (not a plain text encoder), the nodes up to its end (`workflows.writer_end`: MiniMax' TextGenerateV2 and
+    JsonExtractString) and everything upstream of it (loaders, image, system prompt)."""
+    writers = [workflows.writer_end(graph, nid) for nid in workflows.prompt_writers(graph)]
     seen: set[str] = set()
     todo = list(writers)
     while todo:
@@ -301,10 +316,20 @@ FILL_PROMPT_LARGE = ("{text}. Make it as large as the red {shape}, filling it fr
                      "Also remove the red {shape} itself.")
 
 
+# Flux 2 Klein: Qwen's sentence plus "its natural shape" (approach C of the Flux Fill round 2, 10.11.: 8 of 8 good on the
+# eight harder cases, Qwen's sentence alone 6 of 8; the user chose C; docs/tests/fill-flux-ergebnis.md). The red line was
+# left in none of the pictures.
+FILL_PROMPT_NATURAL = ("{text}. Make it as large as the red {shape}, filling it from edge to edge, and blend it into the scene "
+                       "(light, shadows, perspective). Give it its natural shape: the red {shape} only marks the area, it is not "
+                       "the shape of the object. Do not change anything outside the red {shape}. Also remove the red {shape} itself.")
+
+
 def fill_prompt(text: str, mask: "Image.Image", workflow: str | None = None) -> str:
-    """The instruction for Fill with an instruction editor; Qwen's workflows get the wording that asks for the full size."""
-    large = bool(workflow) and Path(workflow).name.startswith("qwen-image")
-    return (FILL_PROMPT_LARGE if large else FILL_PROMPT).format(text=text.strip().rstrip(".!"), shape=_shape(mask))
+    """The instruction for Fill with an instruction editor; Qwen's workflows get the wording that asks for the full size,
+    Flux 2's that wording plus the natural shape."""
+    name = Path(workflow).name if workflow else ""
+    tpl = FILL_PROMPT_NATURAL if name.startswith("flux2-klein") else FILL_PROMPT_LARGE if name.startswith("qwen-image") else FILL_PROMPT
+    return tpl.format(text=text.strip().rstrip(".!"), shape=_shape(mask))
 
 
 def outline_width(gen_w: int, gen_h: int) -> int:
@@ -369,10 +394,7 @@ def outpaint_prompt(prompt: str, enhance: bool, keep: "imaging.Box", canvas: tup
 
 def after_prompt_nodes(graph: dict) -> set[str]:
     """Ids of the nodes that consume the written prompt (text encoder, sampler, decode, output ...)."""
-    import re
-    done = {nid for nid, n in graph.items()
-            if "prompt" in re.findall(r"pc:\s*([a-z]+)", n.get("_meta", {}).get("title", "").lower())
-            and not n.get("class_type", "").startswith(WRITER_SKIP)}
+    done = workflows.writer_chain(graph)
     if not done:
         return set()
     after: set[str] = set()
@@ -403,6 +425,7 @@ class Bridge:
         self.keep_files = keep_files
         self.pipeline = ""
         self.last_vgl = ""
+        self._scribble_layer = None      # Scribble on photo: the id of the scribble layer found on top (hidden after the run)
         self._cancel = threading.Event()
         self._cancel_all = threading.Event()    # "Cancel all": stops the variants and comparison runs that would follow too
         self.on_preview = None                  # the window's callback for live preview frames (PIL images), see Request.preview
@@ -439,13 +462,16 @@ class Bridge:
         if req.mode == "remove":
             req = dataclasses.replace(req, mode="inpaint", remove=True)
         p = req.params
-        p.prompt = strip_placeholder(p.prompt)   # the unedited "<DESCRIBE THE IMAGE>" of a preset is no instruction
+        p.prompt = strip_placeholder(sketch_text(p.prompt))   # the unedited "<DESCRIBE THE IMAGE>" of a preset is no instruction
+        if req.scribble and req.mode != "edit":
+            raise BridgeError("Scribble on photo runs as a whole-picture edit.")
         if p.seed is None or p.seed < 0:
             p.seed = random.randint(0, 10**8 - 1)      # at most 8 digits: it fits the seed field
         p.batch = max(1, int(req.variants))
         tag = uuid.uuid4().hex[:8]
         _wfs = workflows.resolve(req.workflow) if req.workflow else [None]
         self.last_vgl = ""
+        self._scribble_layer = None
         if req.refs:
             if req.mode not in REF_MODES:
                 raise BridgeError("Reference images work in the mode Multi Image Edit.")
@@ -675,7 +701,7 @@ class Bridge:
             # gives a broken picture (a whole creek of ducks); at 1.0 the same instruction edits the picture correctly
             p.denoise = 1.0
 
-        src = mask = layout = obj_box = None
+        src = mask = layout = obj_box = found = None
         if req.mode != "txt2img" or has_sel:
             if seq and seq[0] and self._seq_src is not None:
                 src, mask = self._seq_src      # variant 2 and later: the picture of variant 1, not one with its result in it
@@ -684,6 +710,11 @@ class Bridge:
                 src, mask = self._export(orig, tag, need_mask=has_sel or box_sel)
                 self._seq_src = (src, mask) if seq else None
             layout = None      # BBOX: (box in document pixels, document size); the mask itself is not used further
+            if req.scribble:
+                progress(0.07, "Finding the scribble", phase="prepare")
+                found = self._find_scribble(orig, tag, src)
+                if found is None:
+                    raise BridgeError(models.NO_SCRIBBLE)
             if box_sel:
                 obj = imaging.mask_bbox(mask)
                 mask = None
@@ -700,19 +731,18 @@ class Bridge:
                 # it for the model and the layer mask; 28.10.: a band of ~24 px there was painted anew, darker with Krea 2)
                 mask = imaging.outpaint_mask(keep, (W, H), req.overlap)
 
-        full = any(workflows.full_canvas(workflows.load_template(w)) for w in wf_paths if w)
         bbox = None
         if req.mode in ("inpaint", "outpaint"):
             bbox = imaging.mask_bbox(mask)
             if bbox is None:
                 raise BridgeError("The selection is empty.")
             region = imaging.grow_box(bbox, (W, H), req.context)
-            if full:    # MOSS Inpainting v10: the graph crops around the mask itself
-                region = imaging.Box(0, 0, W, H)
         elif has_sel:
             region = imaging.mask_bbox(mask) or imaging.Box(0, 0, W, H)
         else:
             region = imaging.Box(0, 0, W, H)
+        if found is not None:       # Scribble on photo: only the crop around the scribble is generated (decided 9.11.)
+            region = scribble.region(found, (W, H))
 
         removal = self._kind(req, p, wf_paths)
         # the whole picture selected = a fresh picture from the text, not a fill: the red outline would end up as a frame
@@ -724,14 +754,12 @@ class Bridge:
             gw, gh = region.w, region.h
             factor = float(req.scale) if req.mode == "upscale" else 1.0
             mp = region.w * region.h * factor * factor / 1e6
-            if mp > MAX_RESULT_MP:
-                raise BridgeError(f"The result would be {mp:.0f} megapixels ({region.w * factor:.0f}×{region.h * factor:.0f}); "
-                                  f"the limit is {MAX_RESULT_MP:.0f}. Select a smaller area or use a smaller factor.")
+            if mp > MAX_SCALE_MP + 1e-9:
+                raise BridgeError(f"The result would be {mp:.1f} megapixels ({region.w * factor:.0f}×{region.h * factor:.0f}); "
+                                  f"the limit is {MAX_SCALE_MP:.0f}. Use a smaller factor or a smaller picture.")
             p.extra["megapixels"] = mp
             if req.mode == "upscale" and wf_paths[0]:
                 req = self._auto_stages(req, wf_paths[0], mp)       # a stage that takes over above a size (Fibo: Tiles above 3 MP)
-        elif full:
-            gw, gh = region.w, region.h
         elif req.full_size:
             mult = max(workflows.size_multiple(workflows.load_template(w)) for w in wf_paths if w) if wf_paths[0] else 16
             gw, gh = (max(mult, round(v / mult) * mult) for v in (region.w, region.h))     # the nearest multiple, no scaling
@@ -740,7 +768,9 @@ class Bridge:
                 raise BridgeError(f"The picture is {mp:.0f} megapixels; the limit is {MAX_RESULT_MP:.0f}. Select a smaller area.")
         else:
             mult = max(workflows.size_multiple(workflows.load_template(w)) for w in wf_paths if w) if wf_paths[0] else 16
-            if req.mode == "txt2img":      # always the canvas size, at most native_mp, never scaled up (user 4.11.)
+            if req.mode in ("txt2img", "edit") and req.gen_mp > 0:     # MiniMax: the chosen area in the canvas' aspect ratio (PLAN 2.0b; Edit scales the picture to it)
+                gw, gh = imaging.area_size(region.w, region.h, req.gen_mp, multiple=max(32, mult))
+            elif req.mode == "txt2img":      # always the canvas size, at most native_mp, never scaled up (user 4.11.)
                 gw, gh = imaging.canvas_size(region.w, region.h, req.native_mp, multiple=mult)
             else:
                 base = imaging.native_base(region.w, region.h, req.base_res, req.native_mp) if req.native else req.base_res
@@ -769,7 +799,7 @@ class Bridge:
         # a workflow without a pc:mask node (the Flux 2/3 Klein edit ones) gets the instruction only, no mask
         wf_mask_node = (not wf_paths[0]) or any(has_tag(json.loads(Path(w).read_text(encoding="utf-8")), "mask") for w in wf_paths if w)
         if req.mode in ("inpaint", "outpaint") and wf_mask_node:
-            m = mask.crop(region.pil()).convert("L") if full else imaging.prepare_mask(mask.crop(region.pil()), req.mask_grow, req.mask_blur)
+            m = imaging.prepare_mask(mask.crop(region.pil()), req.mask_grow, req.mask_blur)
             m = m.resize((gw, gh), Image.BILINEAR)
             mask_name = self.comfy.upload_image(m.convert("RGB"), f"pcc-{tag}-mask.png")
 
@@ -841,6 +871,9 @@ class Bridge:
         progress(0.92, "Placing the result in PhotoCraft", phase="place")
         if req.mode == "upscale":
             return self._open_upscaled(results, orig, orig_name, region, p, tag, progress, req, seq)
+        if req.mode in ("txt2img", "edit") and req.gen_mp > 0 and req.new_document:   # MiniMax, "Downsize to canvas" off: full size
+            return self._open_upscaled(results, orig, orig_name, region, p, tag, progress, req, seq,
+                                       word="generated" if req.mode == "txt2img" else "edited")
         orig = self._find_doc(orig, orig_name)
         base = (p.prompt.strip() or ("object" if req.remove else req.mode))[:40]
         mode_name = "remove" if req.remove else req.mode
@@ -851,6 +884,10 @@ class Bridge:
             layer_mask = imaging.box_margin_mask(obj_box, (W, H), BBOX_MARGIN, req.feather_pct)
         elif lm_mode == "soft":
             layer_mask = soft_layer_mask(req, wf_paths, mask, region, bbox)
+        place = region      # where the layers go: the crop, or the whole canvas for Scribble on photo
+        if found is not None:   # the layer is the whole canvas with the crop in it; the mask fades out to the crop's sides
+            place, lm_mode = imaging.Box(0, 0, W, H), "soft"
+            layer_mask = scribble.fade_mask((W, H), found.box, region)
         mode = lm_mode
         # the soft mask's density in PhotoCraft (the slider; every function starts at 100 % since the Fill mask test
         # round 30.10.); 100 % = the mask as it is, nothing to set
@@ -896,6 +933,8 @@ class Bridge:
                 for k, (ab, out) in enumerate(pairs):
                     im = out.resize((region.w, region.h), Image.LANCZOS)
                     im = imaging.sharpen(im, req.sharpen)
+                    if found is not None:      # colour matched to the photo around the scribble, pasted into the canvas
+                        im, _m = scribble.put_back(imaging.to_rgb(src), im, found, region)
                     lab = " ".join(x for x in (label, ab) if x)
                     if req.preset:
                         name = f"{req.preset} #{req.run_no}" + (f".{i + 1}" if count > 1 else "") + (f" [{lab}]" if lab else "")
@@ -904,7 +943,7 @@ class Bridge:
                                 + (f" #{i + 1}" if count > 1 else ""))
                     top_one = k == len(pairs) - 1     # the corrected one (or the only one) of this result
                     first = n == 0 and k == 0
-                    layers.insert(0, self._import(orig, im, region, mode, name, tag, g * 2 + k, first=first,
+                    layers.insert(0, self._import(orig, im, place, mode, name, tag, g * 2 + k, first=first,
                                                   hidden=(g > 0 or not top_one), layer_mask=layer_mask,
                                                   above=above if first else None, density=density))
         group = self._group(layers, req.group_name or f"AI {mode_name} variants") if len(layers) > 1 else None
@@ -916,9 +955,11 @@ class Bridge:
             self._try("select.reselect")  # the layer mask used the selection up: it comes back, ready for another generation
         if seam is not None:
             self._log_seam(req, p.seed, seam)
+        if found is not None and found.how == "layer" and self._scribble_layer is not None:
+            self._try("layer.hideLayers", {"layer": self._scribble_layer})     # the scribble layer is hidden after the run (user 9.11.)
         progress(1.0, f"Done (seed {p.seed})", phase="place")
         return {"seed": p.seed, "vgl": self.last_vgl, "layers": layers, "region": region.__dict__, "size": [gw, gh], "pipeline": self.pipeline,
-                "group": group, "seam": None if req.seam_fixed else seam}   # always on: the number only in runs.jsonl
+                "group": group, "seam": None if req.seam_fixed else seam, "scribble": found.how if found is not None else ""}   # always on: the number only in runs.jsonl
 
     # ---------- feather preview ----------
 
@@ -1195,7 +1236,12 @@ class Bridge:
             return tpl
         if not available:
             return tpl
-        tpl, missing = workflows.fix_lora_names(tpl, available)
+        links = config.model_map()       # a LoRA the user linked in the settings window (another file name) counts as there
+
+        def find(name, avail):
+            f = manifest.FILES.get(name)
+            return inventory.resolve(name, list(avail), links, f.aliases if f else ())
+        tpl, missing = workflows.fix_lora_names(tpl, available, find)
         if missing:
             raise BridgeError("ComfyUI does not list this LoRA file: " + ", ".join(missing)
                               + ". Put it in the LoRA folder and restart ComfyUI (it only re-reads the folder at start), or switch the LoRA off.")
@@ -1207,7 +1253,7 @@ class Bridge:
             tpl = workflows.load_template(wf)
             if not req.enhance or force_plain:
                 # first: without the text model, a picture it alone needed (Text to image) is not required either
-                tpl = workflows.bypass_prompt_writer(tpl, p.prompt)
+                tpl = workflows.bypass_prompt_writer(tpl, workflows.tagged_for_writer_off(tpl, p.prompt))
             if not req.turbo:
                 tpl = workflows.bypass_lora(tpl)
             elif req.lora_strength is not None:
@@ -1252,7 +1298,7 @@ class Bridge:
             rec = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "version": __version__, "mode": ("remove" if req.remove else req.mode), "attempt": attempt,
                    "workflow": Path(wf).name if wf else "builtin", "seed": gp.seed, "size": [gp.width, gp.height],
                    "turbo": req.turbo, "enhance": req.enhance, "layer_mask": req.layer_mask, "base_res": req.base_res,
-                   "native": req.native, "native_mp": req.native_mp,
+                   "native": req.native, "native_mp": req.native_mp, "gen_mp": req.gen_mp, "new_document": req.new_document,
                    "ref_native": req.ref_native, "ref_mp": req.ref_mp, "ref_side": req.ref_side,
                    "context": req.context, "sampler": req.sampler_override, "prompt": (gp.prompt or "")[:600]}
             f.write_text("\n".join(old + [json.dumps(rec, ensure_ascii=False)]) + "\n", encoding="utf-8")
@@ -1301,14 +1347,34 @@ class Bridge:
         img, _ = self._export(orig, uuid.uuid4().hex[:8], need_mask=False)
         return img
 
-    def _export(self, orig: int, tag: str, need_mask: bool) -> tuple[Image.Image, Image.Image | None]:
+    def _find_scribble(self, orig: int, tag: str, src: Image.Image) -> "scribble.Found | None":
+        """Scribble on photo (docs/sketch-plan.md, 9d): the top layer when it holds only scribble strokes, else bright green,
+        then red in the visible picture. The top layer's content is what changes when it is left out: the visible picture
+        against the one without it (no layer export with transparency needed); a hidden top layer or a group does not count."""
+        self._scribble_layer = None
+        layers = [l for l in self.pc.document().get("layers", []) if isinstance(l, dict)]
+        top_layer = None
+        if len(layers) > 1 and layer_visible(layers[0]) is not False and layers[0].get("kind") != "Group":
+            below = self._export(orig, tag + "b", need_mask=False, skip_top=True)[0]
+            a, b = np.asarray(imaging.to_rgb(src)).astype(int), np.asarray(imaging.to_rgb(below)).astype(int)
+            if a.shape == b.shape:
+                diff = (np.abs(a - b).sum(-1) > 24).astype(np.uint8) * 255
+                top_layer = imaging.to_rgb(src).convert("RGBA")
+                top_layer.putalpha(Image.fromarray(diff))
+        hit = scribble.find(imaging.to_rgb(src), top_layer)
+        if hit is not None and hit.how == "layer":
+            self._scribble_layer = layers[0].get("id")
+        return hit
+
+    def _export(self, orig: int, tag: str, need_mask: bool, skip_top: bool = False) -> tuple[Image.Image, Image.Image | None]:
         """The picture (and the selection as a mask) from a throw-away duplicate."""
         pc = self.pc
         # the picture the model sees is what is VISIBLE: layers that are switched off must not be in it. With any of them
         # present the duplicate keeps its layers, drops the hidden ones and is flattened (the plain merged copy may include
         # them). The duplicate has its own layer ids: the hidden layers are found again by their position in the stack.
         layers0 = [l for l in pc.document().get("layers", []) if isinstance(l, dict)]
-        hidden_at = [i for i, l in enumerate(layers0) if layer_visible(l) is False]
+        # skip_top: the picture without the top layer (Scribble on photo compares it with the visible one)
+        hidden_at = [i for i, l in enumerate(layers0) if layer_visible(l) is False or (skip_top and i == 0)]
         pc.execute("image.duplicate", {"name": f"pccomfy-{tag}", "mergedOnly": not hidden_at})
         try:
             if hidden_at:
@@ -1428,10 +1494,12 @@ class Bridge:
                 self._try("select.loadSelection", {"channel": name})
                 self._try("channel.delete", {"channel": name})
 
-    def _open_upscaled(self, results, orig: int, orig_name: str, region: "imaging.Box", p, tag: str, progress, req: Request | None = None, seq: tuple | None = None) -> dict:
+    def _open_upscaled(self, results, orig: int, orig_name: str, region: "imaging.Box", p, tag: str, progress, req: Request | None = None, seq: tuple | None = None,
+                       word: str = "upscaled") -> dict:
         """Upscale: every result becomes a new document (like Photoshop's Image Size into a new file); the original
         stays as it is. The first result is opened last, so it is the active one. seq = (k, n): variant k of n, opened as
-        soon as it is done (the numbering follows it)."""
+        soon as it is done (the numbering follows it). MiniMax Text to image without "Downsize to canvas" opens its
+        results the same way, named "<document> generated WxH" (`word`)."""
         import re
         pc = self.pc
         stem = re.sub(r"[^\w .()+-]", "_", Path(orig_name).stem).strip() or "image"
@@ -1441,7 +1509,7 @@ class Bridge:
             k = seq[0] + 1 if seq else len(items) - n
             w, h = im.size
             tag_txt = re.sub(r"[^\w .()+-]", "_", req.doc_tag if req else "").strip()
-            name = f"{stem} {tag_txt + ' ' if tag_txt else ''}upscaled {w}x{h}" + (f" #{k}" if (seq[1] if seq else len(items)) > 1 else "") + ".png"
+            name = f"{stem} {tag_txt + ' ' if tag_txt else ''}{word} {w}x{h}" + (f" #{k}" if (seq[1] if seq else len(items)) > 1 else "") + ".png"
             full = self.exchange / name
             self._tmp.append(full)
             im.convert("RGB").save(full)

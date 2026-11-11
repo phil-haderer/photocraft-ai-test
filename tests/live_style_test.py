@@ -57,8 +57,19 @@ def prompts() -> dict[int, str]:
 
 
 def style_texts() -> dict[str, str]:
-    """Style name -> its text, from the data of the Styles button (Text to image)."""
+    """Style name -> its text, from the data of the Styles button (Text to image). The names above are the old ones (before
+    plan B step 3, 10.11.): a renamed style is found through its old name ("old" in data/styles/auswahl-2026-11-10.json), a
+    style that was dropped through the old selection and the source in data/styles (where they are)."""
     allst = {s["name"]: s["text"] for g in styles.load().get("txt2img", []) for s in g["styles"]}
+    d = ROOT / "data" / "styles"
+    try:
+        sel = json.loads((d / "auswahl-2026-11-10.json").read_text(encoding="utf-8"))
+        allst.update({s["old"]: allst[s["name"]] for g in sel["groups"] for s in g["styles"] if s["name"] in allst})
+        texts = {e["index"]: e["styleKeywords"] for e in json.loads((d / "krea_moodboards.json").read_text(encoding="utf-8"))}
+        old = json.loads((d / "auswahl-final.json").read_text(encoding="utf-8"))
+        allst.update({s["name"]: texts[s["index"]] for g in old["groups"] for s in g["styles"] if s["name"] not in allst})
+    except (OSError, ValueError, KeyError):
+        pass
     missing = [n for n in PLAN_STYLES.values() if n not in allst]
     if missing:
         sys.exit(f"Styles not in pccomfy/assets/styles.json: {missing}")

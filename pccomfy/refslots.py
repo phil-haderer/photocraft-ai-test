@@ -306,7 +306,27 @@ def preview_position(win: tuple[int, int, int, int], size: tuple[int, int], scre
 # The window part (Tk): one hook in gui.py puts RefSlotsMixin in front of the window's other mixins
 # ======================================================================================================================
 
+def edtab_rows(needs: list[int], room: int) -> list[list[int]]:
+    """The tabs under Edit in rows (indices into ``needs``): as few rows as fit, the tabs shared out evenly with the larger
+    rows first (four tabs that do not fit one row: 2 + 2, three: 2 + 1), so the first row always uses the full width and no
+    text is cut (user 10.11.). A row fits when its widths add up to at most ``room``; one tab per row as the last resort."""
+    n = len(needs)
+    for r in range(1, n + 1):
+        sizes = [n // r + (1 if i < n % r else 0) for i in range(r)]
+        rows, start = [], 0
+        for s in sizes:
+            rows.append(list(range(start, start + s)))
+            start += s
+        if all(sum(needs[i] for i in row) <= room for row in rows):
+            return rows
+    return [[i] for i in range(n)]
+
+
 MULTI_MODE = "multi_edit"     # the window mode that shows the slots (it runs as a whole-image edit)
+SKETCH_MODE = "sketch"        # the window mode of the tab Sketch to image (runs as a whole-image edit; docs/sketch-plan.md)
+SCRIBBLE_MODE = "scribble"    # the window mode of the tab Scribble on photo (plan B, 10.11.: its own tab)
+SKETCH_MODES = (SKETCH_MODE, SCRIBBLE_MODE)
+TAB_MODE = {"edit": "edit", "sketch": SKETCH_MODE, "scribble": SCRIBBLE_MODE}     # tab -> window mode (the others: multi_edit)
 
 
 class RefSlotsMixin:
@@ -385,7 +405,7 @@ class RefSlotsMixin:
         self.f_refs = ttk.Frame(self.f_body)      # inside the body frame (gui.py _build): it is packed before f_neg, which lives there
         head = ttk.Frame(self.f_refs)
         head.pack(fill="x")
-        # no drop-down any more (user 7.11.): the tabs "Multi image edit" and "BBOX placement" under the prompt show the slots
+        # no drop-down any more (user 7.11.): the tabs "Multi image edit" and "Insert reference" under the prompt show the slots
         self.lbl_refs = ttk.Label(head, text="Reference images", style="Muted.TLabel")
         self.lbl_refs.pack(side="left")
         self.v_refs_open = tk.BooleanVar(value=True)       # always open
@@ -489,11 +509,36 @@ class RefSlotsMixin:
             t.insert("1.0", new)
 
     # ---- the tabs of the Edit function (user 7.11.) ----
-    EDIT_TABS = (("edit", "Edit canvas"), ("multi", "Multi image edit"), ("bbox", "BBOX placement"))
+    def _edtab_needs(self, keys):
+        """The width each tab needs with its text in bold (a chosen tab is bold) plus its gap, and the room of a row; None
+        when Tk cannot measure (the stubbed Tk of the tests)."""
+        try:
+            import tkinter.font as tkfont
+            from . import spacing
+            from .gui_common import MIN_W, font
+            self.root.update_idletasks()
+            plain, bold = tkfont.Font(root=self.root, font=font(9)), tkfont.Font(root=self.root, font=font(9, bold=True))
+            gap = 2 * spacing.scale(2)
+            needs = []
+            for k in keys:
+                rb, label = self.rb_edtabs[k], dict(self.EDIT_TABS)[k]
+                needs.append(int(rb.winfo_reqwidth()) - plain.measure(label) + bold.measure(label) + gap)
+            win = max(int(self.root.winfo_width()), self._px(MIN_W))
+            room = win - 2 * spacing.scale(10) - 2 * int(float(str(self.root.cget("highlightthickness")))) - 2
+            if room <= 0 or not all(n > gap for n in needs):
+                return None
+            return needs, room
+        except Exception:
+            return None
+
+    # 2 + 2 (plan B, 10.11.): Edit canvas · Multi image edit / Sketch to image · Scribble on photo; Flux 3 has Insert reference
+    # in the first row too until it moves under Fill (plan B, step 4)
+    EDIT_TABS = (("edit", "Edit canvas"), ("multi", "Multi image edit"), ("bbox", "Insert reference"),
+                 ("sketch", "Sketch to image"), ("scribble", "Scribble on photo"))
 
     def _edtabs_ensure(self):
-        """Three tabs in the design of the model chips: Edit canvas (the plain whole-picture edit), Multi image edit (the
-        reference slots) and, for Flux 3 only, BBOX placement. Behind them the window modes stay `edit` and `multi_edit`
+        """The tabs (since 10.11. in the look of the small switches): Edit canvas (the plain whole-picture edit), Multi image edit (the
+        reference slots) and, for Flux 3 only, Insert reference (BBOX). Behind them the window modes stay `edit` and `multi_edit`
         (BBOX = multi_edit with the tick), so workflows, saved pages and the bridge are as before."""
         if getattr(self, "f_edtabs", None) is not None:
             return
@@ -504,49 +549,142 @@ class RefSlotsMixin:
         self._refs_ensure()                  # makes v_bbox and the slot frame
         self.v_edtab = tk.StringVar(value="edit")
         self.f_edtabs = ttk.Frame(self.f_body)
+        # one frame per row, so each row shares out its own width (made before the tabs: a later sibling would cover them)
+        self.f_edtab_rows = [ttk.Frame(self.f_edtabs) for _ in self.EDIT_TABS]
         self.rb_edtabs, self.tt_edtabs = {}, {}
-        tips = {"edit": _models.FUNCTION_TIPS["edit"], "multi": _models.FUNCTION_TIPS["multi_edit"], "bbox": BBOX_CHECK_TIP}
+        tips = {"edit": _models.FUNCTION_TIPS["edit"], "multi": _models.FUNCTION_TIPS["multi_edit"], "bbox": BBOX_CHECK_TIP,
+                "sketch": _models.FUNCTION_TIPS["sketch"], "scribble": _models.FUNCTION_TIPS["scribble"]}
         for key, label in self.EDIT_TABS:
-            rb = ttk.Radiobutton(self.f_edtabs, text=label, value=key, variable=self.v_edtab, style="Chip.Toolbutton",
+            # the look of the small switches (filled grey, the chosen one blue), the Sketch templates below take the chip look:
+            # swapped on the user's word (10.11.), so the tabs read as one block and the templates as choices inside it
+            rb = ttk.Radiobutton(self.f_edtabs, text=label, value=key, variable=self.v_edtab, style="Small.Toolbutton",
                                  command=self._edtab_clicked)
             self.rb_edtabs[key] = rb
             self.tt_edtabs[key] = ChipTooltip(rb, tips[key])
+        # Scribble on photo: its chips in one row under the tabs (one so far; "Reference at scribble" after its test, plan B)
+        self.v_sketch = tk.StringVar(value=_models.SCRIBBLE_PROMPTS[0][0])
+        self.f_sketch = ttk.Frame(self.f_body)
+        self.rb_sketch = {}
+        for label, _text, tip in _models.SCRIBBLE_PROMPTS:
+            rb = ttk.Radiobutton(self.f_sketch, text=label, value=label, variable=self.v_sketch, style="Chip.Toolbutton",
+                                 command=lambda: self._sketch_pick(self.v_sketch.get()))
+            rb.pack(side="left", padx=(2 if not self.rb_sketch else 4, 0))     # 2: the left edge of the tabs and chips above
+            ChipTooltip(rb, tip)
+            self.rb_sketch[label] = rb
 
     def _edtab_clicked(self):
         """A tab was clicked: it sets the window mode (and the BBOX tick) and the window follows like after a function click."""
         tab = self.v_edtab.get()
-        mode = "edit" if tab == "edit" else MULTI_MODE
-        if self.v_mode.get() != mode:          # Edit canvas <-> the reference tabs: a new function page (it starts BBOX off)
+        self._written_for = ""
+        mode = TAB_MODE.get(tab, MULTI_MODE)
+        if self.v_mode.get() != mode:          # Edit canvas <-> the reference tabs <-> Sketch: a new function page (it starts BBOX off)
             self.v_mode.set(mode)
             self._on_mode()
-        self.v_bbox.set(tab == "bbox")          # Multi image edit <-> BBOX placement: only the tick changes, like the old checkbox
+        self.v_bbox.set(tab == "bbox")          # Multi image edit <-> Insert reference: only the tick changes, like the old checkbox
         self._refs_bbox_changed()
         self._edtabs_update()
 
     def _edtabs_update(self):
         mode, m = self.v_mode.get(), self._refs_model()
-        show = m is not None and mode in ("edit", MULTI_MODE) and MULTI_MODE in m.modes
+        show = (m is not None and mode in ("edit", MULTI_MODE) + SKETCH_MODES
+                and any(k in m.modes for k in (MULTI_MODE,) + SKETCH_MODES))
         if not show and getattr(self, "f_edtabs", None) is None:
             return
         self._edtabs_ensure()
         if not show:
             self.f_edtabs.pack_forget()
+            self.f_sketch.pack_forget()
             return
         bbox = bool(m.bbox)
-        tab = "edit" if mode == "edit" else "bbox" if (bbox and self.v_bbox.get()) else "multi"
+        tab = ({v: k for k, v in TAB_MODE.items()}.get(mode)
+               or ("bbox" if (bbox and self.v_bbox.get()) else "multi"))
         if mode == MULTI_MODE and self.v_bbox.get() and not bbox:
             self.v_bbox.set(False)          # a model without BBOX: the tick does not travel along
         self.v_edtab.set(tab)
-        shown = [k for k, _l in self.EDIT_TABS if k != "bbox" or bbox]
-        for c in range(3):
-            self.f_edtabs.columnconfigure(c, weight=1 if c < len(shown) else 0, uniform="edtab")
+        shown = [k for k, _l in self.EDIT_TABS if (k != "bbox" or bbox) and (k != "multi" or MULTI_MODE in m.modes)
+                 and (k not in ("sketch", "scribble") or TAB_MODE[k] in m.modes)]
+        # as few rows as the texts allow, every row the full width, no text cut (user 10.11.): each tab as wide as its bold
+        # text needs, the room left over shared out; without a measure (tests) four tabs go into two rows of two
+        meas = self._edtab_needs(shown)
+        needs = meas[0] if meas else [0] * len(shown)
+        # plan B (10.11.): always 2 + 2, the edit tabs in the first row, Sketch to image and Scribble on photo in the second;
+        # a row that does not fit is split again (Flux 3 with Insert reference until it moves under Fill)
+        rows = []
+        for group in ([k for k in shown if k not in ("sketch", "scribble")], [k for k in shown if k in ("sketch", "scribble")]):
+            if group and meas:
+                idx = [shown.index(k) for k in group]
+                rows += [[group[i] for i in r] for r in edtab_rows([needs[i] for i in idx], meas[1])]
+            elif group:
+                rows.append(group)
+        self._edtab_layout = rows
+        need = dict(zip(shown, needs))
+        for r, frame in enumerate(self.f_edtab_rows):
+            keys = rows[r] if r < len(rows) else []
+            for c in range(len(self.EDIT_TABS)):
+                frame.columnconfigure(c, weight=1 if c < len(keys) else 0, minsize=need[keys[c]] if c < len(keys) else 0)
+            frame.pack_forget()
+        for r in range(len(rows)):
+            self.f_edtab_rows[r].pack(fill="x")
         for k, _l in self.EDIT_TABS:
             if k in shown:
-                self.rb_edtabs[k].grid(row=0, column=shown.index(k), sticky="ew", padx=2, pady=2)
+                r = next(i for i, row in enumerate(rows) if k in row)
+                self.rb_edtabs[k].grid(in_=self.f_edtab_rows[r], row=0, column=rows[r].index(k), sticky="ew", padx=2, pady=2)
             else:
                 self.rb_edtabs[k].grid_remove()
+        for k in ("sketch", "scribble"):
+            self._sketch_tab_state(m, k)
         anchor = self.f_refs if self.f_refs.winfo_manager() else self.f_neg
         self.f_edtabs.pack(fill="x", padx=10, pady=(6, 0), before=anchor)
+        if mode == SCRIBBLE_MODE and len(self.rb_sketch) > 1:     # one chip would only repeat the tab (user 10.11.): the row
+            self.f_sketch.pack(fill="x", padx=10, pady=(6, 0), after=self.f_edtabs)    # comes with "Reference at scribble"
+        else:
+            self.f_sketch.pack_forget()
+
+    def _sketch_tab_state(self, m, tab: str = "sketch"):
+        """The tabs Sketch to image and Scribble on photo are greyed out when a file of their own is missing (their writer:
+        the upsampler, 6.7 GB and gated, or Flux 2's qwen3vl 4B): only the tab, not the model (user 9.11.); its tooltip
+        names the file."""
+        from . import models as _models
+        mode = TAB_MODE[tab]
+        rb, tt = self.rb_edtabs[tab], self.tt_edtabs[tab]
+        inv = getattr(self, "inv", None)
+        st = inv.mode_status(m.key, mode) if (inv is not None and mode in m.modes) else None
+        if st is not None and st.state == "missing":
+            need = [getattr(f, "name", f) for f in st.missing] + list(st.nodes)
+            rb.configure(state="disabled")
+            tt.text = _models.FUNCTION_TIPS[mode] + "\n\nNeeds " + ", ".join(need) + ": download it in the settings (gear)."
+        else:
+            rb.configure(state="normal")
+            tt.text = _models.FUNCTION_TIPS[mode]
+
+    def _sketch_pick(self, label: str, insert: bool = True):
+        """A Sketch template was clicked: its whole text goes into the prompt field (one undo step), editable (user 10.11.);
+        the tip under the prompt follows (Scribble on photo has its own)."""
+        from . import models as _models
+        if getattr(self, "v_sketch", None) is None:
+            self._edtabs_ensure()
+        if insert:
+            self._written_for = ""          # a template: the upsampler runs again
+        self.v_sketch.set(label)
+        texts = {lb: text for lb, text, _t in _models.SCRIBBLE_PROMPTS}
+        if insert and label in texts:
+            t = self.t_prompt
+            if str(t.cget("state")) != "disabled":
+                t.edit_separator()
+                t.delete("1.0", "end")
+                t.insert("1.0", texts[label])
+                t.edit_separator()
+        self._update_prompt_hint()
+
+    def _written_active(self) -> bool:
+        """Sketch with a prompt the upsampler wrote, loaded from the history (user 10.11., way A): it runs as it is, not
+        expanded again, until a template, another tab, function or model is clicked."""
+        return (bool(getattr(self, "_written_for", "")) and self.v_mode.get() in SKETCH_MODES
+                and self.v_model.get() == self._written_for)
+
+    def _sketch_scribble(self) -> bool:
+        """True in the tab Scribble on photo (the bridge then finds the scribble and changes only its place)."""
+        return self.v_mode.get() == SCRIBBLE_MODE
 
     def _refs_update(self):
         self._refs_retag()
@@ -562,7 +700,7 @@ class RefSlotsMixin:
             self.f_refhead2.pack_forget()
             return
         m = self._refs_model()
-        self.cb_bbox.pack_forget()          # the tick is the tab "BBOX placement" now (user 7.11.); the variable stays
+        self.cb_bbox.pack_forget()          # the tick is the tab "Insert reference" now (BBOX) (user 7.11.); the variable stays
         self.f_refhead2.pack_forget()
         self._refs_bbox_changed()
         self.refslots.set_model(self._refs_max(m), m.tag_style)

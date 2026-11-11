@@ -8,8 +8,12 @@ Edge feather and Context values, against fixed rules:
     4  crop_fade is exactly what the plugin does since 30.10. (bridge.soft_layer_mask); corners fade like edges
        (narrow, wide)
 
+By default a sample runs: every position with both shapes, two Edge feather / Context pairs each, so that all nine
+pairs come up (32 of the 144 cases, every rule checked in each). The full matrix only with PCCOMFY_SLOW_TESTS=1 (~15 s).
+
     python tests/test_fill_mask_variants.py
 """
+import os
 import sys
 from pathlib import Path
 
@@ -103,16 +107,33 @@ def corners_round():
             assert abs(int(side) - int(diag)) <= 14, (v, k, side, diag)
 
 
-def main():
-    report, n = {}, 0
+PCTS, CTXS = (4.0, 10.0, 20.0), (0.2, 0.4, 0.8)
+# the nine Edge feather / Context pairs in an order where each run of three has every value once
+PAIRS = [(PCTS[i], CTXS[(i + k) % 3]) for k in range(3) for i in range(3)]
+
+
+def cases(full: bool):
+    """(position, shape, feather, context): the full matrix, or per position and shape two pairs, rotating through PAIRS."""
+    i = 0
     for pos in POSITIONS:
         for shape in ("rect", "lasso"):
-            for pct in (4.0, 10.0, 20.0):
-                for ctx in (0.2, 0.4, 0.8):
-                    check(pos, shape, pct, ctx, report)
-                    n += 1
+            if full:
+                yield from ((pos, shape, pct, ctx) for pct in PCTS for ctx in CTXS)
+            else:
+                yield from ((pos, shape) + PAIRS[(i + j) % len(PAIRS)] for j in range(2))
+                i += 2
+
+
+def main():
+    full = os.environ.get("PCCOMFY_SLOW_TESTS") == "1"
+    picked = list(cases(full))
+    assert full or {(p, c) for _, _, p, c in picked} == set(PAIRS)     # the sample still meets every pair
+    report, n = {}, 0
+    for pos, shape, pct, ctx in picked:
+        check(pos, shape, pct, ctx, report)
+        n += 1
     corners_round()
-    print(f"test_fill_mask_variants: ok ({n} cases x {len(fillmask.VARIANTS)} variants; most at a crop side: "
+    print(f"test_fill_mask_variants: ok ({'full matrix' if full else 'sample, full matrix with PCCOMFY_SLOW_TESTS=1'}: {n} cases x {len(fillmask.VARIANTS)} variants; most at a crop side: "
           + ", ".join(f"{v} {t}" for v, t in sorted(report.items())) + ")")
 
 

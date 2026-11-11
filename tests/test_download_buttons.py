@@ -139,13 +139,13 @@ def main():
         assert rows[ULTRA]["browser"] and rows[ULTRA]["hint"].startswith("The disk symbol opens civitai.com") and "civitai.com" in rows[ULTRA]["hint"]
         assert "models" + chr(92) + "loras" + chr(92) + "Flux 2" in rows[ULTRA]["hint"] and "licence" in rows[UPS]["hint"]
         head = next(r for r in app._settings_rows() if r[0] == "model" and r[1] == "flux2")
-        assert head[5]["count"] == 1 and head[5]["site"] == 1      # the whole package, optional files too (user 3.11.): the same files the download below opens; Flux 2 has no gated file since its writer is the 4B (6.11.)
+        assert head[5]["count"] == 1 and head[5]["site"] == 1      # the whole package, optional files too (user 3.11.): the same files the download below opens; Flux 2's Sketch writes with qwen3vl 4B since 10.11. (no gated upsampler)
         asked = []
         t.mb.askokcancel = lambda title, msg, **k: asked.append(msg) or True
         opened.clear()
         fake_gate.set()
         app.download_missing("flux2")
-        assert sorted(opened) == sorted([manifest.FILES[ULTRA].url]), opened
+        assert opened == [manifest.FILES[ULTRA].url], opened
         assert "open in your browser" in asked[0] and ULTRA in asked[0] and "flux2-vae.safetensors" in asked[0]
         drain(app, until=lambda: not app._dl)
         assert (mdir / "vae" / "flux2-vae.safetensors").exists()
@@ -157,7 +157,9 @@ def main():
         assert extra[0][0] == "head" and all(r[0] in ("head", "file", "stop") for r in extra)
         cover = {m: st for m, _l, st, _tip in app._mode_cover("krea2")}
         assert cover["txt2img"] == "ready" and cover["inpaint"] == "none" and "img2img" not in cover
-        assert {st for _m, _l, st, _t in app._mode_cover("qwen")} <= {"ready", "none"} and any(st == "ready" for _m, _l, st, _t in app._mode_cover("qwen"))
+        qc = {m: st for m, _l, st, _t in app._mode_cover("qwen")}
+        assert {st for m, st in qc.items() if m not in ("sketch", "scribble")} <= {"ready", "none"} and "ready" in qc.values()
+        assert qc["sketch"] == qc["scribble"] == "missing"      # no upsampler in this ComfyUI: only the two tabs are locked (user 9.11.)
         app._settings_close()
         app.open_settings(focus="moss")
         assert app._settings_focus == "moss" and set(app._set_pages) == {m.key for m in ts.models.MODELS} | {"additional"}

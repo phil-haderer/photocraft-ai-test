@@ -1,7 +1,7 @@
 """The prompt field: editor keys, hints, ready-made prompts, enhance and negative boxes. (moved out of gui.py unchanged; see PLAN.md, phase 0)."""
 from __future__ import annotations
 
-from . import hostos, manifest, styles
+from . import custom_prompts, hostos, manifest, styles
 from .refslots import BBOX_TIP
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
@@ -137,13 +137,14 @@ class PromptMixin:
         text = (spec.prompt_tip if spec and spec.prompt_tip else "") or (EXPAND_HINT if mode == "outpaint" else "")
         if mode == "multi_edit" and getattr(self, "v_bbox", None) is not None and self._bbox_on():
             text = BBOX_TIP              # BBOX ticked: its tip instead of the Multi Image Edit one, only here (user 3.11.)
+        if mode in ("sketch", "scribble") and self._written_active():
+            text = models.WRITTEN_TIP    # a written prompt from the history: no upsampler (user 10.11.)
         if "{tag}" in text:      # Multi Image Edit: the example names the first reference the way this model does
             text = text.replace("{tag}", m.tag_style.format(n=2, i=1) if m and m.tag_style else "the reference image")
         on = bool(text)
         self._hint_text = text
         self._update_llm_button()
         self._update_styles_button()
-        self._update_std_switch()
         self.t_prompt.configure(highlightbackground=ACCENT if on else "#454545", highlightthickness=2 if on else 1)
         if on:
             self.lbl_hint.configure(text=text)
@@ -210,12 +211,60 @@ class PromptMixin:
                 return found
         return ""
 
+    def _llm_wanted(self) -> bool:
+        """Where Describe Canvas is shown (user 10.11. evening, P4): Text to image, and Upscale / Refine while the picture is not
+        made in tiles (every tile gets the whole prompt, so a description puts its objects into every tile, P8). Hidden in
+        every other function."""
+        mode = self.v_mode.get()
+        if mode == "txt2img":
+            return True
+        return mode in SCALE_MODES and not self._tiles_on()
+
+    def _tiles_on(self) -> bool:
+        """The selected workflow makes the picture in tiles: it has a tile split (SplitImageToTileList) that is not part of a
+        stage switched off. Flux 3 Upscale always tiles; Flux 2 and Fibo have the stage "Tiles". (Fibo also tiles by itself
+        above 3 MP; the window does not know the picture's size before the run, so that case is not counted.)"""
+        try:
+            templates = self._wf_templates()
+        except Exception:
+            return False
+        split = {nid for t in templates for nid, node in t.items()
+                 if isinstance(node, dict) and node.get("class_type") == "SplitImageToTileList"}
+        if not split:
+            return False
+        stages = self._stages()
+        for i, st in enumerate(stages):
+            if "tile" in str(st.get("label", "")).lower() and i < len(getattr(self, "stage_vars", ())):
+                return bool(self.stage_vars[i].get())
+        return True
+
+    def _prompt_margin(self):
+        """The text keeps a margin on the right over the whole height, as wide as the bin in the corner (P5): a tag with a
+        right margin over all of the text, set again after every change (typed text at the very start would miss it)."""
+        t = getattr(self, "t_prompt", None)
+        b = getattr(self, "b_clear", None)
+        if t is None or b is None:
+            return
+        try:
+            t.tag_configure("pc_margin", rmargin=int(b.winfo_reqwidth() or 0) + self._px(2))
+            t.tag_add("pc_margin", "1.0", "end")
+            t.tag_lower("pc_margin")
+        except (tk.TclError, TypeError, ValueError):
+            pass
+
     def _update_llm_button(self):
         """The LLM button is grey while no function is chosen, the prompt is switched off (Remove object) or the model's text
         model is missing; the tooltip says which file."""
         b = getattr(self, "b_llm", None)
         if b is None:
             return
+        want = self._llm_wanted()
+        if want != getattr(self, "_llm_shown", True):
+            if want:
+                b.pack(side="left", padx=(self._px(8), 0), after=self.b_save)     # right of Save (11.11.)
+            else:
+                b.pack_forget()
+            self._llm_shown = want
         m = self._model()
         off = str(self.t_prompt.cget("state")) == "disabled"
         if m is None or off:
@@ -230,7 +279,7 @@ class PromptMixin:
 
     def describe_canvas(self):
         """The LLM button: the model's text model describes the picture in PhotoCraft (Bridge.describe_canvas); the text goes
-        to the end of the prompt after a line break, in one undo step (Ctrl+Z in the field takes it away)."""
+        in front of the prompt, followed by a line break, in one undo step (Ctrl+Z in the field takes it away)."""
         import threading
         if getattr(self, "_describing", False) or (self.worker and self.worker.is_alive()):
             return
@@ -319,32 +368,36 @@ class PromptMixin:
         self._style_tip = None
         self._style_menus: list = []        # kept, so the submenus (and their names) stay alive
         kw = dict(tearoff=0, bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground="#1b1b1b", bd=0, font=font(9))
-        for mode, groups in self._styles.items():
+        self._mode_styles: dict = {}        # mode -> {style name: text} (Edit canvas and Sketch to image remember the style chosen last)
+        self._custom_kw = kw
+        self.m_custom: dict = {}            # mode -> its "Custom prompts" submenu (filled again each time the menu opens)
+        self._custom_menus: dict = {}       # mode -> the menus below it (one per saved prompt), destroyed on refresh
+        for mode in dict.fromkeys([k for k, _l in MODE_LABELS] + list(self._styles)):
+            groups = self._styles.get(mode, [])
             top = tk.Menu(self.root, **kw)
+            cm = tk.Menu(top, **kw)
+            self.m_custom[mode] = cm
+            self._custom_menus[mode] = []
+            top.add_cascade(label="Custom prompts", menu=cm)     # at the very top (user 11.11.); the style groups follow
+            cm.bind("<<MenuSelect>>", lambda e, m=cm: self._style_preview(m), add="+")
+            cm.bind("<Unmap>", lambda e: self._style_tip_hide(), add="+")
+            self._refresh_custom_menu(mode, entries=[])
+            if groups:
+                top.add_separator()
+            self._mode_styles[mode] = {s["name"]: s["text"] for g in groups for s in g["styles"]}
+            if mode in SET_STYLE_MODES:     # a whole sentence: the window may replace it like a stock text when the tab changes
+                models.STOCK_PROMPTS.update(self._mode_styles[mode].values())
             for g in groups:
                 sub = tk.Menu(top, **kw)
                 self._style_menus.append(sub)
                 for i, s in enumerate(g["styles"]):
-                    sub.add_command(label=s["name"], command=lambda t=s["text"]: self._apply_style(t))
+                    sub.add_command(label=s["name"], command=lambda t=s["text"], n=s["name"]: self._apply_style(t, n))
                     self._style_texts[(str(sub), i)] = s["text"]
                 sub.bind("<<MenuSelect>>", lambda e, m=sub: self._style_preview(m), add="+")
                 sub.bind("<Unmap>", lambda e: self._style_tip_hide(), add="+")
                 top.add_cascade(label=g["name"], menu=sub)
             top.bind("<<MenuSelect>>", lambda e: self._style_tip_hide(), add="+")
             self.m_styles[mode] = top
-
-    def _update_std_switch(self):
-        """"v10 graph" (A/B test) likewise only in MOSS Fill of the standard window."""
-        want10 = (self.v_mode.get() == "inpaint" and self.v_model.get() == "moss" 
-                  and (self.workflows_dir / V10_WORKFLOW).exists())
-        if want10 and not self._v10_shown:
-            self.cb_v10.pack(side="left", padx=(10, 0), after=self.f_pchoice)
-            self._v10_shown = True
-        elif not want10 and self._v10_shown:
-            self.cb_v10.pack_forget()
-            self._v10_shown = False
-        if not want10:
-            self.v_v10.set(False)
 
     def _build_prompt_placeholder(self):
         """The word "Prompt" in grey inside the empty field; it goes when the field has the focus or any text (user 6.11.)."""
@@ -360,6 +413,10 @@ class PromptMixin:
 
     def _prompt_placeholder(self, focused: bool | None = None):
         t = self.t_prompt
+        self._prompt_margin()          # the margin for the bin covers any text set by the program or typed (P5)
+        word = models.SKETCH_PLACEHOLDER if self.v_mode.get() == "sketch" else "Prompt"    # Sketch to image: plan B, 10.11.
+        if self._ph.cget("text") != word:
+            self._ph.configure(text=word)
         try:
             if focused is None:
                 focused = self.root.focus_get() is t
@@ -383,24 +440,47 @@ class PromptMixin:
             pass
 
     def _update_styles_button(self):
-        """The Styles button is there only in a mode that has styles (Text to image), it sits left
-        of the LLM button."""
+        """The Styles button is there in every function (its menu starts with Custom prompts, then come the style groups of
+        the modes that have them: Text to image, Edit canvas, Sketch to image), in the middle of the row over the field (P2,
+        10.11. evening; user 11.11.). Grey, like Save, while the prompt field is off (Remove)."""
         b = getattr(self, "b_styles", None)
         if b is None:
             return
         want = self.v_mode.get() in self.m_styles
         if want and not self._styles_shown:
-            b.pack(side="left", padx=(0, 6), before=self.b_clear)      # row: Describe Canvas, Styles, Delete
+            b.pack(side="left", before=self.b_save)       # first on the left, as high as Generate (window tests E and F, 11.11.)
             self._styles_shown = True
         elif not want and self._styles_shown:
             b.pack_forget()
             self._styles_shown = False
+        off = str(self.t_prompt.cget("state")) == "disabled"
+        for w in (b, getattr(self, "b_save", None)):
+            if w is not None:
+                w.configure(state="disabled" if off else "normal")
+
+    def _match_styles_height(self):
+        """Styles looks like Generate: the same height (window tests E and F, 11.11.: first lower, then higher than Generate).
+        Its vertical padding is whatever its own height lacks of Generate's; the row keeps that height."""
+        try:
+            self.root.update_idletasks()
+            want = max(int(w.winfo_reqheight() or 0) for w in (self.b_go, self.w_variants, self.b_stop))   # Generate's real height: its row
+            s = ttk.Style(self.root)
+            pad_x = self._px(10)
+            s.configure("Styles.TButton", padding=(pad_x, 0))
+            self.root.update_idletasks()
+            lack = max(0, want - int(self.b_styles.winfo_reqheight() or 0))
+            s.configure("Styles.TButton", padding=(pad_x, lack // 2, pad_x, lack - lack // 2))
+            self.f_ptop.rowconfigure(0, minsize=want)
+        except (tk.TclError, AttributeError, ValueError):
+            pass
 
     def _styles_menu(self):
-        """A click on the Styles button: the groups, opening under the button."""
-        m = self.m_styles.get(self.v_mode.get())
+        """A click on the Styles button: Custom prompts, then the groups, opening under the button."""
+        mode = self.v_mode.get()
+        m = self.m_styles.get(mode)
         if m is None or str(self.t_prompt.cget("state")) == "disabled":
             return
+        self._refresh_custom_menu(mode)
         b = self.b_styles
         try:
             m.tk_popup(b.winfo_rootx(), b.winfo_rooty() + b.winfo_height())
@@ -410,12 +490,259 @@ class PromptMixin:
             except Exception:
                 pass
             self._style_tip_hide()
+            # window test E (11.11.): after Append the field took no clicks for a moment. A hover box made in the menu's last
+            # moments could outlive the menu, topmost over the field: look once more when the menu is surely gone
+            for ms in (60, 300):
+                try:
+                    self.root.after(ms, self._style_tip_hide)
+                except Exception:
+                    pass
 
-    def _apply_style(self, text: str):
-        """A style entry is added to the prompt after a line break (user 1.11.; an empty field just gets the style), in one undo
-        step: Ctrl+Z in the field takes it away again."""
+    # ---------- Custom prompts (custom_prompts.py, docs/prompt-saver-konzept.md; user 11.11.) ----------
+
+    def _cp_tag(self) -> tuple:
+        """(model, function) as the window shows them, for the tag of a saved prompt."""
+        m = self._model()
+        mode = self.v_mode.get()
+        fn = "Edit canvas" if mode == "edit" else SCALE_FN_LABEL if mode in SCALE_MODES else dict(MODE_LABELS).get(mode, mode)
+        return (m.label if m else "Own workflow"), fn
+
+    def _cp_load(self) -> list:
+        entries = custom_prompts.load()
+        note = custom_prompts.load_note()
+        if note:
+            custom_prompts.clear_note()
+            self._status(note, error=True)
+        return entries
+
+    def _refresh_custom_menu(self, mode: str, entries: list | None = None):
+        """Fills the Custom prompts submenu of `mode` from the file (a normal Tk submenu): each saved prompt is a submenu of its
+        own with Use, Append, Edit and Delete; no prompts: one greyed-out line."""
+        cm = self.m_custom.get(mode)
+        if cm is None:
+            return
+        if entries is None:
+            entries = self._cp_load()
+        cm.delete(0, "end")
+        for old in self._custom_menus.get(mode, []):
+            self._style_texts = {k: v for k, v in self._style_texts.items() if k[0] != str(old)}
+            try:
+                old.destroy()
+            except Exception:
+                pass
+        self._custom_menus[mode] = []
+        if not entries:
+            cm.add_command(label=custom_prompts.EMPTY_LABEL, state="disabled")
+            return
+        for e in entries:
+            sub = tk.Menu(cm, **self._custom_kw)
+            self._custom_menus[mode].append(sub)
+            n = e["name"]
+            sub.add_command(label="Use", command=lambda n=n: self._cp_use(n))
+            sub.add_command(label="Append", command=lambda n=n: self._cp_use(n, append=True))
+            sub.add_command(label="Edit", command=lambda n=n: self._cp_edit(n))
+            sub.add_command(label="Delete", command=lambda n=n: self._cp_delete(n))
+            for i in (0, 1):
+                self._style_texts[(str(sub), i)] = e["text"]      # the hover box shows the whole text
+            sub.bind("<<MenuSelect>>", lambda ev, m=sub: self._style_preview(m), add="+")
+            sub.bind("<Unmap>", lambda ev: self._style_tip_hide(), add="+")
+            cm.add_cascade(label=custom_prompts.label(e), menu=sub)
+
+    def _cp_use(self, name: str, append: bool = False):
+        """Use: the saved text replaces the prompt; Append: it goes to the end after a line break. One undo step each."""
+        self._style_tip_hide()           # the hover box (topmost) must not stay over the field (window test E, 11.11.)
         t = self.t_prompt
         if str(t.cget("state")) == "disabled":
+            return
+        entries = self._cp_load()
+        i = custom_prompts.find(entries, name)
+        if i < 0:
+            return
+        text = entries[i]["text"]
+        auto = t.cget("autoseparators")      # Tk would otherwise split delete + insert into two undo steps
+        t.configure(autoseparators=False)
+        appended = False
+        try:
+            t.edit_separator()
+            old = t.get("1.0", "end").rstrip()
+            if append and old:
+                t.insert("end-1c", ("" if t.get("end-2c", "end-1c") == "\n" else "\n") + text)
+                appended = True
+            else:
+                t.delete("1.0", "end")
+                t.insert("1.0", text)
+            t.edit_separator()
+        finally:
+            t.configure(autoseparators=auto)
+        self._written_for = ""
+        t.focus_set()
+        self._update_prompt_hint()
+        self._status(f"Prompt “{name}” {'appended' if appended else 'set'}. Ctrl+Z in the field brings the text before back.")
+
+    def save_prompt(self):
+        """The Save button: asks for a name and keeps the text of the field (user 11.11.)."""
+        t = self.t_prompt
+        if str(t.cget("state")) == "disabled":
+            return
+        text = t.get("1.0", "end").strip()
+        if not text:
+            self._status("Write a prompt first")
+            return
+        model, fn = self._cp_tag()
+
+        def done(name, _text):
+            entries = self._cp_load()
+            r = custom_prompts.add(entries, name, text, model, fn)
+            if r == "exists":
+                if not messagebox.askyesno("Save prompt", f"“{name.strip()}” exists. Replace it?", parent=self.root):
+                    return False
+                r = custom_prompts.add(entries, name, text, model, fn, replace=True)
+            return self._cp_finish(r, entries, f"Prompt saved as “{name.strip()[:custom_prompts.MAX_NAME]}”. Find it under Styles > Custom prompts.")
+        self._cp_dialog("Save prompt", "", None, done)
+
+    def _cp_edit(self, name: str):
+        entries = self._cp_load()
+        i = custom_prompts.find(entries, name)
+        if i < 0:
+            return
+
+        def done(new_name, new_text):
+            entries = self._cp_load()
+            j = custom_prompts.find(entries, name)
+            if j < 0:
+                return True
+            r = custom_prompts.edit(entries, j, new_name, new_text)
+            if r == "exists":
+                if not messagebox.askyesno("Edit prompt", f"“{new_name.strip()}” exists. Replace it?", parent=self.root):
+                    return False
+                r = custom_prompts.edit(entries, j, new_name, new_text, replace=True)
+            return self._cp_finish(r, entries, f"Prompt “{new_name.strip()[:custom_prompts.MAX_NAME]}” changed.")
+        self._cp_dialog("Edit prompt", entries[i]["name"], entries[i]["text"], done)
+
+    def _cp_delete(self, name: str):
+        if not messagebox.askyesno("Delete prompt", f"Delete “{name}”?", parent=self.root):
+            return
+        entries = self._cp_load()
+        i = custom_prompts.find(entries, name)
+        if i < 0:
+            return
+        custom_prompts.delete(entries, i)
+        self._cp_finish("", entries, f"Prompt “{name}” deleted.")
+
+    def _cp_finish(self, result: str, entries: list, ok_text: str) -> bool:
+        """Writes the list after add/edit/delete and says what happened in the status line; True = the dialog may close."""
+        msgs = {"name": "Give the prompt a name.", "text": "The text is empty.",
+                "full": f"{custom_prompts.MAX_ENTRIES} prompts are saved: delete one first."}
+        if result:
+            self._status(msgs.get(result, "Not saved."), error=True)
+            return False
+        if not custom_prompts.save(entries):
+            self._status(f"Could not write {custom_prompts.path()}.", error=True)
+            return False
+        self._refresh_custom_menu(self.v_mode.get(), entries)
+        self._status(ok_text)
+        return True
+
+    def _cp_dialog(self, title: str, name: str, text, done):
+        """A small window in the style of the gear windows: Name (40 characters at most) and, when `text` is not None, the
+        text; Save / Cancel. `done(name, text)` returns False to keep it open. It does not block (the tests drive
+        self._cp_win.ok())."""
+        old = getattr(self, "_cp_win", None)
+        if old is not None:
+            try:
+                old.destroy()
+            except tk.TclError:
+                pass
+        win = tk.Toplevel(self.root, **hostos.TOP_KW)
+        win.withdraw()                   # placed first, then shown: a shown window without a title bar ignored the move (window test F)
+        win.title(title)
+        win.wm_overrideredirect(True)
+        win.configure(bg=BG, highlightthickness=1, highlightbackground="#5c5c5c")
+        box = ttk.Frame(win)
+        box.pack(fill="both", expand=True, padx=self._keep(14), pady=self._keep(12))
+        ttk.Label(box, text=title, font=font(10, bold=True), foreground="#ffffff").pack(anchor="w")
+        ttk.Label(box, text="Name", style="Muted.TLabel").pack(anchor="w", pady=(self._keep(8), 0))
+        v_name = tk.StringVar(value=name)
+        e = ttk.Entry(box, textvariable=v_name, width=44)
+        e.pack(fill="x")
+        mx = custom_prompts.MAX_NAME
+        v_name.trace_add("write", lambda *_a: v_name.set(v_name.get()[:mx]) if len(v_name.get()) > mx else None)
+        t = None
+        if text is not None:
+            ttk.Label(box, text="Text", style="Muted.TLabel").pack(anchor="w", pady=(self._keep(8), 0))
+            t = tk.Text(box, height=7, width=44, wrap="word", bg=PANEL, fg=FG, insertbackground=FG, relief="flat",
+                        highlightthickness=1, highlightbackground="#454545", highlightcolor=ACCENT, font=font(10), padx=6, pady=4,
+                        undo=True)
+            t.pack(fill="both", expand=True)
+            t.insert("1.0", text)
+        row = ttk.Frame(box)
+        row.pack(fill="x", pady=(self._keep(12), 0))
+
+        def close():
+            self._cp_win = None
+            try:
+                win.destroy()
+            except tk.TclError:
+                pass
+            # the keyboard goes back to the plugin and its prompt field (window test F, 11.11.: after Save the field took no
+            # clicks for a moment: Windows had left no window of the plugin active)
+            try:
+                self.root.after_idle(self._prompt_focus_back)
+            except tk.TclError:
+                pass
+
+        def ok(_e=None):
+            if done(v_name.get(), t.get("1.0", "end").strip() if t is not None else ""):
+                close()
+        win.ok, win.close, win.v_name, win.t_text = ok, close, v_name, t     # for the tests
+        ttk.Button(row, text="Cancel", command=close, style="TipOk.TButton").pack(side="right")
+        ttk.Button(row, text="Save", command=ok, style="TipOk.TButton").pack(side="right", padx=(0, self._keep(8)))
+        win.protocol("WM_DELETE_WINDOW", close)
+        win.bind("<Escape>", lambda ev: close())
+        if t is None:
+            win.bind("<Return>", ok)
+        self._cp_win = win
+        try:
+            win.transient(self.root)
+            win.update_idletasks()
+            w, h = max(self._px(360), win.winfo_reqwidth()), win.winfo_reqheight()
+            # beside the window, top edges level, like the settings window (window test E, 11.11.); no room on the right of
+            # the screen: on the left of the window
+            x = self.root.winfo_rootx() + self.root.winfo_width() + 8
+            try:
+                vx0, _vy0, vx1, _vy1 = self._monitor_at(self.root.winfo_rootx(), self.root.winfo_rooty(), work=True)
+                if x + w > vx1:
+                    x = max(vx0, self.root.winfo_rootx() - w - 8)
+            except Exception:
+                pass
+            y = self.root.winfo_rooty()
+            self._cp_pos = (x, y)                # (a hidden test window reports +0+0, so the tests read this)
+            win.geometry(f"{w}x{h}+{x}+{y}")
+            win.deiconify()
+            win.lift()
+            win.focus_force()
+            e.focus_set()
+            e.selection_range(0, "end")
+        except tk.TclError:
+            pass
+
+    def _prompt_focus_back(self):
+        try:
+            self.root.focus_force()
+            if str(self.t_prompt.cget("state")) != "disabled":
+                self.t_prompt.focus_set()
+        except tk.TclError:
+            pass
+
+    def _apply_style(self, text: str, name: str = ""):
+        """A style entry is added to the prompt after a line break (user 1.11.; an empty field just gets the style), in one undo
+        step: Ctrl+Z in the field takes it away again. In Edit canvas and Sketch to image the style is the whole sentence (plan B, 10.11.)."""
+        self._style_tip_hide()
+        t = self.t_prompt
+        if str(t.cget("state")) == "disabled":
+            return
+        if self.v_mode.get() in SET_STYLE_MODES:
+            self._set_style(text, name)
             return
         auto = t.cget("autoseparators")      # Tk would otherwise split delete + insert into two undo steps
         t.configure(autoseparators=False)
@@ -432,6 +759,50 @@ class PromptMixin:
             t.configure(autoseparators=auto)
         t.focus_set()
         self._status("Style added to the prompt. Ctrl+Z in the field takes it away again.")
+
+    def _set_style(self, text: str, name: str = ""):
+        """Edit canvas and Sketch to image (plan B, 10.11.): the style replaces the whole field; what was typed for <WHAT IT SHOWS>
+        in the style before goes along into the new one. The style is remembered (settings.json); only Sketch to image puts it
+        back into the field on opening (_sketch_style_fill; Edit canvas stays as it was, user 10.11.)."""
+        t = self.t_prompt
+        mode = self.v_mode.get()
+        subject = styles.subject_of(t.get("1.0", "end"), self._mode_styles.get(mode, {}).values(), models.SKETCH_MARK)
+        new = styles.fill(text, None if subject == models.SKETCH_MARK else subject, models.SKETCH_MARK)
+        self._written_for = ""              # a style: the writer runs again (Sketch from the history)
+        auto = t.cget("autoseparators")
+        t.configure(autoseparators=False)
+        try:
+            t.edit_separator()
+            t.delete("1.0", "end")
+            t.insert("1.0", new)
+            t.edit_separator()
+        finally:
+            t.configure(autoseparators=auto)
+        if name:
+            cfgmod.set_setting(STYLE_KEY + mode, name)
+        t.focus_set()
+        self._update_prompt_hint()
+        self._status(f"Style “{name or 'chosen'}” set. Ctrl+Z in the field brings the text before back.")
+
+    def _sketch_style_fill(self):
+        """Opening Sketch to image: an empty field (or one with a stock text of another tab) gets the style chosen last, with
+        <WHAT IT SHOWS> to replace; without one it stays empty and shows "Choose a style under Styles" (plan B, 10.11.)."""
+        t = self.t_prompt
+        if str(t.cget("state")) == "disabled":
+            return
+        cur = t.get("1.0", "end").strip()
+        if cur and cur not in models.STOCK_PROMPTS:
+            return
+        texts = getattr(self, "_mode_styles", {}).get("sketch", {})
+        name = cfgmod.get_setting(STYLE_KEY + "sketch", "")
+        new = texts.get(name, "") if isinstance(name, str) else ""
+        if new == cur:
+            return
+        t.edit_separator()
+        t.delete("1.0", "end")
+        if new:
+            t.insert("1.0", new)
+        t.edit_separator()
 
     def _style_text_at(self, menu, active):
         """The text of entry number `active` of a style submenu ("" for none)."""
@@ -562,6 +933,7 @@ class PromptMixin:
             if getattr(self, "_prompt_kept", ""):
                 t.insert("1.0", self._prompt_kept)
             self._prompt_kept = ""
+        self._update_styles_button()        # Styles and Save are grey while the field is off
 
     def _show_negative(self):
         opened = bool(self.v_neg_open.get())

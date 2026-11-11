@@ -31,6 +31,9 @@ label{color:var(--mut);font-size:12px}
 .view.z img{image-rendering:pixelated}
 #hint{padding:5px 14px;color:var(--mut);font-size:12px;border-top:1px solid var(--line)}
 kbd{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.rt{display:flex;gap:4px;flex:none;white-space:nowrap}.rt button{padding:2px 8px;font-size:12px}.rt button.gut.on{background:#2f9e5b;border-color:#2f9e5b;color:#fff}.rt button.mittel.on{background:#c9a227;border-color:#c9a227;color:#111}.rt button.schlecht.on{background:#d04848;border-color:#d04848;color:#fff}
+.t{position:relative}.t i{position:absolute;top:4px;right:4px;width:10px;height:10px;border-radius:50%;border:1px solid #000}.t i.gut{background:#2f9e5b}.t i.mittel{background:#c9a227}.t i.schlecht{background:#d04848}
+#count{color:var(--mut);font-size:12px}
 </style></head><body>
 <div id="top">
   <div style="display:flex;gap:8px;flex:1;min-width:0"><span class="who" style="color:var(--a)">A</span><div class="strip" id="ta"></div></div>
@@ -39,16 +42,19 @@ kbd{background:var(--panel);border:1px solid var(--line);border-radius:4px;paddi
     <span><button id="m2" class="on">Side by side</button> <button id="m1">Toggle</button></span>
     <span><button id="z100" class="on">100 %</button> <button id="z200">200 %</button> <button id="zfit">Fit</button></span>
     <label><input type="checkbox" id="sync" checked> link scrolling</label>
+    <span id="count"></span>
   </div>
   <div style="display:flex;gap:8px;flex:1;min-width:0;justify-content:flex-end"><div class="strip" id="tb" style="justify-content:flex-end"></div><span class="who" style="color:var(--b)">B</span></div>
 </div>
 <div id="main">
-  <div class="pane" id="pa"><div class="bar"><b>A</b><span class="lb" id="la"></span><span id="za"></span></div><div class="pr" id="pra"></div><div class="view" id="va"><img id="ia"></div></div>
-  <div class="pane" id="pb"><div class="bar"><b>B</b><span class="lb" id="lb"></span><span id="zb"></span></div><div class="pr" id="prb"></div><div class="view" id="vb"><img id="ib"></div></div>
+  <div class="pane" id="pa"><div class="bar"><b>A</b><span class="lb" id="la"></span><span class="rt" id="ra"></span><span id="za"></span></div><div class="pr" id="pra"></div><div class="view" id="va"><img id="ia"></div></div>
+  <div class="pane" id="pb"><div class="bar"><b>B</b><span class="lb" id="lb"></span><span class="rt" id="rb"></span><span id="zb"></span></div><div class="pr" id="prb"></div><div class="view" id="vb"><img id="ib"></div></div>
 </div>
 <div id="hint">Click a thumbnail at the top left for A, at the top right for B. Drag or use the wheel to scroll. In Toggle mode <kbd>Space</kbd> or a click switches A/B in place; <kbd>1</kbd> = A, <kbd>2</kbd> = B. Pictures of different size are linked by proportion (the detail matches roughly, not pixel for pixel).</div>
 <script>
 const SETS = __SETS__;
+// optional rating (a page served with window.RATE_CONF = {url, ratings_url}): gut / mittel / schlecht per picture with an id
+const RATE = window.RATE_CONF || null, RATINGS = {}, WAHL = ['gut', 'mittel', 'schlecht'];
 const $ = id => document.getElementById(id);
 let zoom = 1, mode = 2, flip = 'a', syncing = false, fit = false, moved = false, active = 'va', ia = 0, ib = 1;
 const sel = $('set');
@@ -59,13 +65,17 @@ function strips() {
     const el = $(id); el.innerHTML = '';
     items.forEach((it, i) => {
       const d = document.createElement('div'); d.className = 't' + (i === cur ? ' sel' : ''); d.title = it.label;
-      d.innerHTML = '<img src="' + it.thumb + '"><span>' + it.short + '</span>';
+      d.innerHTML = '<img src="' + it.thumb + '"><span>' + it.short + '</span>' + (RATE && it.id && RATINGS[it.id] ? '<i class="' + RATINGS[it.id] + '"></i>' : '');
       d.onclick = () => { if (who === 'a') ia = i; else ib = i; strips(); show(); };
       el.appendChild(d);
     });
   }
 }
-function load() { const n = SETS[+sel.value].images.length; ia = 0; ib = Math.min(1, n - 1); strips(); show(); }
+function load() {
+  const items = SETS[+sel.value].images, n = items.length; ia = 0; ib = Math.min(1, n - 1);
+  if (RATE) { const r = items.map((it, i) => it.id ? i : -1).filter(i => i >= 0); if (r.length) { ia = r[0]; ib = r[1] ?? r[0]; } }   // rating: start on the first two variants
+  strips(); show();
+}
 function setImg(img, sizeEl, lbEl, prEl, it) {
   lbEl.textContent = it.label; prEl.textContent = "Prompt: " + it.prompt;
   img.onload = () => { sizeEl.textContent = img.naturalWidth + ' x ' + img.naturalHeight; apply(); };
@@ -73,7 +83,28 @@ function setImg(img, sizeEl, lbEl, prEl, it) {
 }
 function show() {
   const items = SETS[+sel.value].images;
-  setImg($('ia'), $('za'), $('la'), $('pra'), items[ia]); setImg($('ib'), $('zb'), $('lb'), $('prb'), items[ib]); layout();
+  setImg($('ia'), $('za'), $('la'), $('pra'), items[ia]); setImg($('ib'), $('zb'), $('lb'), $('prb'), items[ib]); layout(); rateBars();
+}
+function rateBars() {
+  if (!RATE) return;
+  const items = SETS[+sel.value].images;
+  for (const [id, it] of [['ra', items[ia]], ['rb', items[ib]]]) {
+    const el = $(id); el.innerHTML = '';
+    if (!it.id) continue;
+    for (const w of WAHL) {
+      const b = document.createElement('button'); b.textContent = w; b.className = w + (RATINGS[it.id] === w ? ' on' : '');
+      b.onclick = () => rate(it.id, w); el.appendChild(b);
+    }
+  }
+  const all = SETS.flatMap(s => s.images).filter(i => i.id);
+  $('count').textContent = 'bewertet: ' + all.filter(i => RATINGS[i.id]).length + '/' + all.length;
+}
+async function rate(id, w) {
+  try {
+    const r = await fetch(RATE.url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id, wahl: w})});
+    if (!r.ok) throw new Error(await r.text());
+    RATINGS[id] = w; strips(); rateBars();
+  } catch (e) { alert('Not saved: ' + e.message); }
 }
 function apply() {
   for (const id of ['ia', 'ib']) {
@@ -109,8 +140,14 @@ const zb = (id, z, f) => $(id).onclick = () => { zoom = z; fit = f; for (const k
 zb('z100', 1, false); zb('z200', 2, false); zb('zfit', 1, true);
 addEventListener('keydown', e => {
   if (e.target.tagName === 'SELECT') return;
+  if (RATE && 'gms'.includes(e.key.toLowerCase()) && e.key.length === 1) {   // G / M / S rate the picture in the pane in use
+    const items = SETS[+sel.value].images, it = items[(mode === 1 ? flip === 'a' : active === 'va') ? ia : ib];
+    if (it.id) rate(it.id, WAHL['gms'.indexOf(e.key.toLowerCase())]);
+  }
   if (e.code === 'Space') { e.preventDefault(); if (mode === 1) toggle(); else { mode = 1; layout(); } }
   if (e.key === '1' && mode === 1 && flip === 'b') toggle(); if (e.key === '2' && mode === 1 && flip === 'a') toggle();
 });
+if (RATE) fetch(RATE.ratings_url).then(r => r.json()).then(d => { Object.assign(RATINGS, d); strips(); rateBars(); }).catch(() => {});
+if (RATE) $('hint').textContent += ' Rating: the buttons above each picture, or G (gut), M (mittel), S (schlecht) for the picture in the pane the mouse was last in (in Toggle mode: the one shown).';
 load();
 </script></body></html>

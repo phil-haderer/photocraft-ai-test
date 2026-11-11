@@ -106,7 +106,7 @@ class Inventory:
         if own:
             return Status("missing", own)
         per = {mode: self.mode_status(key, mode) for mode in m.modes}
-        bad = {mode: s for mode, s in per.items() if s.state == "missing"}
+        bad = {mode: s for mode, s in per.items() if s.state == "missing" and not manifest.mode_alone(key, mode)}
         opt = self.missing(manifest.TABS[key].optional)
         if not bad:
             return Status("ready", (), opt)
@@ -187,11 +187,14 @@ class Inventory:
         for m in models.MODELS:
             st = self.tab_status(m.key)
             names = list(manifest.TABS[m.key].required) if m.key in manifest.TABS else []
-            for mode in (manifest.TABS[m.key].modes if m.key in manifest.TABS else {}):
-                names += [n for n in manifest.mode_extra(m.key, mode) if n not in names]
+            modes = manifest.TABS[m.key].modes if m.key in manifest.TABS else {}
+            for mode in modes:
+                if not manifest.mode_alone(m.key, mode):
+                    names += [n for n in manifest.mode_extra(m.key, mode) if n not in names]
             opt = [n for n in (manifest.TABS[m.key].optional if m.key in manifest.TABS else ()) if n not in names]
-            for mode in (manifest.TABS[m.key].modes if m.key in manifest.TABS else {}):
-                opt += [n for n in manifest.mode_optional(m.key, mode) if n not in names and n not in opt]
+            for mode in modes:      # a mode that locks only itself (Sketch): its files are listed with the additional features
+                more = manifest.mode_optional(m.key, mode) + (manifest.mode_extra(m.key, mode) if manifest.mode_alone(m.key, mode) else ())
+                opt += [n for n in more if n not in names and n not in opt]
             files = ([(manifest.FILES[n], self.found(n), "required") for n in names if n in manifest.FILES]
                      + [(manifest.FILES[n], self.found(n), "optional") for n in opt
                         if n in manifest.FILES and manifest.FILES[n].kind not in manifest.ADDITIONAL_KINDS])

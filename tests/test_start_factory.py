@@ -61,11 +61,12 @@ def main():
     finally:
         app.root.destroy()
     # "Set current settings as my standard settings" is loaded at the start (user 4.11., evening); a value not saved stays at the standard
-    cfgmod.set_saved_page("qwen", "inpaint", {"sharpen": 0.4, "context": 0.65})
+    cfgmod.set_saved_page("qwen", "inpaint", {"sharpen": 0.4, "context": 0.65, "steps": 13})
     app = start(left_over)
     try:
         app._start_fresh()
         assert abs(app.v_sharpen.get() - 0.4) < 1e-6 and abs(app.v_context.get() - 0.65) < 1e-6, (app.v_sharpen.get(), app.v_context.get())
+        assert app.v_steps.get() == 13, app.v_steps.get()        # the saved steps come back too (PLAN 2.5, 4.11.: "steps did not come back")
     finally:
         app.root.destroy()
     cfgmod.set_saved_page("qwen", "inpaint", None)

@@ -20,7 +20,7 @@ def main():
             assert (t.ROOT / "workflows" / w).exists(), (m.key, w)
         for mode in m.modes:
             assert mode in dict(gui.MODE_LABELS), (m.key, mode)
-    assert [m.label for m in models.MODELS] == ["Flux 3 Klein Edit", "Flux 2 Klein Edit", "Qwen Image 2.1", "Fibo 2.0 Edit Turbo", "Krea 2 Turbo", "MOSS Image"]
+    assert [m.label for m in models.MODELS] == ["Flux 3 Klein Edit", "Flux 2 Klein Edit", "Qwen Image 2.1", "Fibo 2.0 Edit Turbo", "Krea 2 Turbo", "MOSS Image", "MiniMax H3 Image"]
 
     app = gui.App(cfgmod.load())
     wfdir = Path(app.workflows_dir)
@@ -43,7 +43,7 @@ def main():
     app._on_model()
     assert app.v_workflow.get() == "qwen-image-21-edit.json" and app.v_res.get() == 1024 and app.v_turbo.get() is False    # Qwen: Turbo off by default (27.10.)
     assert app.rb_modes["edit"]["state"] == "normal" and app.rb_modes["upscale"]["state"] == "normal"     # functions: never grey
-    assert [k for k, rb in app.rb_tabs.items() if rb["state"] == "normal"] == ["qwen", "fibo"]          # models that can fill
+    assert [k for k, rb in app.rb_tabs.items() if rb["state"] == "normal"] == ["flux2", "qwen", "fibo"]          # models that can fill (Flux 2 since 10.11.)
     app.v_mode.set("upscale"); app._on_mode()
     assert app.v_model.get() == "qwen" and app.v_workflow.get() == "qwen-image-21-upscale.json"      # Qwen can upscale: stays
     app.v_mode.set("refine"); app._on_mode()
@@ -59,7 +59,7 @@ def main():
     app.v_mode.set("inpaint"); app._on_mode()
 
     # the modes follow each other in the order text, edit, fill, remove, expand, reference, upscale, refine
-    assert [k for k, _ in gui.MODE_LABELS] == ["txt2img", "outpaint", "inpaint", "remove", "edit", "multi_edit", "upscale", "refine", "img2img"]
+    assert [k for k, _ in gui.MODE_LABELS] == ["txt2img", "outpaint", "inpaint", "remove", "edit", "multi_edit", "sketch", "scribble", "upscale", "refine", "img2img"]
 
     # MOSS: text to image, Generative fill, Expand (a test); the DMD2 LoRA is its own LoRA, Lenovo and SLG are switches
     app.v_model.set("moss")
@@ -102,7 +102,7 @@ def main():
     app.v_model.set("flux2")
     app._on_model()
     assert app.v_res.get() == 1024
-    assert len(app.rb_tabs) == 6 and app.f_tabs is not None
+    assert len(app.rb_tabs) == 7 and app.f_tabs is not None      # + MiniMax H3 Image (PLAN 2.0b)
 
     # Flux 3: upscale brings its workflow, 1.5 and the placeholder; edit takes the placeholder away again
     app.v_model.set("flux3")
@@ -122,10 +122,15 @@ def main():
     assert "refine" in models.BY_KEY["flux3"].modes                                      # Flux 3 Refine (after Pixaroma, 1.11.)
 
     # a model without the current mode: the first one it has
+    app.v_model.set("flux3")
+    app.v_mode.set("inpaint")
+    app._on_model()
+    assert app.v_mode.get() == "txt2img" and app.v_workflow.get() == "flux3-klein-t2i.json"      # Flux 3 has no Fill: text to image
     app.v_model.set("flux2")
     app.v_mode.set("inpaint")
     app._on_model()
-    assert app.v_mode.get() == "txt2img" and app.v_workflow.get() == "flux2-klein-t2i.json"      # Flux 2 starts with text to image
+    assert app.v_mode.get() == "inpaint" and app.v_workflow.get() == "flux2-klein-edit.json"     # Flux 2 Fill (user 10.11.)
+    assert app._hint_text == models.FILL_TIP
 
     # Fibo: one workflow with the LLM checkbox; its state stays while the mode changes; the tab follows a loaded workflow
     app.v_model.set("fibo")

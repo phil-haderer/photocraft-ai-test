@@ -1,0 +1,17 @@
+{
+ "note": "Own style texts (not from the Krea 2 Style Explorer), added to the named group of Text to image by tools/build_styles.py (user 10.11.2026). Not yet tested on the GPU.",
+ "groups": [
+  {
+   "name": "Studio & product",
+   "styles": [
+    {"name": "Studio portrait", "text": "professional studio portrait, softbox key light, subtle rim light, seamless grey backdrop, natural skin texture, sharp focus on the eyes, shallow depth of field, neutral color grading"},
+    {"name": "Business headshot", "text": "corporate headshot, clean light grey background, soft even lighting, friendly confident expression, business attire, sharp focus, natural skin tones, 85mm portrait lens"},
+    {"name": "Stock photo, lifestyle", "text": "authentic lifestyle stock photography, natural window light, candid genuine moment, bright airy interior, warm natural tones, soft shallow depth of field, clean modern composition"},
+    {"name": "Stock photo, office team", "text": "business stock photography, modern bright office, colleagues collaborating, natural daylight, candid interaction, clean uncluttered background, soft depth of field"},
+    {"name": "Product photo, colour backdrop", "text": "commercial product photography, solid pastel colour backdrop, soft diffused studio light, gentle shadow, centered composition, crisp detail, clean minimal styling"},
+    {"name": "Product photo, lifestyle setting", "text": "lifestyle product photography, product on a wooden table, soft natural daylight, styled props, warm neutral palette, shallow depth of field, clean commercial look"},
+    {"name": "Food photography", "text": "professional food photography, soft side light, 45-degree angle, fresh ingredients, rustic table surface, appetizing natural colors, shallow depth of field"}
+   ]
+  }
+ ]
+}

@@ -2,6 +2,9 @@
 Run: python tests/run_all.py            (all files)
      python tests/run_all.py bars round  (only files whose name contains one of the words)
      python tests/run_all.py -j 4        (four files at a time; the files use their own temp folders and ports)
+PCCOMFY_SLOW_TESTS=1 also runs the slow parts (test_scribble on the real round 6 photos, the full matrix of
+test_fill_mask_variants); without it they are skipped or sampled. Only test_*.py files are collected
+(tests/selfcheck_*.py and tests/live_*.py are run by hand).
 Exit code 0 = all green. The tests use a stubbed Tk and a fake PhotoCraft: the real window and real generations are not covered."""
 import os
 import subprocess

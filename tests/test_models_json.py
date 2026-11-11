@@ -28,7 +28,7 @@ def bad(doc, text):
 def main():
     assert manifest.MODELS_JSON.is_file() and manifest.MODELS_JSON.parent == ROOT / "pccomfy"
     files = manifest.load_files()
-    assert files == manifest._LIST and len(files) == len(manifest.FILES) == 30, len(files)
+    assert files == manifest._LIST and len(files) == len(manifest.FILES) == 33, len(files)      # + the three MiniMax H3 Image files (PLAN 2.0b)
     for f in files:
         assert f.kind in manifest.KINDS, f
         assert f.url == "" or f.url.startswith("https://"), f

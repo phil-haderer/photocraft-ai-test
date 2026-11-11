@@ -203,6 +203,24 @@ def main():
     assert miss == ["Flux 3\\flux-3-image-klein-restore.safetensors"]
     off, miss = workflows.fix_lora_names(workflows.bypass_lora(f3), [])                          # switched off: nothing to find
     assert not miss
+    # a LoRA linked in the settings window under another file name: the run uses the linked file instead of stopping
+    # with "ComfyUI does not list this LoRA file" (the settings window called the model ready; review 10.11.)
+    import types
+    from pccomfy import bridge, config
+    restore = "Flux 3\\flux-3-image-klein-restore.safetensors"
+    listed = ["mine\\my_restore.safetensors", "Flux 2\\ultra_real_v4.safetensors"]
+    fake = types.SimpleNamespace(comfy=types.SimpleNamespace(loras=lambda: listed))
+    try:
+        bridge.Bridge._real_lora_names(fake, f3)
+        raise AssertionError("an unlinked, unlisted LoRA must stop the run")
+    except bridge.BridgeError as e:
+        assert restore in str(e)
+    config.set_model_link(restore, "mine\\my_restore.safetensors")
+    try:
+        assert bridge.Bridge._real_lora_names(fake, f3)["9"]["inputs"]["lora_name"] == "mine\\my_restore.safetensors"
+    finally:
+        config.set_model_link(restore, None)
+    assert bridge.Bridge._real_lora_names(types.SimpleNamespace(comfy=types.SimpleNamespace(loras=lambda: ["flux 3/FLUX-3-IMAGE-KLEIN-RESTORE.safetensors"])), f3)["9"]["inputs"]["lora_name"] == "flux 3/FLUX-3-IMAGE-KLEIN-RESTORE.safetensors"   # case and separator, as before
     # Remove Selection: the text box is usable on every model that has the function
     for key in ("qwen", "flux2", "flux3", "fibo"):
         assert models.BY_KEY[key].modes["remove"].remove_text, key
@@ -298,6 +316,10 @@ def main():
 
     # run time next to "Done"; Flux 2 refine default without "people, faces"; the tip is a wrapped label
     assert gui.duration_text(23.4) == "23 s" and gui.duration_text(65) == "1 min 05 s" and gui.duration_text(0.2) == "0 s"
+    # the "Done" line after Upscale names the new documents, not "created 0 layers" (review 10.11.)
+    assert gui.made_text(1) == "created 1 layer" and gui.made_text(3) == "created 3 layers" and gui.made_text(0) == "created 0 layers"
+    assert gui.made_text(0, 1) == "opened 1 new document" and gui.made_text(0, 2) == "opened 2 new documents"
+    assert gui.made_text(2, 1) == "created 2 layers"      # layers win when a run made both (not the case today)
     assert "people" not in models.FLUX2_DEFAULT and models.FLUX2_DEFAULT_OLD in models.STOCK_PROMPTS and models.FLUX2_DEFAULT.endswith("Keep the composition and colors exactly as they are.") and models.FLUX2_DEFAULT_PREV in models.STOCK_PROMPTS
     assert models.EDIT_TIP == "Describe the result: “Replace the laptop with a book.” or “Remove the sitting person.”"
     assert app.lbl_hint["wrap"] == "word"      # selectable text
@@ -387,10 +409,12 @@ def main():
     assert app.v_sharpen.get() == 0.0                         # a greyed-out slider takes no typed value
     app.w_sharpen.configure(state="normal")
 
-    # Text to image: every model shows the tip under the prompt
+    # Text to image: every model shows the tip under the prompt; MiniMax says where its picture goes instead (a new
+    # document unless "Downsize to canvas" is ticked, PLAN 2.0b)
     for m in models.MODELS:
         if "txt2img" in m.modes:
-            assert m.modes["txt2img"].prompt_tip == models.T2I_TIP, m.key
+            want = models.MINIMAX_T2I_TIP if m.key == "minimax" else models.T2I_TIP
+            assert m.modes["txt2img"].prompt_tip == want, m.key
     pick("flux3", "txt2img")
     assert app._hint_text == models.T2I_TIP
 

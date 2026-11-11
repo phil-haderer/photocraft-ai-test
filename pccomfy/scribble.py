@@ -5,7 +5,8 @@ The settings are the ones the blind test rounds 5 to 7 rated best (docs/tests/sk
 - the scribble is found on its own layer (the top layer, mostly transparent, one colour), else by colour: bright green
   first, then pure red (round 7: on a red neon wall the wall outweighed a green scribble when the larger area won);
   a scribble covers at least MIN_SHARE of the picture (clean photos had red specks of 107 and 314 pixels, the smallest
-  real scribble 2410);
+  real scribble 2410); a thin frame drawn round an area counts with half of that when its box covers at least
+  FRAME_BOX of the picture (writer round 10.11.: a 2 px rectangle round a facade had 481 pixels in 1.5 MP);
 - only a crop around it is generated: the box (+ 8 %) grown by CONTEXT (40 %; 100 % gave twice the faults);
 - the result is shifted to the photo's colours in the ring around the scribble (mean and spread per channel, spread
   held to 0.7 .. 1.4) and comes back opaque over the box, fading to 0 at the crop's sides (as Fill with Qwen and Fibo).
@@ -23,6 +24,8 @@ RED = (252, 2, 2)          # as measured on the user's scribbles
 GREEN = (0, 255, 0)        # bright pure green (user 9.11.: for photos with much red)
 PAD = 0.08                 # the box around the strokes, a little larger
 MIN_SHARE = 0.0005         # 0.05 % of the picture (about 1000 pixels at 2 MP)
+FRAME_SHARE = 0.5          # a thin frame needs only half of MIN_SHARE ...
+FRAME_BOX = 0.01           # ... when the box of its strokes covers at least 1 % of the picture (a speck's box is tiny)
 CONTEXT = 0.4              # the crop around the box, as Remove with Flux and Qwen
 RING_PAD = 0.20            # the colour match leaves out the box + 20 % (where the new object may reach)
 FEATHER_PCT = 10.0         # soft edge in % of the box's shorter side
@@ -103,9 +106,16 @@ def find_by_colour(im: Image.Image) -> Found | None:
     least = MIN_SHARE * im.width * im.height
     for colour, how in ((GREEN, "green"), (RED, "red")):
         n, xy = _largest_area(colour_pixels(a, colour))
-        if xy and n >= least:
+        if xy and (n >= least or _thin_frame(n, xy, im.size)):
             return _found(xy, im.size, how)
     return None
+
+
+def _thin_frame(n: int, xy: tuple, size: tuple[int, int]) -> bool:
+    """A thin outline round an area: few pixels (at least FRAME_SHARE of the minimum) but a box of FRAME_BOX or more."""
+    area = size[0] * size[1]
+    box = (xy[2] - xy[0] + 1) * (xy[3] - xy[1] + 1)
+    return n >= FRAME_SHARE * MIN_SHARE * area and box >= FRAME_BOX * area
 
 
 def is_scribble_layer(layer: Image.Image) -> bool:

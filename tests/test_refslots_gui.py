@@ -395,14 +395,14 @@ def main():
 
     # BBOX: a Flux 3 Multi Image Edit switch; the request carries it only while it is ticked and the function is the right one
     pick("flux3", "multi_edit")
-    assert not app.cb_bbox.winfo_manager()           # the tick is the tab "BBOX placement" now (user 7.11.)
+    assert not app.cb_bbox.winfo_manager()           # the tick is the tab "Insert reference" now (user 7.11.)
     assert app._request().bbox is False and app._hint_text.startswith("Example:")
     assert not hasattr(app, "lbl_refbbox")          # no tip under the slots any more (user 3.11.)
     assert app.refslots.max_refs == 3 and app.lbl_refs["text"] == "Reference images (max. 3)"      # Flux 3 with BBOX off: its usual three
     app.v_edtab.set("bbox")                         # a click on the tab (the stubbed Tk has no invoke): it sets the mode and the tick
     app._edtab_clicked()
     assert app.v_mode.get() == "multi_edit" and app.v_bbox.get() and app.v_edtab.get() == "bbox"
-    assert app.refslots.max_refs == 1 and app.lbl_refs["text"] == "Reference images (max. 1)"      # BBOX placement: one reference image
+    assert app.refslots.max_refs == 1 and app.lbl_refs["text"] == "Reference images (max. 1)"      # Insert reference: one reference image
     assert app._request().bbox is True and app._hint_text == refslots.BBOX_TIP     # BBOX ticked: its tip under the prompt instead
     assert "name the object from the reference image" in refslots.BBOX_TIP
     assert app._request().layer_mask == "soft"      # BBOX: the margin mask, whatever the mode's start value (live finding 30.10.: "none" gave a whole new picture)
@@ -422,7 +422,7 @@ def main():
     app.v_edtab.set("bbox")
     app._edtab_clicked()
     assert app.v_edtab.get() == "bbox" and app._bbox_on() and app.refslots.max_refs == 1
-    app.v_edtab.set("multi")                                                   # BBOX placement -> Multi image edit: only the tick changes
+    app.v_edtab.set("multi")                                                   # Insert reference -> Multi image edit: only the tick changes
     app._edtab_clicked()
     assert app.v_mode.get() == "multi_edit" and not app.v_bbox.get() and app.refslots.max_refs == 3
     app.v_edtab.set("edit")                                                    # -> Edit canvas: the plain edit, no slots
@@ -432,7 +432,7 @@ def main():
     app._edtab_clicked()
     app._on_edit_fn()                                                          # the Edit button always opens on Edit canvas, BBOX off
     assert app.v_mode.get() == "edit" and app.v_edtab.get() == "edit" and not app.v_bbox.get()
-    pick("qwen", "multi_edit")                                                 # no BBOX placement for a model without it
+    pick("qwen", "multi_edit")                                                 # no Insert reference for a model without it
     assert app.v_edtab.get() == "multi" and not app._bbox_on()
     pick("qwen", "inpaint")
     assert app.v_fn.get() == ""                                                # another function: the Edit button is off

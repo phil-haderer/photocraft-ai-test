@@ -23,7 +23,7 @@ class RecStyle(t.Widget):
 
 
 def main():
-    keys = [k for k, _label in gui.MODE_LABELS if k != "img2img"]
+    keys = [k for k, _label in gui.MODE_LABELS if k not in ("img2img", "sketch", "scribble")]     # Sketch and Scribble are tabs under Edit, no button
     assert len(keys) == 8, keys
     for k in keys:
         assert f"fn-{k}" in icons.SHAPES, k

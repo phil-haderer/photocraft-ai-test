@@ -22,18 +22,22 @@ class ModeMixin:
         self._switch_context(mode)
         if mode in SCALE_MODES:
             self._scale_mode = mode
-        self.v_fn.set("scale" if mode in SCALE_MODES else "edit" if mode in ("edit", "multi_edit") else "")
+        self.v_fn.set("scale" if mode in SCALE_MODES else "edit" if mode in EDIT_MODES else "")
         self._sync_fac()
         if mode in SCALE_MODES:      # the factor row (with None) for both
             self.f_scale.pack(fill="x", padx=10, pady=4, after=self._below_prompt())   # under the LLM row, above the LoRA
         else:
             self.f_scale.pack_forget()
+        if self._gen_wanted():       # MiniMax: the size row and "Downsize to canvas" instead of "Use canvas size up to"
+            self.f_gen.pack(fill="x", padx=10, pady=4, after=self._below_prompt())
+        else:
+            self.f_gen.pack_forget()
         if mode in SCALE_MODES:              # also Fibo Refine, which runs as Edit (user 28.10.)
             self._pack_post(self.f_detail)
         else:
             self.f_detail.pack_forget()
         self._update_native_text()
-        if self._native_wanted():
+        if self._native_wanted() and not self._gen_wanted():
             self._pack_post(self.f_native)
         else:
             self.f_native.pack_forget()
@@ -62,7 +66,7 @@ class ModeMixin:
             self._fit_height()
 
     def _update_factor_buttons(self):
-        """The factors need a model with Upscale and stay within its largest factor (Fibo: 2x)."""
+        """The factors need a model with Upscale and stay within its largest factor (Fibo: 3x since 10.11.)."""
         mm = self._model()
         for key, rb in getattr(self, "rb_scale", {}).items():
             rb.configure(state="normal" if (mm is None or self._custom_workflow() or self._factor_ok(mm, key)) else "disabled")
@@ -126,6 +130,13 @@ class ModeMixin:
                 self._insert_prompt(texts[self._rpick])
         self._sync_fac()
         self._on_scale_pick()
+
+    def _gen_wanted(self) -> bool:
+        """The model's mode draws a chosen area (gen_mp in its start settings: MiniMax Text to image, PLAN 2.0b) and its
+        own workflow is chosen: the size row and "Downsize to canvas" are shown and sent."""
+        m = self._model()
+        spec = m.modes.get(self.v_mode.get()) if m else None
+        return bool(spec and "gen_mp" in spec.settings and self.v_workflow.get() == spec.workflow)
 
     def _native_wanted(self) -> bool:
         """"Original size" applies to every function that sends a re-scaled picture to the model: not to Upscale and
@@ -194,12 +205,12 @@ class ModeMixin:
             if key == "img2img" and not self._custom_workflow():
                 rb.grid_remove()           # no model uses it
                 continue
-            if key == "multi_edit":        # a tab of the Edit function (refslots.py), no button of its own
+            if key in ("multi_edit", "sketch", "scribble"):        # tabs of the Edit function (refslots.py), no button of their own
                 rb.configure(state="normal")
                 rb.grid_remove()
                 continue
             # greyed out when every model that can do it is hidden (right-click menu, gear window)
-            own = ("edit", "multi_edit") if key == "edit" else (key,)
+            own = EDIT_MODES if key == "edit" else (key,)
             offered = self._custom_workflow() or any(any(k in x.modes for k in own) and x.key not in hidden for x in models.MODELS)
             rb.configure(state="normal" if offered else "disabled")
             self.tt_modes[key].text = MODE_TIPS[key]        # no ranking in the tooltip (user 3.11.: it was for development)
@@ -314,10 +325,11 @@ class ModeMixin:
         m = self._model()
         if m is None:
             return
+        self._written_for = ""
         self._remember_model_for_mode()
         self._reset_detail()
-        if self.v_mode.get() == "multi_edit" and "multi_edit" not in m.modes and "edit" in m.modes:
-            self.v_mode.set("edit")              # this model has no reference images: plain Edit canvas
+        if self.v_mode.get() in ("multi_edit", "sketch", "scribble") and self.v_mode.get() not in m.modes and "edit" in m.modes:
+            self.v_mode.set("edit")              # this model has no reference images (or no Sketch): plain Edit canvas
         if self.v_mode.get() not in m.modes:
             if self.v_mode.get() == "upscale" and "refine" in m.modes:
                 self.v_mode.set("refine")        # Fibo cannot enlarge: back to None
@@ -357,10 +369,22 @@ class ModeMixin:
             s["workflow"] = spec.workflow
         elif not force:
             s.pop("enhance", None)       # same workflow: the "Enhance prompt with LLM" checkbox keeps what you set (Expand ignores it)
-        if not getattr(self, "_factory", False):         # Shift + "Reset page": the standard settings, not the saved ones
-            s.update(cfgmod.saved_page(m.key, mode))      # settings the user saved for this page (chip menu) replace the starting ones
+        saved = {} if getattr(self, "_factory", False) else cfgmod.saved_page(m.key, mode)   # Shift + "Reset page": not the saved ones
+        s.update(saved)                                   # settings the user saved for this page (chip menu) replace the starting ones
         self._switch_context(mode)   # first: the context memory belongs to the mode, the defaults below overwrite its value
         self._apply_settings(s)
+        own = {k: saved[k] for k in ("steps", "cfg", "sampler", "scheduler") if k in saved}
+        if own:
+            # the workflow's own steps / CFG / sampler / scheduler are read for the new workflow now, then the saved ones go on
+            # top; read later (_on_workflow) they would overwrite the saved ones (PLAN 2.5, 4.11.: "saved steps did not come back")
+            self._sync_sampler_fields()
+            for k, var, conv in (("steps", self.v_steps, int), ("cfg", self.v_cfg, float),
+                                 ("sampler", self.v_sampler, str), ("scheduler", self.v_scheduler, str)):
+                if k in own:
+                    try:
+                        var.set(conv(own[k]))
+                    except (tk.TclError, ValueError, TypeError):
+                        pass
         t = self.t_prompt
         cur = t.get("1.0", "end").strip() if str(t.cget("state")) != "disabled" else ""
         first = spec.prompts[0] if spec.prompts else None      # Flux 2 Refine: always starts on its "Default" prompt
@@ -372,6 +396,13 @@ class ModeMixin:
         if changed and cur and cur not in models.STOCK_PROMPTS and mode == "outpaint" and str(t.cget("state")) != "disabled":
             self._away_prompt = cur
             cur = ""
+        # the text of Sketch to image / Scribble on photo belongs to the scribble, edited or not: Upscale / Refine does not
+        # count it as own text; it waits aside and comes back with its tab (user 10.11., P6)
+        aside = self.__dict__.setdefault("_sketch_away", {})
+        if (changed and cur and cur not in models.STOCK_PROMPTS and prev in ("sketch", "scribble")
+                and mode in ("upscale", "refine") and str(t.cget("state")) != "disabled"):
+            aside[prev] = cur
+            cur = ""
         if first is not None and str(t.cget("state")) != "disabled" and (cur == "" or cur in models.STOCK_PROMPTS):
             t.edit_separator()                  # one undo step: Ctrl+Z in the field brings the earlier text back
             t.delete("1.0", "end")
@@ -379,6 +410,8 @@ class ModeMixin:
             t.edit_separator()
             if mode == "refine":
                 self._rpick = first[0]
+            elif mode == "scribble":
+                self._sketch_pick(first[0], insert=False)
         elif (cur == "" or cur in models.STOCK_PROMPTS) and str(t.cget("state")) != "disabled":   # an unedited stock text is replaced
             t.delete("1.0", "end")
             if spec.prompt_hint:
@@ -386,6 +419,19 @@ class ModeMixin:
             elif changed and mode != "outpaint" and getattr(self, "_away_prompt", ""):
                 t.insert("1.0", self._away_prompt)
                 self._away_prompt = ""
+        back = aside.get(mode) if changed else None
+        if back and str(t.cget("state")) != "disabled" and t.get("1.0", "end").strip() in ({""} | models.STOCK_PROMPTS):
+            t.edit_separator()
+            t.delete("1.0", "end")
+            t.insert("1.0", back)
+            t.edit_separator()
+        if changed:
+            aside.pop(mode, None)
+        if mode == "sketch":
+            self._sketch_style_fill()       # Sketch to image: the style chosen last, with what the sketch shows (plan B, 10.11.)
+        v = getattr(self, "v_sketch", None)
+        if v is not None:       # the chip of Scribble on photo (one so far; "Reference at scribble" comes after its test)
+            v.set(models.SCRIBBLE_PROMPTS[0][0])
         self._update_mode_radios()
         self._update_prompt_choices()
         self._update_prompt_hint()
@@ -444,6 +490,7 @@ class ModeMixin:
         (_model_for_mode) and opens with that model's settings; otherwise the model stays."""
         m = self._model()
         mode = self.v_mode.get()
+        self._written_for = ""              # another function: a loaded written prompt no longer counts (Sketch, user 10.11.)
         if not getattr(self, "_booting", False) and not self._custom_workflow() and (m is None or mode not in m.modes):
             key = self._model_for_mode(mode)
             if key:
@@ -515,6 +562,8 @@ class ModeMixin:
         self.v_native_mp.set(native_mp_default(self.v_mode.get()))
         self.v_ref_native.set(True)
         self.v_ref_mp.set(REF_MP)
+        self.v_gen_mp.set(models.GEN_MP_STEPS[0])
+        self.v_downsize.set(False)
         self.v_denoise.set(1.0)       # as a new window has it; the workflow's own value and the function's rule follow below
         self.v_sharpen.set(0.0)
         self.v_feather.set(2.0)
@@ -997,6 +1046,7 @@ class ModeMixin:
                 if j != i and other["id"] in st["excludes"]:
                     self.stage_vars[j].set(False)
         self._update_stage_scales()
+        self._update_llm_button()       # Describe Canvas goes while Upscale makes the picture in tiles (P4, 10.11. evening)
 
     def _sync_sampler_fields(self):
         """Steps, CFG, Denoise (and sampler / scheduler) show what the selected workflow runs with - without its speed LoRA

@@ -837,20 +837,29 @@ class SettingsMixin(DownloadMixin):
         # mouse goes into it, so the field got no keyboard (user 5.11.: "the cursor cannot be placed", also after Refresh). A click
         # into the field takes the keyboard (focus -force), after Tk's own focus change.
         ent.bind("<ButtonPress-1>", lambda e: ent.after_idle(self._force_focus, ent), add="+")
-        b = ttk.Button(row, text="Refresh", image=self._icon("refresh", px=SET_ICON_PX), compound="left", style="SetSmall.TButton",
-                       command=self._comfy_address_check)
-        b.pack(side="left", padx=(8, 0))
+        # Refresh and Reset to default side by side, equally high (window test F, 11.11.); the refresh arrow at 90 %
+        btns = ttk.Frame(row)
+        btns.pack(side="left", fill="y", padx=(8, 0))
+        b = ttk.Button(btns, text="Refresh", image=self._icon("refresh", px=round(SET_ICON_PX * 0.9)), compound="left",
+                       style="SetSmall.TButton", command=self._comfy_address_check)
+        b.pack(side="left", fill="y")
         Tooltip(b, "Checks the address and, if it is ComfyUI, uses it from now on: the plugin reads its models and nodes again.")
-        self.lbl_comfy_mark = ttk.Label(row, text="", style=SET_STYLES["green"])
-        self.lbl_comfy_mark.pack(side="left", padx=(8, 0))
-        self.lbl_comfy_msg = ttk.Label(row, text="", style=SET_STYLES["muted"])
-        self.lbl_comfy_msg.pack(side="left", padx=(4, 0))
-        reset = ttk.Button(row, text="Reset to default", style="SetSmall.TButton", command=self._comfy_address_reset)      # a button like the others (user 6.11.)
-        reset.pack(side="right")
+        reset = ttk.Button(btns, text="Reset to default", style="SetSmall.TButton", command=self._comfy_address_reset)      # a button like the others (user 6.11.)
+        reset.pack(side="left", fill="y", padx=(8, 0))
         Tooltip(reset, "Goes back to the standard address of ComfyUI on this PC.")
+        self.b_comfy_refresh, self.b_comfy_reset = b, reset
+        # what the check found ("✓ ComfyUI found …"), in its own line under the field (11.11.)
+        found = ttk.Frame(box)
+        found.pack(fill="x", pady=(4, 0))
+        self.lbl_comfy_mark = ttk.Label(found, text="", style=SET_STYLES["green"])
+        self.lbl_comfy_mark.pack(side="left")
+        self.lbl_comfy_msg = ttk.Label(found, text="", style=SET_STYLES["muted"])
+        self.lbl_comfy_msg.pack(side="left", padx=(4, 0))
         self.lbl_comfy_note = ttk.Label(box, text="", style=SET_STYLES["muted"], justify="left", wraplength=self._px(520))
         self._comfy_seq = 0      # the note below is packed only while it has text (no empty line, user 6.11.)
         self._comfy_address_check(apply=False)          # shows at once whether the address in use answers
+        # a line under the address block, as above "Prompt" in the main window (window test F, 11.11.)
+        ttk.Frame(parent, style="Sep.TFrame", height=1).pack(side="top", fill="x", padx=14, pady=(10, 0))
 
     URL_HISTORY_MAX = 10
 

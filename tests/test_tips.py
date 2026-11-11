@@ -20,7 +20,7 @@ from pccomfy.tips import TIPS  # noqa: E402
 
 
 def logic():
-    assert len(TIPS) == 24 and all(isinstance(t, str) and t.strip() for t in TIPS) and len(set(TIPS)) == 24
+    assert len(TIPS) == 26 and all(isinstance(t, str) and t.strip() for t in TIPS) and len(set(TIPS)) == 26     # 26 since the Save prompt tip (11.11.; 25 since the Sketch tip, 10.11.)
     # tips removed on 3.11. (user): the shown list keeps the tips' ids, an old list of numbers still counts
     for gone in ("disk icon", "Mask density", "value box", "no <obj_1>", "\"x1\"", "Hover a function button", "LLM button", "Match colours"):
         assert not [t for t in TIPS if gone in t], gone

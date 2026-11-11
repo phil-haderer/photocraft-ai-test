@@ -111,11 +111,11 @@
   "class_type": "EmptyFlux2LatentImage",
   "inputs": {
    "width": [
-    "208",
-    0
+    "170",
+    1
    ],
    "height": [
-    "208",
+    "171",
     1
    ],
    "batch_size": 1
@@ -128,7 +128,7 @@
   "class_type": "VAEEncode",
   "inputs": {
    "pixels": [
-    "213",
+    "100",
     0
    ],
    "vae": [
@@ -198,11 +198,11 @@
   "inputs": {
    "steps": 4,
    "width": [
-    "208",
-    0
+    "170",
+    1
    ],
    "height": [
-    "208",
+    "171",
     1
    ]
   },
@@ -276,12 +276,168 @@
   "class_type": "PreviewImage",
   "inputs": {
    "images": [
-    "200",
+    "103",
     0
    ]
   },
   "_meta": {
    "title": "pc:output Result"
+  }
+ },
+ "170": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "ceil(((a - 128) / max(1, ceil((a - 128) / 1280)) + 128) / 32) * 32",
+   "values.a": [
+    "208",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Math Expression - Tile width (equal tiles, about 1280 px apart)"
+  }
+ },
+ "171": {
+  "class_type": "ComfyMathExpression",
+  "inputs": {
+   "expression": "ceil(((a - 128) / max(1, ceil((a - 128) / 1280)) + 128) / 32) * 32",
+   "values.a": [
+    "208",
+    1
+   ]
+  },
+  "_meta": {
+   "title": "Math Expression - Tile height (equal tiles, about 1280 px apart)"
+  }
+ },
+ "100": {
+  "class_type": "SplitImageToTileList",
+  "inputs": {
+   "image": [
+    "213",
+    0
+   ],
+   "tile_width": [
+    "170",
+    1
+   ],
+   "tile_height": [
+    "171",
+    1
+   ],
+   "overlap": 128
+  },
+  "_meta": {
+   "title": "Split Image into Tiles - tiles of about 1280 px"
+  }
+ },
+ "101": {
+  "class_type": "ImageMergeTileList",
+  "inputs": {
+   "image_list": [
+    "200",
+    0
+   ],
+   "final_width": [
+    "208",
+    0
+   ],
+   "final_height": [
+    "208",
+    1
+   ],
+   "overlap": 128
+  },
+  "_meta": {
+   "title": "Merge Tiles - Join the tiles"
+  }
+ },
+ "103": {
+  "class_type": "ColorMatch",
+  "inputs": {
+   "image_ref": [
+    "102",
+    0
+   ],
+   "image_target": [
+    "101",
+    0
+   ],
+   "method": "mkl",
+   "strength": 1.0,
+   "multithread": true
+  },
+  "_meta": {
+   "title": "Color Match (KJNodes) - Colours back to your picture"
+  }
+ },
+ "102": {
+  "class_type": "ImageScale",
+  "inputs": {
+   "image": [
+    "188",
+    0
+   ],
+   "upscale_method": "lanczos",
+   "width": [
+    "208",
+    0
+   ],
+   "height": [
+    "208",
+    1
+   ],
+   "crop": "disabled"
+  },
+  "_meta": {
+   "title": "Upscale Image - To the size of the result",
+   "pc_stage_off": {
+    "label": "Tiles",
+    "default_on": true,
+    "remove": [
+     "100",
+     "101",
+     "102",
+     "103",
+     "170",
+     "171"
+    ],
+    "set_nodes": {
+     "211": {
+      "pixels": [
+       "213",
+       0
+      ]
+     },
+     "209": {
+      "width": [
+       "208",
+       0
+      ],
+      "height": [
+       "208",
+       1
+      ]
+     },
+     "205": {
+      "width": [
+       "208",
+       0
+      ],
+      "height": [
+       "208",
+       1
+      ]
+     },
+     "187": {
+      "images": [
+       "200",
+       0
+      ]
+     }
+    },
+    "tip": "Flux 2 redraws the picture in tiles, like Flux 3 Upscale: much better than one pass in the test round (2 of 3 good against 0 of 3). Needs the ComfyUI-KJNodes pack (Color Match)."
+   }
   }
  }
 }

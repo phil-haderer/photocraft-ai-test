@@ -30,11 +30,29 @@ from pccomfy import gui, gui_theme, models  # noqa: E402
 HOME_Y = 300
 
 
+def _shape(app):
+    r = app.root
+    return (r.geometry(), r.winfo_height(), r.winfo_rooty(), app.f_body.winfo_reqheight(), app.cv_body.winfo_height(),
+            app.sb_body.shown, getattr(app, "_fit_job", None))
+
+
+QUIET = 0.25        # longer than the window's own delayed fit (gui_theme._on_content_size: 60 ms) several times over
+
+
 def settle(app, s=0.6):
-    end = time.time() + s
+    """Lets Tk work until the window has been still for QUIET seconds (no pending fit, same size and place), at most s
+    seconds; the first call after start waits the full s (the start-up callbacks run at 100 to 200 ms)."""
+    start = time.time()
+    end, still, last = start + s, start, None
     while time.time() < end:
         app.root.update()
+        now = _shape(app)
+        if now != last:
+            last, still = now, time.time()
+        elif now[-1] is None and time.time() - still >= QUIET and getattr(app, "_settled_once", False):
+            return
         time.sleep(0.02)
+    app._settled_once = True
 
 
 def stays_at(app, home, what):

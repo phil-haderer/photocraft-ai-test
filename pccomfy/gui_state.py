@@ -4,12 +4,13 @@ from __future__ import annotations
 import os
 import socket
 
-from . import comfyaddr, photocraft
+from . import comfyaddr, models, photocraft
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
 
 
 WATCH_MS = 1000       # how often the window asks PhotoCraft's control port (Linux: closing with PhotoCraft; 7.11.: 5 s took ~12 s, now ~2-3 s)
+COMFY_FAILS_RED = 3     # failed probes in a row before a ComfyUI that was up turns red (a big model loading can block the answer for seconds, user 11.11.)
 COMFY_WATCH_MS = 1000   # how often the ComfyUI dot asks the server whether it is still there (tester 5.11.: 5 s felt slow)
 
 
@@ -55,6 +56,14 @@ class StateMixin:
         if url != self.comfy.url:
             return
         was = getattr(self, "_comfy_up", None)
+        if ok:
+            self._comfy_fails = 0
+        else:
+            self._comfy_fails = getattr(self, "_comfy_fails", 0) + 1
+            # a ComfyUI that was up stays green over short stalls: red only after COMFY_FAILS_RED misses in a row, and never
+            # during a run (the run reports a real failure itself over the WebSocket)
+            if was and (self._comfy_fails < COMFY_FAILS_RED or getattr(self, "_running", False)):
+                return
         self._comfy_up = ok
         if not ok:
             self._comfy_read = None         # gone: when it comes back it is read again first
@@ -164,7 +173,7 @@ class StateMixin:
         """Every setting in the window, as plain JSON values."""
         clip = self.v_clip.get().strip()
         return {
-            "mode": self.v_mode.get(), "workflow": self.v_workflow.get(),
+            "mode": self.v_mode.get(), "workflow": self.v_workflow.get(), "edit_tabs": models.EDIT_TABS_VERSION,
             "clip": "" if clip in ("", CLIP_DEFAULT) else clip,
             "checkpoint": self.v_ckpt.get().strip(), "steps": int(self.v_steps.get()), "cfg": float(self.v_cfg.get()),
             "denoise": float(self.v_denoise.get()), "seed": int(self.v_seed.get()), "variants": int(self.v_variants.get()),
@@ -172,6 +181,7 @@ class StateMixin:
             "base_res": int(self.v_res.get()), "context": float(self.v_context.get()),
             "native": bool(self.v_native.get()), "native_mp": round(float(self.v_native_mp.get()), 1),
             "ref_native": bool(self.v_ref_native.get()), "ref_mp": round(float(self.v_ref_mp.get()), 1),
+            "gen_mp": int(self.v_gen_mp.get()), "downsize": bool(self.v_downsize.get()),
             "mask_grow": int(self.v_grow.get()), "mask_blur": int(self.v_blur.get()), "overlap": int(self.v_overlap.get()),
             "scale": self._scale(),
             "enhance": bool(self.v_enhance.get()),
@@ -195,6 +205,7 @@ class StateMixin:
                     notes.append(key)
 
         put(self.v_mode, "mode", str)
+        self.v_mode.set(models.legacy_sketch_mode(self.v_mode.get(), str(s.get("prompt", "")), s.get("edit_tabs")))   # own tab (10.11.)
         if self.v_mode.get() not in dict(MODE_LABELS):      # a mode that no longer exists (the old "reference"): the first one
             self.v_mode.set(MODE_LABELS[0][0])
         wf = s.get("workflow")
@@ -225,6 +236,8 @@ class StateMixin:
         put(self.v_native_mp, "native_mp", float)
         put(self.v_ref_native, "ref_native", bool)
         put(self.v_ref_mp, "ref_mp", float)
+        put(self.v_gen_mp, "gen_mp", int)
+        put(self.v_downsize, "downsize", bool)
         put(self.v_context, "context", float)
         put(self.v_grow, "mask_grow", int)
         put(self.v_blur, "mask_blur", int)
@@ -279,6 +292,7 @@ class StateMixin:
             "negative": p.negative, "steps": p.steps, "cfg": p.cfg, "denoise": self.v_denoise.get(),
             "sampler": p.sampler, "scheduler": p.scheduler, "variants": req.variants, "base_res": req.base_res,
             "native": req.native, "native_mp": req.native_mp,
+            "gen_mp": int(self.v_gen_mp.get()), "downsize": bool(self.v_downsize.get()),
             "context": req.context, "mask_grow": req.mask_grow, "mask_blur": req.mask_blur, "overlap": req.overlap, "scale": req.scale,
             "on_top": bool(self.v_top.get()), "adv_open": bool(self.v_adv_open.get()), "model": self.v_model.get(), "neg_open": bool(self.v_neg_open.get()), "prompt_h": self._prompt_lines(), "enhance": bool(self.v_enhance.get()), "turbo": req.turbo, "layer_mask": req.layer_mask, "mask_density": req.mask_density,
             "stage_on": req.stage_on, "stage2_on": bool(self.v_stage2.get()), "stage3_on": bool(self.v_stage3.get()), "stage_strengths": [round(float(v.get()), 2) for v in self.v_sstr], "detail": req.detail, "sharpen": round(float(self.v_sharpen.get()), 2), "loras": [list(x) for x in req.loras], "lora_strength": req.lora_strength if req.lora_strength is not None else self.state.get("lora_strength", 1.0),

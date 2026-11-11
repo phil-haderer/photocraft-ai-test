@@ -259,18 +259,18 @@
  "401": {
   "class_type": "CLIPLoader",
   "inputs": {
-   "clip_name": "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",
-   "type": "flux3",
+   "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+   "type": "stable_diffusion",
    "device": "default"
   },
   "_meta": {
-   "title": "Prompt upsampler (text model)"
+   "title": "Prompt writer (text model, Qwen3-VL 4B)"
   }
  },
  "402": {
   "class_type": "PrimitiveStringMultiline",
   "inputs": {
-   "value": "You are the prompt upsampler of an image editing model. You get a picture and a short edit request. Write ONE detailed, self-contained English caption of the finished picture after the edit, as it will look. Start with the medium and the subject, describe the whole scene of the given picture (subjects, setting, composition, camera view, lighting, colours) and fold the requested change into it at the place where it happens. The picture may carry rough coloured scribble lines that mark where something new goes and its rough shape and size: in the caption the scribbles are gone and the new object stands exactly there, realistic. Keep everything the request does not change as it is in the picture. Output only the caption as one block of prose, 80 to 180 words, with no lists, Markdown or explanations."
+   "value": "You write the edit instruction for an image editing model. You get a picture and a short request. Write ONE clear English instruction that starts with a verb. If the picture carries rough coloured scribble lines: say where they are (which part of the picture, what they lie on) and what replaces them exactly there; name the new object with its look, material, colour, size and pose, matching the light, perspective and style of the photo; the scribble lines must be gone and everything else stays unchanged. If the picture is a sketch or drawing: say to turn it into the finished picture in the look the request asks for (a realistic photograph, a still from an animated film or another style) and name each element of the drawing with its colour, material and place, keeping the composition, shapes and proportions exactly, with no sketch lines left unless the look has outlines. Output only the instruction as one block of prose, 60 to 150 words, with no lists, Markdown or explanations."
   },
   "_meta": {
    "title": "Text (System prompt, edit)"

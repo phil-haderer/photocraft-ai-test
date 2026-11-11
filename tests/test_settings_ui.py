@@ -312,8 +312,9 @@ def main():
     assert len(foot) == 2 and foot[0] is foot[1]
     assert probe.b_history.master is foot[0] and probe.b_copy_canvas.master is foot[0]
     assert probe.b_history.image == probe._icon("clock", px=gui_theme.FOOT_BTN_PX) and probe.b_copy_canvas.image == probe._icon("copy", px=gui_theme.FOOT_BTN_PX)
-    # flat like the trash button (no dark button background) and about 60 % of the other icons (user 28.10.)
-    assert probe.b_gear["style"] == probe.b_clear["style"] == "Link.TButton" and ui_settings.GEAR_PX == 12 == round(0.6 * gui_theme.ICON_PX)
+    # flat like the trash button (no dark button background; the bin sits in the prompt field since 10.11. evening, on the
+    # field's colour) and about 60 % of the other icons (user 28.10.)
+    assert probe.b_gear["style"] == "Link.TButton" and probe.b_clear["style"] == "Field.Link.TButton" and ui_settings.GEAR_PX == 12 == round(0.6 * gui_theme.ICON_PX)
     # Refresh = a flat circle arrow in the gear's size, Reset = the small button "Reset page" (option A, user 29.10.)
     assert probe.b_refresh.image == probe._icon("refresh", px=ui_settings.GEAR_PX) and probe.b_refresh.text is None
     assert probe.b_reset.text == "Reset page" and probe.b_refresh["style"] == "Link.TButton" and probe.b_reset["style"] == "Narrow.TButton"
@@ -583,7 +584,8 @@ def main():
     assert app.v_conn.get() == "ComfyUI not connected" and reads == [1]        # the refresh before it failed: ComfyUI is back, so everything is read again
     app._apply_refresh({"comfy": True})                                         # ... and only the read makes the dot green
     assert app.lbl_dot.cget("style") == "ConnOk.TLabel"
-    app._comfy_alive(app.comfy.url, False)
+    for _ in range(3):                                                           # red only after 3 misses in a row (tests/test_comfy_dot_grace.py)
+        app._comfy_alive(app.comfy.url, False)
     assert app.v_conn.get() == "ComfyUI not connected" and app.lbl_dot.cget("style") == "ConnBad.TLabel"
     app._comfy_alive(app.comfy.url, True)                                        # back: red and "connecting" until it is read again
     assert app.v_conn.get() == "ComfyUI connecting …" and app.lbl_dot.cget("style") == "ConnBad.TLabel" and reads == [1, 1]

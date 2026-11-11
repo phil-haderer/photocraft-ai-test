@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
-from pccomfy import bridge, workflows  # noqa: E402
+from pccomfy import bridge, models, workflows  # noqa: E402
 from pccomfy.bridge import Bridge, BridgeError, Request  # noqa: E402
 import test_reference_mode as T  # noqa: E402  (the PhotoCraft simulator and the fake ComfyUI)
 
@@ -138,11 +138,15 @@ def main():
     expect_error("pc:upscale", "upscale", wf=ROOT / "workflows" / "fibo2-edit.json")
     expect_error("pc:upscale", "refine", wf=None)
     expect_error("between 1 and 8", "upscale", scale=9)
-    bridge.MAX_RESULT_MP = 1.0                                         # 200x120 at 8x = 1.5 megapixels
+    bridge.MAX_SCALE_MP = 1.0                                          # 200x120 at 8x = 1.5 megapixels
     try:
         expect_error("limit is 1", "upscale", scale=8)
+        run("upscale", scale=(1e6 / (200 * 120)) ** 0.5 - 1e-6)        # just under 1.0 megapixels still runs
     finally:
-        bridge.MAX_RESULT_MP = 24.0
+        bridge.MAX_SCALE_MP = 16.0
+    # ComfyUI's ImageScaleToTotalPixels takes at most 16 megapixels (user 10.11.): the plugin stops before, not ComfyUI
+    assert bridge.MAX_SCALE_MP == 16.0 and bridge.MAX_RESULT_MP == 24.0
+    assert "up to 16 MP" in models.FUNCTION_TIPS["upscale"]
     print("ALL OK (upscale/refine)")
 
 

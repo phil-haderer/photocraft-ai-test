@@ -18,8 +18,8 @@ START, END = "<!-- model-downloads:start -->", "<!-- model-downloads:end -->"
 from pccomfy import manifest  # noqa: E402
 
 TITLES = {"flux3": "Flux 3 Klein", "flux2": "Flux 2 Klein", "qwen": "Qwen Image 2.1", "fibo": "Fibo 2.0",
-          "krea2": "Krea 2 Turbo", "moss": "MOSS Image"}
-MODE_NAMES = {"txt2img": "Text to image", "edit": "Edit", "multi_edit": "Multi image edit", "inpaint": "Fill",
+          "krea2": "Krea 2 Turbo", "moss": "MOSS Image", "minimax": "MiniMax H3 Image"}
+MODE_NAMES = {"txt2img": "Text to image", "edit": "Edit", "multi_edit": "Multi image edit", "sketch": "Sketch", "inpaint": "Fill",
               "remove": "Remove", "outpaint": "Expand", "upscale": "Upscale", "refine": "Refine"}
 FOLDER_ORDER = ("unet", "clip", "vae", "lora", "upscale_model", "preview", "bg_removal")
 GATED_PAGES = {"black-forest-labs/flux-3-image-klein-comfy": "https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy"}
@@ -72,6 +72,7 @@ def table(rows: list[str], used_head: str) -> list[str]:
 
 NODE_NOTES = {      # custom node packs a model's functions need (manifest.NODE_PACKS); everything else uses ComfyUI's own nodes
     "flux3": "Upscale also needs the custom node pack [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) (Color Match). Install it from the ComfyUI Manager or the link, then restart ComfyUI.",
+    "flux2": "Upscale with tiles (on at the start) also needs the custom node pack [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) (Color Match). Install it from the ComfyUI Manager or the link, then restart ComfyUI. Without it switch Tiles off.",
     "fibo": "The tiles option of Upscale also needs the custom node pack [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) (Color Match). Install it from the ComfyUI Manager or the link, then restart ComfyUI.",
 }
 
@@ -82,12 +83,14 @@ def model_block(key: str) -> list[str]:
     for n in t.required:
         need.setdefault(n, [])
     for mode, spec in t.modes.items():
+        if spec.alone:          # Sketch: its files lock only the tab Sketch, so they are listed as optional
+            continue
         for n in spec.requires:
             if n in need and need[n] == []:
                 continue
             need.setdefault(n, []).append(MODE_NAMES.get(mode, mode))
     opt: dict[str, str] = {}
-    for n in list(t.optional) + [x for s in t.modes.values() for x in s.optional]:
+    for n in list(t.optional) + [x for s in t.modes.values() for x in s.optional + (s.requires if s.alone else ())]:
         f = manifest.FILES.get(n)
         if f is None or f.kind == "bg_removal" or n in need:
             continue
@@ -117,7 +120,7 @@ def extra_block() -> list[str]:
 
 def render() -> str:
     lines = [START, ""]
-    for key in ("flux3", "flux2", "qwen", "fibo", "krea2", "moss"):
+    for key in ("flux3", "flux2", "qwen", "fibo", "krea2", "moss", "minimax"):
         lines += model_block(key)
     lines += extra_block()
     lines += [END]

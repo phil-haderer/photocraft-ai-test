@@ -6,12 +6,13 @@ import re
 
 from .gui_common import *  # noqa: F401,F403
 from .gui_common import __all__ as _ALL  # noqa: F401
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from . import config as cfgmod, hostos, icons, spacing, uiscale
 
 ICON_PX = 20       # the window's button icons (vector, icons.py) before the display scaling; the slot icons have their own (19, refslots.py)
 FOOT_BTN_PX = round(ICON_PX * 0.85 * 0.9)   # the clock and Copy canvas in the footer: 90 % of the small header icon (user 4.11.)
+STYLES_ICON_GAP = 5                    # room between the palette and "Styles" (window test F, 11.11.)
 SMALL_ICON_PX = round(ICON_PX * 0.85)   # flat header icons, the bin and the Styles button: 85 % of the usual icon (user 1.11.)
 HINT_ICON_PX = 14  # the info icon in front of the tip under the prompt: about one text line high
 FN_GAP = 8         # room between a function symbol and its text (ttk has no gap option: the symbol gets it on its right)
@@ -130,12 +131,20 @@ class ThemeMixin:
         # look of the functions above them)
         s.configure("Chip.Toolbutton", background=BG, foreground=FG, padding=(2, 3), anchor="center", relief="solid",
                     borderwidth=1, bordercolor="#686868", lightcolor=BG, darkcolor=BG, font=font(9))
+        # clam draws an inner ring in light/darkcolor inside the border: it follows the fill, so a chosen chip is blue to the
+        # edge, not a blue border around a dark ring (the "double outline", user 10.11.)
+        chip_fill = [("disabled", BG), ("selected", ACCENT), ("active", "#5f5f5f")]
         s.map("Chip.Toolbutton", foreground=[("disabled", DISABLED), ("selected", ON_ACCENT)],
-              bordercolor=[("disabled", "#4a4a4a"), ("selected", ACCENT)], background=[("selected", ACCENT), ("active", "#5f5f5f")],
-              font=[("selected", font(9, bold=True))])
+              bordercolor=[("disabled", "#4a4a4a"), ("selected", ACCENT)], background=chip_fill, lightcolor=chip_fill,
+              darkcolor=chip_fill, font=[("selected", font(9, bold=True))])
         s.configure("Missing.Chip.Toolbutton", foreground=NA_RED)
         s.configure("Accent.TButton", background=ACCENT, foreground=ON_ACCENT, font=font(10, bold=True))
         s.map("Accent.TButton", background=[("active", "#5ba3f5"), ("disabled", "#5a6678")])
+        # the bin inside the prompt field (P5, 10.11.): flat like Link.TButton, on the field's colour
+        s.configure("Field.Link.TButton", background=PANEL, foreground=MUTED, padding=(1, 1), borderwidth=0, relief="flat", width=0)
+        s.map("Field.Link.TButton", background=[("active", PANEL)])
+        self._styles_button_look(s)
+        s.configure("Stop.TButton", padding=(self._px(12), 6), width=0)     # Cancel: the stop square on the grey button (11.11.)
         s.configure("Fit.TButton", padding=(5, 6), width=0)     # "Cancel all": as wide as its text (a fixed width cut the last letter)
         s.configure("Split.Accent.TButton", padding=(6, 6))     # the narrow "×2 ▾" piece on the right of Generate
         s.configure("TCombobox", fieldbackground=PANEL, background=PANEL, foreground=FG, arrowcolor=FG)
@@ -154,8 +163,9 @@ class ThemeMixin:
         s.configure("SetHint.TLabel", foreground=HINT_TEXT, font=font(9))      # a highlight in the settings (relinked models): the blue of the prompt tip
         s.configure("SetRed.TLabel", foreground=ERROR_TEXT, font=font(10, bold=True))        # the X behind a model that is not yet available
         s.configure("SetHead9.TLabel", foreground="#ffffff", font=font(9, bold=True))        # "Covers these modes:", the same line height as the list
-        s.configure("Done.TLabel", foreground=DONE_GREEN, font=font(10, bold=True))      # the word "Done"
-        s.configure("DoneRest.TLabel", foreground=FG, font=font(10, bold=True))        # what follows it (seed, layers, time)
+        # the done line in normal weight (user 10.11.: in bold a long line, e.g. "scribble found on its own layer", was cut)
+        s.configure("Done.TLabel", foreground=DONE_GREEN, font=font(10))      # the word "Done"
+        s.configure("DoneRest.TLabel", foreground=FG, font=font(10))        # what follows it (seed, layers, time)
         # greyed out must be visible on the dark theme (clam keeps nearly the normal text colour)
         for w in ("TCheckbutton", "TRadiobutton", "TLabel"):
             s.map(w, foreground=[("disabled", DISABLED)])
@@ -204,6 +214,48 @@ class ThemeMixin:
                     ("Checkbutton.label", {"sticky": "nswe"})]})]})])
         except Exception:
             pass
+
+    def _styles_button_look(self, s):
+        """The Styles button (user 10.11. evening, P2): Generate's blue, white text in Generate's font, slightly rounded
+        corners. The rounding is a picture element (clam draws square buttons), stretched with fixed corners; without image
+        support it is the square Generate look."""
+        s.configure("Styles.TButton", background=ACCENT, foreground=ON_ACCENT, font=font(10, bold=True), width=0,
+                    padding=(self._px(10), 0), anchor="center")     # the height comes from _match_styles_height: Generate's (11.11.)
+        s.map("Styles.TButton", background=[("disabled", "#5a6678"), ("active", "#5ba3f5")],
+              foreground=[("disabled", "#a8a8a8")])
+        try:
+            r, k = self._px(4), 4           # corner radius; drawn 4x larger and scaled down for a smooth edge
+            side = 2 * r + 2
+            imgs = {}
+            for name, colour in (("off", ACCENT), ("hot", "#5ba3f5"), ("grey", "#5a6678")):
+                big = Image.new("RGBA", (side * k, side * k), (0, 0, 0, 0))
+                ImageDraw.Draw(big).rounded_rectangle([0, 0, side * k - 1, side * k - 1], radius=r * k, fill=colour)
+                imgs[name] = icons.photo(self.root, None, "", side, image=big.resize((side, side), Image.LANCZOS))
+            self._styles_btn_imgs = imgs    # Tk drops an image Python no longer holds
+            if "Round.button" not in s.element_names():
+                s.element_create("Round.button", "image", imgs["off"], ("disabled", imgs["grey"]), ("active", imgs["hot"]),
+                                 border=r + 1, sticky="nswe")
+            s.layout("Styles.TButton", [("Round.button", {"sticky": "nswe", "children": [
+                ("Button.padding", {"sticky": "nswe", "children": [("Button.label", {"sticky": "nswe"})]})]})])
+        except Exception:
+            pass
+
+    def _styles_icon(self):
+        """The palette of the Styles button: white on the blue button, a light grey when it is greyed out (P2, 10.11.)."""
+        cache = self.__dict__.setdefault("_icon_cache", {})
+        px = SMALL_ICON_PX
+
+        gap = self._px(STYLES_ICON_GAP)
+
+        def img(c):
+            if ("palette", c, px) not in cache:
+                # a clear strip on the right of the palette keeps the text away from it (window test F, 11.11.: about 5 px)
+                im = icons.render("palette", c, self._px(px))
+                wide = Image.new("RGBA", (im.width + gap, im.height), (0, 0, 0, 0))
+                wide.paste(im, (0, 0))
+                cache[("palette", c, px)] = icons.photo(self.root, None, "", 0, image=wide)
+            return cache[("palette", c, px)]
+        return (img(ON_ACCENT), "disabled", img("#a8a8a8"))
 
     def _flat_tabs(self, s):
         """The tabs of the settings window (user 1.11.): no fill, white text; the chosen tab has a blue line under it, a

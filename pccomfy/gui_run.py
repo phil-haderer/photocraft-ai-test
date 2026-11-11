@@ -42,8 +42,6 @@ class RunMixin:
 
     def _request(self) -> Request:
         wf = self.v_workflow.get()
-        if self.v_v10.get() and self._v10_shown:      # A/B test: MOSS Fill / Expand with the published v10 graph
-            wf = V10_WORKFLOW
         wf_path = None if wf == BUILTIN else str(self.workflows_dir / wf)
         p = GenParams(prompt=self.t_prompt.get("1.0", "end").strip(), negative=self.t_neg.get("1.0", "end").strip(),
                       checkpoint=self.v_ckpt.get().strip(), steps=int(self.v_steps.get()), cfg=float(self.v_cfg.get()),
@@ -55,11 +53,15 @@ class RunMixin:
         target = p.prompt if (self.v_mode.get() == "remove" and spec is not None and spec.remove_text) else ""
         req = Request(mode=self._run_mode(), params=p, remove_target=target, workflow=wf_path, base_res=int(self.v_res.get()),
                        native=bool(self.v_native.get()) and self._native_wanted(), native_mp=self._native_mp(),
+                       gen_mp=float(self.v_gen_mp.get()) if self._gen_wanted() else 0.0,
+                       new_document=self._gen_wanted() and not bool(self.v_downsize.get()),
                        full_size=self.v_mode.get() in SCALE_MODES,
                        context=min(1.0, max(0.0, round(float(self.v_context.get()) * 20) / 20)),   # the slider's range and steps (an old saved 2.0 too)
                        mask_grow=int(self.v_grow.get()), mask_blur=int(self.v_blur.get()),
                        overlap=int(self.v_overlap.get()), variants=int(self.v_variants.get()),
-                       enhance=bool(self.v_enhance.get()) and self._llm_row_wanted(),
+                       enhance=(bool(spec.settings.get("enhance", True)) and self._has_text_model() and not self._written_active())
+                       if self.v_mode.get() in ("sketch", "scribble")
+                       else bool(self.v_enhance.get()) and self._llm_row_wanted(),     # Sketch: the writer always (not Fibo)
                        turbo=bool(self.v_turbo.get()), scale=self._scale(),
                        lora_strength=(round(float(self.v_lora_str.get()), 2) if self._has_lora_switch() else None),
                        stage_on=bool(self.v_stage.get()) or not self._stage_label(), stages_off=self._stages_off(), stage_strengths=self._stage_strengths(), sampler_override=self._sampler_override(), doc_tag=self._doc_tag(), loras=[tuple(x) for x in self._loras()], sharpen=0.0 if self.v_mode.get() in NO_SHARPEN_MODES else round(float(self.v_sharpen.get()), 2), detail=round(float(self.v_detail.get()), 2) if self.v_mode.get() in SCALE_MODES else 1.0,
@@ -68,9 +70,7 @@ class RunMixin:
                        mask_density=min(100, max(0, int(self.v_density.get()))),
                        seam_fixed=self._seam_mode() == "on" and self._run_mode() in ("inpaint", "remove", "outpaint"),
                        preview=bool(self.v_live.get()))
-        if wf == V10_WORKFLOW:      # v10 has its own recipe: its sampler values, UltraReal on, no skip-layer guidance, no speed LoRA
-            req.sampler_override, req.turbo, req.stage_on, req.stages_off, req.stage_strengths = {}, False, True, ["7"], {}
-            req.params.steps, req.params.cfg, req.params.sampler, req.params.scheduler = 25, 2.5, "er_sde", "simple"
+        req.scribble = self.v_mode.get() == "scribble"      # its own tab since plan B (10.11.)
         return req
 
     def _doc_tag(self) -> str:
@@ -133,6 +133,9 @@ class RunMixin:
             self._status(f"{m.label if m else 'This model'} needs a description of the surroundings: "
                          "click Describe or type one.", error=True)
             return
+        if self.v_mode.get() == "sketch" and not self.t_prompt.get("1.0", "end").strip():
+            self._status(models.NO_STYLE, error=True)       # Sketch to image without a style or text: no run (plan B, 10.11.)
+            return
         try:
             req = self._request()
         except (tk.TclError, ValueError) as e:
@@ -154,6 +157,7 @@ class RunMixin:
             self._fprev_on, self._fprev_dirty = False, None
             self.b_fprev.configure(text="Show feather")
         self._running = True
+        self._run_label = self._model_label()           # the bar names the model of this run, not one picked meanwhile (window test E)
         self.b_go.configure(state="disabled")
         self.w_variants.configure(state="disabled")     # part of Generate: grey with it while a run is on
         self.b_undo.configure(state="disabled")
@@ -177,7 +181,7 @@ class RunMixin:
 
         def work():
             try:
-                total = 0
+                total = docs = 0
                 res = None
                 t_start = time.monotonic()
                 for k, rq in enumerate(runs):
@@ -192,13 +196,15 @@ class RunMixin:
                             raise
                         continue          # "Cancel" ends this comparison run only
                     total += len(res["layers"])
+                    docs += int(res.get("documents") or 0)      # Upscale: new documents, no layers
                 if res is None:
                     raise Cancelled()
                 self.events.put(("vgl", res.get("vgl", "")))
                 self.events.put(("seed", res.get("seed")))
                 seam = res.get("seam")     # the seam correction's A/B: the tone jump of #1 in levels, before → after
                 seam_text = f" · seam {seam[0]:.0f} → {seam[1]:.0f}" if seam else ""
-                self.events.put(("done", f"Done · seed {res['seed']} · created {total} layer{'s' if total != 1 else ''}{seam_text} · {duration_text(time.monotonic() - t_start)}"))
+                # how Scribble on photo found the scribble is no longer in the line (user 10.11.: it made the line too long, cut off)
+                self.events.put(("done", f"Done · seed {res['seed']} · {made_text(total, docs)}{seam_text} · {duration_text(time.monotonic() - t_start)}"))
             except Cancelled:
                 self.events.put(("done", "Cancelled."))
             except (BridgeError, ComfyError, PhotoCraftError, ValueError, OSError) as e:
@@ -241,7 +247,8 @@ class RunMixin:
             return
         m = self._model()
         title = req.group_name or SHORT_MODES.get(self.v_mode.get(), self.v_mode.get())
-        self._hist_run = runhistory.entry(title, m.label if m else "", settings)
+        self._hist_run = runhistory.entry(title, m.label if m else "", settings,
+                                          llm=settings.get("prompt", "") if self._written_active() else "")   # loads back without the upsampler
 
     def _history_end(self, ok: bool):
         """The run is over: a finished one goes in front of the last runs; a cancelled or failed one is left out."""
@@ -286,6 +293,9 @@ class RunMixin:
             self.t_prompt.edit_separator()
         self.t_neg.delete("1.0", "end")
         self.t_neg.insert("1.0", negative)
+        # Sketch: the prompt the upsampler wrote runs as it is, not expanded a second time (user 10.11., way A)
+        self._written_for = self.v_model.get() if (e.get("llm") and self.v_mode.get() in ("sketch", "scribble")) else ""
+        self._update_prompt_hint()
         name = e.get("title") or "the run"
         if notes:
             self._status(f"Loaded “{name}”, but: {', '.join(notes)}.", error=True)
@@ -442,8 +452,7 @@ class RunMixin:
             self._status("Cancelling…")
 
     def _show_stop_all(self, on: bool):
-        """"Cancel all" beside "Cancel": Cancel gets narrower while it is shown, so the row (with Undo and Redo) still fits the window."""
-        self.b_stop.configure(width=6 if on else 9)
+        """"Cancel all" beside "Cancel" (a narrow stop square since 11.11., so the row with Undo and Redo fits the window)."""
         if on:
             self.b_stop_all.pack(side="left", fill="y", padx=(6, 0), after=self.b_stop)
         else:
@@ -568,13 +577,20 @@ class RunMixin:
         if v is not None and v.get() != text:
             v.set(text)
 
-    def _generating_word(self) -> str:
-        """The words before the step while the image model works: "<model> is generating" (user 4.11.)."""
+    def _model_label(self) -> str:
         try:
             m = self._model()
         except Exception:
             m = None
-        return f"{m.label} is generating" if m is not None else "Generating"
+        return m.label if m is not None else ""
+
+    def _generating_word(self) -> str:
+        """The words before the step while the image model works: "<model> is generating" (user 4.11.), with the model the run
+        started with: a model chosen during the run must not rename it (window test E, 11.11.)."""
+        label = getattr(self, "_run_label", None)
+        if label is None or not getattr(self, "_running", False):
+            label = self._model_label()
+        return f"{label} is generating" if label else "Generating"
 
     def _set_progress(self, fraction: float, msg: str | None, phase: str, phase_fraction: float, elapsed: float | None):
         """Move the single bar and name the step. Idempotent and only forward: Tk is touched only when the value or the

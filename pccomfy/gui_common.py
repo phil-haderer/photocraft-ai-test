@@ -41,6 +41,10 @@ NATIVE_TIP = ("The picture goes to the model as large as it is, up to this many 
 NATIVE_TIP_CANVAS = ("The picture is made in the size of your canvas, never larger and never enlarged, and at most this many "
                      "megapixels (a bigger canvas is scaled down to it). The sides are rounded down to the multiple the "
                      "model needs, so the size can differ from the canvas by a few pixels.")
+GEN_MP_TIP = ("How large MiniMax H3 Image draws the picture, in megapixels, in the shape of your canvas. "
+              "Bigger is slower; the model works from 4 to 20 MP and is best at about 16 MP.")
+DOWNSIZE_TIP = ("Off: the picture opens as a new document in the chosen size. On: it is drawn in the chosen size, "
+                "scaled down to your canvas and added as a layer.")
 NATIVE_TIP_END = " Bigger pictures are slower and need more VRAM; the models are made for about 1 MP, so test it per model."
 
 MODE_LABELS = [
@@ -48,14 +52,16 @@ MODE_LABELS = [
     ("outpaint", "Expand image"),
     ("inpaint", "Fill Selection"),
     ("remove", "Remove Selection"),
-    ("edit", "Edit"),            # one function button for Edit canvas, Multi image edit and BBOX placement (tabs under the prompt, refslots.py; user 7.11.)
+    ("edit", "Edit"),            # one function button for Edit canvas, Multi image edit and Insert reference (BBOX) (tabs under the prompt, refslots.py; user 7.11.)
     ("multi_edit", "Multi Image Edit"),
+    ("sketch", "Sketch to image"),        # a tab of the Edit function too (refslots.py; docs/sketch-plan.md)
+    ("scribble", "Scribble on photo"),    # likewise, its own tab since plan B (10.11.)
     ("upscale", "Upscale (new file)"),
     ("refine", "Refine (same size)"),
     ("img2img", "Image → image"),    # only for a workflow of your own (no model tab)
 ]
 SCALE_FN_LABEL = "Upscale / Refine"      # the one function button of the standard mode for Upscale and Refine (user 6.11.)
-SHORT_MODES = {"txt2img": "Text", "edit": "Edit", "inpaint": "Fill Selection", "outpaint": "Expand", "multi_edit": "Multi Edit",
+SHORT_MODES = {"txt2img": "Text", "edit": "Edit", "inpaint": "Fill Selection", "outpaint": "Expand", "multi_edit": "Multi Edit", "sketch": "Sketch", "scribble": "Scribble",
                "remove": "Remove Selection", "upscale": "Upscale", "refine": "Refine", "img2img": "Img2img"}   # layer names
 MODE_TIPS = models.FUNCTION_TIPS    # the tooltips of the function buttons, the same for every model (user 28.10.)
 EXPAND_HINT = "Don't use a prompt for expanding."   # user 3.11.
@@ -754,13 +760,14 @@ CUTOUT_MISSING = ("No background-removal model found: download birefnet.safetens
                   "Models, Additional.")
 CUTOUT_BOTH_LABEL = "Both"
 NO_SHARPEN_MODES = ("outpaint", "inpaint", "remove")   # no "Sharpen result" slider and none applied: Expand, Fill, Remove (user 28.10. / 5.11.)
-NO_LLM_MODES = ("outpaint", "remove") + SCALE_MODES   # no "Enhance prompt with LLM" row: fixed or ready-made prompts (user 30.10.)
-LLM_TIP = "Describe Canvas: describes the picture in PhotoCraft and adds the text to the end of your prompt. Ctrl+Z undoes it."   # the Describe Canvas button (user 3.11.)
+NO_LLM_MODES = ("outpaint", "remove", "sketch", "scribble") + SCALE_MODES   # no "Enhance prompt with LLM" row: fixed or ready-made prompts (user 30.10.);
+# Sketch: the upsampler always runs with Flux 3, Flux 2 and Qwen, Fibo never has one (user 10.11.)
+EDIT_MODES = ("edit", "multi_edit", "sketch", "scribble")     # the window modes behind the one function button Edit (its tabs)
+LLM_TIP = "Describe Canvas: describes the picture in PhotoCraft and puts the text in front of your prompt. Ctrl+Z undoes it."   # the Describe Canvas button (user 3.11.)
 STYLES_TIP = "Style prompts"
-V10_WORKFLOW = "moss-image-inpaint-v10.json"      # MOSS Fill as published (MOSS Inpainting v10), test switch next to Prompt
-V10_TIP = ("Test: runs MOSS Inpainting v10 as published instead of the edit LoRA. Its graph crops around the selection "
-           "(256 px of context), softens the mask and pastes the result back; needs the KJNodes and Essentials packs. "
-           "Context and Edge feather do not apply; describe the selection (\"a red silk scarf\"), no instruction. Off: the edit LoRA fills. Compare the results.")
+SAVE_PROMPT_TIP = "Save prompt: keeps the text of the prompt under a name; find it under Styles > Custom prompts."   # the Save button next to Describe Canvas (user 11.11.)
+SET_STYLE_MODES = ("edit", "sketch")   # Styles sets the whole sentence here instead of adding to it (plan B, 10.11.; Edit canvas: its field is not filled on opening)
+STYLE_KEY = "style_"                # settings.json: the style chosen last per mode ("style_sketch")
 LIVE_TIP = "Shows the picture while it is being made, under the plugin. It goes away when the result is in PhotoCraft."
 ERROR, ERROR_TEXT = "#e5484d", "#ffc2c2"
 DONE_GREEN = "#39A95D"      # only the word "Done" above the bar
@@ -779,6 +786,14 @@ def duration_text(seconds: float) -> str:
     """"23 s", "1 min 05 s"."""
     s = max(0, round(seconds))
     return f"{s} s" if s < 60 else f"{s // 60} min {s % 60:02d} s"
+
+
+def made_text(layers: int, documents: int = 0) -> str:
+    """What a run left in PhotoCraft, for the "Done" line: "created 2 layers"; Upscale opens new documents instead of
+    adding layers, so it says "opened 1 new document" (it said "created 0 layers" before)."""
+    if documents and not layers:
+        return f"opened {documents} new document{'s' if documents != 1 else ''}"
+    return f"created {layers} layer{'s' if layers != 1 else ''}"
 
 
 def scale_text(v) -> str:
@@ -818,6 +833,8 @@ MIN_W = 333  # the window's fixed width (it cannot be resized; the height follow
 
 
 __all__ = [
+    "GEN_MP_TIP",
+    "DOWNSIZE_TIP",
     "REF_MP",
     "REF_MAX_MP",
     "NATIVE_MP",
@@ -921,6 +938,7 @@ __all__ = [
     "DISABLED",
     "SCALE_MODES",
     "NO_LLM_MODES",
+    "EDIT_MODES",
     "NO_SHARPEN_MODES",
     "CUTOUT_TIP",
     "CUTOUT_MISSING",
@@ -928,8 +946,9 @@ __all__ = [
     "LIVE_TIP",
     "LLM_TIP",
     "STYLES_TIP",
-    "V10_WORKFLOW",
-    "V10_TIP",
+    "SAVE_PROMPT_TIP",
+    "SET_STYLE_MODES",
+    "STYLE_KEY",
     "PAGE_NOT_SAVED",
     "PREVIEW_MAX_H",
     "ERROR",
@@ -939,6 +958,7 @@ __all__ = [
     "set_dot",
     "_dpi_aware",
     "duration_text",
+    "made_text",
     "scale_text",
     "parse_list",
     "sweep_requests",

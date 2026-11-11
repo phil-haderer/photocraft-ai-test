@@ -69,7 +69,9 @@ def label(e: dict, today: str | None = None) -> str:
 def settings_to_load(e: dict) -> dict:
     """What a click puts into the window: every setting of the run, a new seed (-1), and the text model's prompt with
     Enhance off when there was one."""
+    from . import models
     s = dict(e["settings"])
+    s["mode"] = models.legacy_sketch_mode(str(s.get("mode", "")), str(s.get("prompt", "")), s.get("edit_tabs"))   # own tab (10.11.)
     s["seed"] = -1
     if e.get("llm"):
         s["prompt"], s["enhance"] = e["llm"], False

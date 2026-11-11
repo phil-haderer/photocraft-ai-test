@@ -49,6 +49,14 @@ class _M:
 app._model = lambda: _M()
 app._set_progress(0.6, "Sampling 6/10…", "image", 0.6, 9)
 assert app.v_pl.v == "Qwen Image 2.1 is generating · Sampling 6/10", app.v_pl.v
+# a model chosen during the run does not rename it: the run keeps the label it started with (window test E, 11.11.)
+app._running, app._run_label = True, "Qwen Image 2.1"
+class _N:
+    label = "Flux 3"
+app._model = lambda: _N()
+app._set_progress(0.7, "Sampling 7/10…", "image", 0.7, 10)
+assert app.v_pl.v == "Qwen Image 2.1 is generating · Sampling 7/10", app.v_pl.v
+app._running = False
 app._model = lambda: None
 
 # a new run starts from zero, a finished one is full

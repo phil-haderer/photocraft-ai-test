@@ -1,5 +1,6 @@
 """pccomfy/scribble.py: finding the scribble (own layer, green first, red; minimum size) and putting the result back only
 there, exactly as the blind test rounds 5 to 7 did it in tests/live_sketch.py (docs/sketch-plan.md, 9.11. evening)."""
+import os
 import sys
 from pathlib import Path
 
@@ -57,6 +58,19 @@ def test_tiny_red_specks_are_no_scribble():
     assert scribble.find_by_colour(im) is None
     ImageDraw.Draw(im).rectangle((600, 700, 650, 750), fill=scribble.RED)      # 2601 pixels
     assert scribble.find_by_colour(im).how == "red"
+
+
+def test_a_thin_frame_round_an_area_is_a_scribble():
+    """Writer round 10.11., picture 8: a 2 px red rectangle round a facade (481 pixels in 1.5 MP, the minimum is 762) was
+    not found; a thin frame counts with half the pixels when its box covers 1 % of the picture. A speck still does not."""
+    im = Image.new("RGB", (1543, 988), PHOTO)                # 1.5 MP: the minimum is 762 pixels
+    ImageDraw.Draw(im).rectangle((230, 420, 400, 600), outline=scribble.RED, width=1)      # 684 pixels, box 3 %
+    assert scribble.MIN_SHARE * im.width * im.height > 684
+    found = scribble.find_by_colour(im)
+    assert found and found.how == "red" and found.box.x < 230 and found.box.x + found.box.w > 400
+    speck = Image.new("RGB", (1543, 988), PHOTO)
+    ImageDraw.Draw(speck).rectangle((600, 700, 621, 721), fill=scribble.RED)  # 484 pixels, a small box
+    assert scribble.find_by_colour(speck) is None
 
 
 def _stroke_layer(size=(900, 600), colour=(30, 30, 220)):
@@ -130,7 +144,11 @@ def test_put_back_as_round_7():
 
 def test_real_round6_scribbles_when_present():
     """On the user's round 6 photos (when the test data is on this PC): green found at the scribble on every one, also on
-    the red neon wall; red found except on the neon wall (there it takes the wall)."""
+    the red neon wall; red found except on the neon wall (there it takes the wall). Slow (~15 s): only with
+    PCCOMFY_SLOW_TESTS=1."""
+    if os.environ.get("PCCOMFY_SLOW_TESTS") != "1":
+        print("   (skipped: real round 6 photos only with PCCOMFY_SLOW_TESTS=1)")
+        return
     if not ls.R6_DIR.is_dir():
         print("   (skipped: no round 6 photos on this PC)")
         return

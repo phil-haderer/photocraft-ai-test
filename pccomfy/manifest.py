@@ -3,7 +3,8 @@
 Pure data, no ComfyUI and no Tk. Three levels per tab (decided with the user, see PLAN.md task 6 to 8):
 
 * ``required``: files the whole tab needs. When one is missing the tab is greyed out.
-* ``modes[mode].requires``: extra files of one mode. When one is missing only that mode is greyed out.
+* ``modes[mode].requires``: extra files of one mode. When one is missing the whole tab is locked (standard settings rule),
+  unless the mode is ``alone``: then only that mode is greyed out (Sketch, whose upsampler is 6.7 GB and gated; user 9.11.).
 * ``optional`` (tab or mode): switches and helpers (speed LoRAs, prompt enhancers). A missing one is only a note.
 
 The file names are the ones the shipped ``workflows/*.json`` load (checked by tests/test_detection.py). The tab level
@@ -107,6 +108,8 @@ class ModeSpec:
     requires: tuple = ()            # extra files this mode needs on top of the tab's
     optional: tuple = ()            # files of switches that belong to this mode
     nodes: tuple = ()               # node classes this mode needs (checked against ComfyUI's /object_info)
+    alone: bool = False             # a missing file locks only this mode, not the model (Sketch, user 9.11.); the settings
+                                    # window and the README list its files with the additional features
 
 
 @dataclass(frozen=True)
@@ -121,6 +124,10 @@ _ULTRA = ("Flux 2\\ultra_real_v4.safetensors",)
 _UPSAMPLER = "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors"
 _TAEF2 = "taef2_decoder.pth"           # live preview of the Flux 2 latent: Flux 2, Flux 3, Fibo, MOSS
 DESCRIBE_FALLBACK = "qwen3.5_9b_int8_convrot.safetensors"     # the LLM button and "Describe" in the reference slots (user 30.10.)
+# Sketch runs never without a writer (sketch round 2: 45 of 72 without, 64 of 71 with); missing, it locks only the tab
+# Sketch (user 9.11.). Flux 3 and Qwen write with BFL's upsampler, Flux 2 with qwen3vl 4B and an instruction prompt (writer
+# round 10.11., option B). Fibo's Sketch is its edit graph without a writer: no files of its own.
+_SKETCH = ModeSpec(requires=(_UPSAMPLER,), alone=True)
 _CUT_OWN_LLM = ModeSpec(optional=("birefnet.safetensors", "rmbg-2.0.safetensors"))     # the same without the 9B fallback, for every model: the 9B fallback is no longer listed anywhere (Fibo, Flux 3 and Qwen 6.11., Flux 2 6.11. evening)
 
 TABS: dict[str, TabSpec] = {
@@ -136,6 +143,8 @@ TABS: dict[str, TabSpec] = {
                                 optional=("seedvr2_3b_int8_convrot.safetensors", "seedvr2_ema_vae_fp16.safetensors")),
             "refine": ModeSpec(),   # the edit graph with the picture rescaled to its own size: no files of its own
             "multi_edit": _CUT_OWN_LLM,      # no 9B fallback file in the list (user 6.11.)
+            "sketch": _SKETCH,
+            "scribble": _SKETCH,   # the tab Scribble on photo: the same workflow and files as Sketch (plan B)
         },
         optional=(_TAEF2,)),
     "flux2": TabSpec(
@@ -145,6 +154,8 @@ TABS: dict[str, TabSpec] = {
             "upscale": ModeSpec(requires=_ULTRA),
             "refine": ModeSpec(requires=_ULTRA),
             "multi_edit": _CUT_OWN_LLM,      # no 9B fallback file in the list (user 6.11.)
+            "sketch": ModeSpec(requires=("qwen3vl_4b_int8_convrot.safetensors",), alone=True),   # its writer (10.11.)
+            "scribble": ModeSpec(requires=("qwen3vl_4b_int8_convrot.safetensors",), alone=True),   # the tab Scribble on photo: the same workflow and files as Sketch (plan B)
         },
         optional=(_TAEF2,)),
     "qwen": TabSpec(
@@ -158,6 +169,8 @@ TABS: dict[str, TabSpec] = {
             "remove": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
             "upscale": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
             "refine": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors",)),
+            "sketch": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors", _UPSAMPLER), alone=True),
+            "scribble": ModeSpec(requires=("qwen3vl_8b_int8_convrot.safetensors", _UPSAMPLER), alone=True),   # the tab Scribble on photo: the same workflow and files as Sketch (plan B)
         },
         optional=("qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors", "taeqi2_1_decoder.pth")),      # no 9B int8 fallback in the list (user 6.11.): Describe uses the w4a8 writer of Qwen Text to image
     "fibo": TabSpec(
@@ -173,6 +186,14 @@ TABS: dict[str, TabSpec] = {
         # Text to image starts with the UltraReal LoRA on: a file the start values use is required (user 30.10.)
         modes={"txt2img": ModeSpec(requires=("Moss\\lenovo_moss.safetensors",))},
         optional=("Moss\\lora_dmd2.safetensors", _TAEF2)),      # its own required 9B writer describes (6.11.)
+    # MiniMax H3 Image (PLAN 2.0b, user 10.11.): UNet w4a8, text encoder nvfp4, VAE; the prompt writer (Qwen 3.5 9B w4a8)
+    # starts off, so it is optional
+    "minimax": TabSpec(
+        required=("minimax_h3_image_pruned_w4a8.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+                  "minimax_h3_image_vae_fp16.safetensors"),
+        modes={"txt2img": ModeSpec(optional=("qwen3.5_9b_w4a8_gptq.safetensors",)),
+               "edit": ModeSpec(optional=("qwen3.5_9b_w4a8_gptq.safetensors",)),      # the same writer, with the official edit task prompt
+               "multi_edit": ModeSpec(optional=("qwen3.5_9b_w4a8_gptq.safetensors",) + _CUT_OWN_LLM.optional)}),
 }
 
 
@@ -209,6 +230,12 @@ def mode_required(key: str, mode: str) -> tuple:
     return tab_required(key) + mode_extra(key, mode)
 
 
+def mode_alone(key: str, mode: str) -> bool:
+    """True when a missing file of this mode greys out only the mode (ModeSpec.alone), not the whole model."""
+    t = TABS.get(key)
+    return bool(t and mode in t.modes and t.modes[mode].alone)
+
+
 def mode_optional(key: str, mode: str) -> tuple:
     t = TABS.get(key)
     if t is None:
@@ -230,6 +257,7 @@ DESCRIBE_WRITERS = {
     "flux2": ("qwen3vl_4b_int8_convrot.safetensors",),     # the Flux 2 prompt writer too (user 6.11.)
     "flux3": ("qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",),
     "krea2": ("qwen3vl_4b_int8_convrot.safetensors",),     # the same file as Fibo and Flux 3 (user 6.11.; Krea 2 used the fp8 file before)
+    "minimax": ("qwen3.5_9b_w4a8_gptq.safetensors",),     # its prompt writer (PLAN 2.0b)
 }
 
 
@@ -253,9 +281,9 @@ FEATURE_USE = {
     "taeqi2_1_decoder.pth": "live preview",
     "lighttaew2_1.safetensors": "live preview",
     DESCRIBE_FALLBACK: "LLM button, Describe",
-    "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors": "LLM prompt enhancement",
+    "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors": "LLM prompt enhancement, Sketch",
     "qwen3.5_9b_w4a8_gptq.safetensors": "LLM prompt enhancement",
-    "qwen3vl_4b_int8_convrot.safetensors": "LLM prompt enhancement, Describe",
+    "qwen3vl_4b_int8_convrot.safetensors": "LLM prompt enhancement, Describe, Sketch",     # optional only at Flux 2
     "birefnet.safetensors": "Cut out, remove background",
     "rmbg-2.0.safetensors": "Remove background (second model)",
     "qwen\\qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors": "Turbo LoRA",
@@ -298,7 +326,7 @@ GGUF_PAGES = {
 # node class prefix -> (pack, where to get it). Only what the shipped workflows use.
 NODE_PACKS = (
     ("SeedVR2", "ComfyUI itself (SeedVR2 nodes): update ComfyUI", "https://github.com/comfyanonymous/ComfyUI"),
-    ("ColorMatch", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),      # Flux 3 Upscale and Fibo Upscale tiles: colours back to your picture
+    ("ColorMatch", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),      # Flux 3 Upscale, Flux 2 and Fibo Upscale tiles: colours back to your picture
     ("GrowMaskWithBlur", "ComfyUI-KJNodes", "https://github.com/kijai/ComfyUI-KJNodes"),
     ("MaskBoundingBox+", "ComfyUI_essentials", "https://github.com/cubiq/ComfyUI_essentials"),
 )
@@ -315,12 +343,13 @@ def node_pack(cls: str) -> tuple[str, str] | None:
 CONTRIBUTORS = (
     ("Peszemeszek", "photocraft-comfyui-bridge, the upstream this plugin is forked from (MIT OR Apache-2.0)", "https://github.com/Peszemeszek/photocraft-comfyui-bridge"),
     ("ComfyUI", "the node-based engine behind every generation", "https://github.com/comfyanonymous/ComfyUI"),
-    ("Comfy-Org", "ComfyUI-ready model files: Qwen Image 2.1, Qwen3-VL, FLUX.2, MOSS-Image, SeedVR2, Fibo 2.0", "https://huggingface.co/Comfy-Org"),
+    ("Comfy-Org", "ComfyUI-ready model files: Qwen Image 2.1, Qwen3-VL, FLUX.2, MOSS-Image, SeedVR2, Fibo 2.0, MiniMax H3 Image", "https://huggingface.co/Comfy-Org"),
     ("Black Forest Labs", "FLUX.2 Klein and FLUX.3 Klein", "https://huggingface.co/black-forest-labs"),
     ("Qwen team (Alibaba)", "Qwen Image 2.1 and the Qwen text encoders", "https://huggingface.co/Qwen"),
     ("Bria", "Fibo 2.0 Edit, the VGL prompt format and RMBG-2.0 (second model of the Remove background scissors)", "https://huggingface.co/briaai/RMBG-2.0"),
     ("OpenMOSS", "MOSS-Image", "https://huggingface.co/OpenMOSS-Team"),
     ("Krea", "Krea 2 Turbo", "https://www.krea.ai"),
+    ("MiniMax", "MiniMax H3 Image (MiniMax-H3-Image Community License Agreement)", "https://huggingface.co/MiniMaxAI/MiniMax-H3-Image"),
     ("ausboss", "the FLUX.3 Klein Restore and Outpaint LoRAs", "https://huggingface.co/ausboss"),
     ("lodestones", "MOSS-Image 8-step DMD2 LoRA", "https://huggingface.co/lodestones"),
     ("kianxyzw", "ComfyUI Model Linker, the model of the \"similar name\" hint under a missing file (MIT)", "https://github.com/kianxyzw/comfyui-model-linker"),

@@ -1,7 +1,7 @@
 """Style prompts for the "Styles" button beside the prompt (gui_prompt.py), without Tk.
 
 The data is pccomfy/assets/styles.json, built by tools/build_styles.py from the Krea 2 Style Explorer (ThetaCursed, MIT,
-licence in pccomfy/assets/LICENSE-krea-style-explorer.txt). It can be extended by hand (user-edits.md). Format:
+licence in pccomfy/assets/LICENSE-krea-style-explorer.txt). It can be extended by hand. Format:
 
     {"modes": {"<mode>": {"groups": [{"name": "...", "styles": [{"name": "...", "text": "..."}]}]}}}
 
@@ -37,3 +37,22 @@ def load(path: Path | str | None = None) -> dict[str, list[dict]]:
         if groups:
             out[str(mode)] = groups
     return out
+
+
+def subject_of(text: str, templates, mark: str) -> str | None:
+    """What stands at the place of ``mark`` in ``text`` when ``text`` is one of ``templates`` with the mark filled in (plan B,
+    10.11.: a new style keeps what was typed for <WHAT IT SHOWS>); the mark itself when it is still there; None for any
+    other text."""
+    text = text.strip()
+    for tpl in templates:
+        if mark not in tpl:
+            continue
+        head, _, tail = tpl.strip().partition(mark)
+        if text.startswith(head) and text.endswith(tail) and len(text) >= len(head) + len(tail):
+            return text[len(head):len(text) - len(tail)]
+    return None
+
+
+def fill(template: str, subject: str | None, mark: str) -> str:
+    """The style's text with the subject put in at ``mark`` (the mark stays when there is no subject)."""
+    return template.replace(mark, subject) if subject else template

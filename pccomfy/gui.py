@@ -70,7 +70,7 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
 
         g = lambda k, default: self.state.get(k, default)  # noqa: E731
         start_mode = g("mode", "inpaint")
-        self.v_mode = tk.StringVar(value="edit" if start_mode == "multi_edit" else start_mode)     # Edit starts on the tab Edit canvas (user 7.11.)
+        self.v_mode = tk.StringVar(value="edit" if start_mode in ("multi_edit", "sketch", "scribble") else start_mode)     # Edit starts on the tab Edit canvas (user 7.11.)
         self.v_workflow = tk.StringVar(value=g("workflow", BUILTIN))
         self.v_ckpt = tk.StringVar(value=g("checkpoint", d["checkpoint"]))
         self.v_clip = tk.StringVar(value=g("clip", "") or CLIP_DEFAULT)
@@ -86,6 +86,8 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
         self.v_native_mp = tk.DoubleVar(value=float(g("native_mp", native_mp_default(g("mode", "inpaint")))))
         self.v_ref_native = tk.BooleanVar(value=bool(g("ref_native", True)))   # Multi Image Edit: reference images in original size
         self.v_ref_mp = tk.DoubleVar(value=float(g("ref_mp", REF_MP)))
+        self.v_gen_mp = tk.IntVar(value=int(g("gen_mp", models.GEN_MP_STEPS[0])))   # MiniMax: the area the model draws (PLAN 2.0b)
+        self.v_downsize = tk.BooleanVar(value=bool(g("downsize", False)))   # MiniMax: off = a new document, on = a layer in the canvas
         self.v_context = tk.DoubleVar(value=g("context", d["context"]))
         # Context is remembered per mode. Fill Selection starts at 0.2: with a wide margin Fibo lets the new object grow
         # beyond the selection or doubles it (live test); the other modes keep the global default.
@@ -276,6 +278,7 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
         self.tt_enhance = Tooltip(self.cb_enhance, ENHANCE_TIP)
         self._icons["copy"] = self._icon("copy", px=round(ICON_PX * 0.8))     # 80 % of the usual icon, flat like the other icons: white, blue under the mouse (user 1.11.)
         self._last_vgl = ""             # the prompt the text model wrote in the last run
+        self._written_for = ""          # Sketch: the model whose written prompt the history put into the field (runs without the upsampler)
         self.b_copy = ttk.Button(self.f_enh, image=self._icons["copy"], style="Link.TButton", command=self._copy_enhanced, state="disabled")
         self.b_copy.pack(side="left", padx=(8, 0))
         self.tt_copy = Tooltip(self.b_copy, "Copy the prompt the text model wrote in the last run.")
@@ -354,35 +357,40 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
 
         self.sep_prompt = ttk.Frame(r, style="Sep.TFrame", height=1)     # a light line above "Prompt"
         self.sep_prompt.pack(fill="x", padx=10, pady=(6, 4))
-        # the icon row over the field (user 6.11.: no heading "Prompt", the field says it), from the left: Describe Canvas, Styles
-        # (only where a mode has styles), Delete; then, where a mode has ready-made prompts, radio buttons that fill the field
+        # the row over the field (user 10.11. evening, docs/plan-vorschlaege-10-11.md P2 to P5; order since 11.11., window test E):
+        # on the left the blue Styles button (as high as Generate), then Save, then Describe Canvas (only in Text to image and
+        # Upscale / Refine without tiles); the bin sits in the field itself, bottom right. The row keeps the height of
+        # Generate, so nothing moves between modes
         self.f_ptop = ttk.Frame(r)
-        self.f_ptop.pack(fill="x", padx=10)
-        # "Describe Canvas" (user 30.10., named "LLM" until 3.11., an icon since 6.11.): the model's own text model describes the
-        # picture, the text is added to the prompt
-        self._icons["llm"] = self._icon("describe", px=SMALL_ICON_PX)
-        self.b_llm = ttk.Button(self.f_ptop, image=self._icons["llm"], style="Link.TButton", command=self.describe_canvas)
-        self.b_llm.pack(side="left", padx=(0, 6))
-        self.tt_llm = Tooltip(self.b_llm, LLM_TIP)
-        self._icons["clear"] = self._icon("trash", px=round(SMALL_ICON_PX * 0.9))      # 90 % of the other icons of the row (user 6.11.)
-        self.b_clear = ttk.Button(self.f_ptop, image=self._icons["clear"], style="Link.TButton", command=self._clear_prompt)   # flat: the row keeps its height
-        self.b_clear.pack(side="left")
-        Tooltip(self.b_clear, "Delete the prompt (Ctrl+Z in the field brings it back).")
-        # "Styles" between "Describe Canvas" and the bin (user 1.11.): style prompts (styles.json) for the modes that have them, now Text to image; shown by
-        # _update_styles_button. A click on an entry replaces the prompt
-        self._icons["styles"] = self._icon("palette", px=SMALL_ICON_PX)
-        self.b_styles = ttk.Button(self.f_ptop, image=self._icons["styles"], style="Link.TButton", command=self._styles_menu)
+        self.f_ptop.pack(fill="x", padx=10, pady=(0, 4))
+        self.f_ptop.columnconfigure(1, weight=1)
+        self.f_pleft = ttk.Frame(self.f_ptop)
+        self.f_pleft.grid(row=0, column=0, sticky="nsw")
+        # "Styles" (user 1.11.; blue button since 10.11. evening): white palette left of a white "Styles", rounded corners, as high
+        # as Generate (it fills the row, whose height is Generate's: _match_styles_height); style prompts (styles.json) and
+        # Custom prompts, shown by _update_styles_button
+        self._icons["styles"] = self._styles_icon()
+        self.b_styles = ttk.Button(self.f_pleft, text="Styles", image=self._icons["styles"], compound="left", style="Styles.TButton",
+                                   command=self._styles_menu)
         Tooltip(self.b_styles, STYLES_TIP)
         self._styles_shown = False
         self._build_styles_menus()
-        self.f_pchoice = ttk.Frame(self.f_ptop)
+        # "Save" (user 11.11., the Prompt-Saver): right of Styles, in every function (grey while the field is off); the saved
+        # prompts are under Styles > Custom prompts
+        self._icons["save_prompt"] = self._icon("save", px=SMALL_ICON_PX)
+        self.b_save = ttk.Button(self.f_pleft, image=self._icons["save_prompt"], style="Link.TButton", command=self.save_prompt)
+        self.b_save.pack(side="left", padx=(self._px(10), 0))
+        Tooltip(self.b_save, SAVE_PROMPT_TIP)
+        # "Describe Canvas" (user 30.10., named "LLM" until 3.11., an icon since 6.11.): the model's own text model describes the
+        # picture, the text goes in front of the prompt; right of Save (11.11.)
+        self._icons["llm"] = self._icon("describe", px=SMALL_ICON_PX)
+        self.b_llm = ttk.Button(self.f_pleft, image=self._icons["llm"], style="Link.TButton", command=self.describe_canvas)
+        self.b_llm.pack(side="left", padx=(self._px(8), 0))
+        self._llm_shown = True
+        self.tt_llm = Tooltip(self.b_llm, LLM_TIP)
+        self.f_pchoice = ttk.Frame(self.f_pleft)
         self.f_pchoice.pack(side="left", padx=(10, 0))
         self._pchoice_key = None
-        # "v10 graph" next to "Prompt" (user 1.11., A/B test): MOSS Fill and Expand as the published Inpainting v10 graph does it
-        self.v_v10 = tk.BooleanVar(value=False)
-        self.cb_v10 = ttk.Checkbutton(self.f_ptop, text="v10 graph", variable=self.v_v10)
-        Tooltip(self.cb_v10, V10_TIP)
-        self._v10_shown = False
         self.f_prompt = ttk.Frame(r)
         self.f_prompt.pack(fill="x", padx=10)
         try:
@@ -396,6 +404,14 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
         self.t_prompt.pack(side="left", fill="both", expand=True)
         # the same thin bar as the body (design list, point 10): only while the text is longer than the field
         self.sb_prompt = ThinScrollbar(self.f_prompt, self.t_prompt, self._px(6), BG, auto=True)
+        # the bin in the field, bottom right (user 10.11. evening, P5): always in front; the text keeps a narrow margin on the
+        # right over the whole height, so it never runs under the bin (_prompt_margin)
+        self._icons["clear"] = self._icon("trash", px=round(SMALL_ICON_PX * 0.9))      # 90 % of the other icons of the row (user 6.11.)
+        self.b_clear = ttk.Button(self.t_prompt, image=self._icons["clear"], style="Field.Link.TButton", command=self._clear_prompt,
+                                  cursor="arrow", takefocus=False)
+        self.b_clear.place(relx=1.0, rely=1.0, anchor="se", x=-self._px(4), y=-self._px(4), bordermode="outside")   # clear of the 1 or 2 px field border
+        Tooltip(self.b_clear, "Delete the prompt (Ctrl+Z in the field brings it back).")
+        self._prompt_margin()
         self.grip = ttk.Frame(r, style="Grip.TFrame", height=self._px(7), cursor="sb_v_double_arrow")
         self.grip.pack(fill="x", padx=10, pady=(1, 0))
         self._grip_drag(self.grip, self.t_prompt)
@@ -532,6 +548,24 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
         self.rb_refine = {}             # label -> button, built by _update_prompt_choices for the model
         self._rpick = ""                # the Refine button that was chosen ("" = the first one)
         self.f_scale.columnconfigure(0, weight=1)
+        # MiniMax H3 Image, Text to image (PLAN 2.0b, user 10.11.): the size row like "Upscale factor", and the tick
+        # "Downsize to canvas" under it (off = a new document in the chosen size); only shown for a mode with gen_mp
+        self.f_gen = ttk.Frame(r)
+        lb3 = ttk.Label(self.f_gen, text="Size")
+        lb3.grid(row=0, column=0, sticky="w")
+        Tooltip(lb3, GEN_MP_TIP)
+        f_mp = ttk.Frame(self.f_gen)
+        f_mp.grid(row=0, column=1, sticky="e")
+        self.rb_gen = {}
+        for i, mp in enumerate(models.GEN_MP_STEPS):
+            rb = ttk.Radiobutton(f_mp, text=f"{mp} MP", value=mp, variable=self.v_gen_mp, style="Small.Toolbutton")
+            rb.pack(side="left", padx=(0 if i == 0 else 4, 0))
+            Tooltip(rb, GEN_MP_TIP)
+            self.rb_gen[mp] = rb
+        self.cb_downsize = ttk.Checkbutton(self.f_gen, text="Downsize to canvas", variable=self.v_downsize)
+        self.cb_downsize.grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        Tooltip(self.cb_downsize, DOWNSIZE_TIP)
+        self.f_gen.columnconfigure(0, weight=1)
         self.v_scale.trace_add("write", lambda *x: self._sync_fac())     # presets, Reset and a tab change set the factor too
         self.f_detail = ttk.Frame(self.f_post)      # Upscale and Refine: under Advanced settings, above "Sharpen result" (user 28.10.)
         self._slider_row(self.f_detail)
@@ -637,17 +671,21 @@ class App(SettingsMixin, RefSlotsMixin, ThemeMixin, PromptMixin, LoraMixin, Mode
             self.m_variants.add_radiobutton(label=str(n), value=n, variable=self.v_variants)
         self.v_variants.trace_add("write", lambda *a: self._show_variants())
         self._show_variants()
-        self.b_stop = ttk.Button(bf, text="Cancel", width=9, command=self.stop, state="disabled")
+        # Cancel: a stop square instead of the word (window test F, 11.11.), on the usual grey button, as high as Generate
+        self._icons["stop"] = self._icon("stop", px=SMALL_ICON_PX)
+        self.b_stop = ttk.Button(bf, image=self._icons["stop"], style="Stop.TButton", command=self.stop, state="disabled")
         self.b_stop.pack(side="left", fill="y", padx=(1, 0))      # as close as Generate and the variants (user 6.11.)
         Tooltip(self.b_stop, "Cancel the run (Esc or Ctrl+Alt+Enter). With several variants it ends only the one that is running.")
         # "Cancel all" shows up only while several runs follow one another (variants of Upscale / Refine, a comparison)
         self.b_stop_all = ttk.Button(bf, text="Cancel all", style="Fit.TButton", command=self.stop_all)
         Tooltip(self.b_stop_all, "Cancel this run and all the variants that are still to come.")
-        self._icons.update({"undo": self._icon("undo"), "redo": self._icon("redo")})
-        self.b_undo = ttk.Button(bf, image=self._icons["undo"], style="Icon.TButton", command=self.undo_edit)
-        self.b_redo = ttk.Button(bf, image=self._icons["redo"], style="Icon.TButton", command=self.redo_edit)
-        self.b_redo.pack(side="right", fill="y", padx=(6, 0))     # Undo and Redo at the right edge (user 30.10.), the rest stays left
-        self.b_undo.pack(side="right", fill="y", padx=(6, 0))
+        # Undo and Redo: flat icons without a button face, as small as the Save icon over the prompt (window test E, 11.11.)
+        self._icons.update({"undo": self._icon("undo", px=SMALL_ICON_PX), "redo": self._icon("redo", px=SMALL_ICON_PX)})
+        self.b_undo = ttk.Button(bf, image=self._icons["undo"], style="Link.TButton", command=self.undo_edit)
+        self.b_redo = ttk.Button(bf, image=self._icons["redo"], style="Link.TButton", command=self.redo_edit)
+        self.b_redo.pack(side="right", padx=(self._px(8), self._px(5)))     # Undo and Redo at the right edge (user 30.10.), 5 px in from it (11.11.)
+        self.b_undo.pack(side="right", padx=(self._px(8), 0))
+        self._match_styles_height()
         Tooltip(self.b_redo, "Brings the AI edit back after an Undo.")
         Tooltip(self.b_undo, "Back to the state before the last generation.")
 

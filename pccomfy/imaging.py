@@ -143,6 +143,14 @@ def canvas_size(w: int, h: int, cap_mp: float, multiple: int = 16) -> tuple[int,
     return (max(multiple, int(w * k) // multiple * multiple), max(multiple, int(h * k) // multiple * multiple))
 
 
+def area_size(w: int, h: int, mp: float, multiple: int = 32) -> tuple[int, int]:
+    """MiniMax H3 Image (PLAN 2.0b): the size with an area of `mp` megapixels in the aspect ratio of w × h, both sides
+    rounded to the nearest multiple (the official examples round to 32). Larger or smaller than the canvas alike. MiniMax
+    counts a megapixel as 1024 × 1024 (min_generation_area 4 194 304 = 4 MP, 16 MP = 4096 × 4096, 16:9 = 5472 × 3072)."""
+    k = math.sqrt(max(0.25, float(mp)) * 1024 * 1024 / float(w * h))
+    return (max(multiple, int(round(w * k / multiple)) * multiple), max(multiple, int(round(h * k / multiple)) * multiple))
+
+
 def native_base(w: int, h: int, base: int, cap_mp: float) -> float:
     """"Original size": the side of the square whose area the generation gets (for gen_size). A crop larger than the model's
     base size is kept as it is, up to `cap_mp` megapixels (above that it is scaled down to the cap); a smaller crop

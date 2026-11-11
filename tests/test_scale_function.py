@@ -97,11 +97,11 @@ def main():
     app._on_scale_fn()
     assert app.v_mode.get() == "upscale"
 
-    # Fibo enlarges only up to 2x (6.11.): 3x and 4x are greyed out, the Refine row works
+    # Fibo enlarges up to 3x (10.11.; 2x since 6.11.): only 4x is greyed out, the Refine row works
     app.v_model.set("fibo")
     app._on_model()
     assert app.v_mode.get() == "upscale" and app._scale() == 1.5, (app.v_mode.get(), app._scale())
-    assert [str(app.rb_scale[k]["state"]) for k in ("x 1.5", "x 2", "x 3", "x 4")] == ["normal", "normal", "disabled", "disabled"]
+    assert [str(app.rb_scale[k]["state"]) for k in ("x 1.5", "x 2", "x 3", "x 4")] == ["normal", "normal", "normal", "disabled"]
     # ... and they look greyed out like a greyed-out model chip (8.11.): grey text, no fill, a dark outline
     st = gui.ttk.Style(app.root)
     assert st.lookup("Small.Toolbutton", "foreground", ["disabled"]) == gui.DISABLED
@@ -151,8 +151,19 @@ def main():
     app.v_mode.set("upscale")
     app._on_mode()
     app.root.update()
-    assert not shown(app.f_stage_row) and not shown(app.sep_stage_row)       # the stage row is Fibo's only, until test round 2.3/1
+    assert not shown(app.f_stage_row) and not shown(app.sep_stage_row)       # Qwen has no stage row (user 10.11.: Qwen stays as it is)
     assert str(app.rb_tabs["fibo"]["state"]) == "normal"                  # the chip stays clickable (falls back to None)
+    # Flux 2 Upscale: the stage "Tiles" in the row, on at the start (user 10.11.); Refine runs its own graph without it
+    app.v_model.set("flux2")
+    app._on_model()
+    app.v_mode.set("upscale")
+    app._on_mode()
+    app.root.update()
+    assert shown(app.f_stage_row) and [cb["text"] for cb in app.stage_row_cbs if shown(cb)] == ["Tiles"]
+    assert app.stage_vars[0].get() is True and app._request().stage_on and app.v_workflow.get() == "flux2-klein-upscale.json"
+    app.v_mode.set("refine")
+    app._on_mode()
+    assert app.v_workflow.get() == "flux2-klein-refine.json"
 
     # the request through the new buttons is the request of the old way (function Upscale / Refine, then the factor) - PLAN.md 5.3
     import dataclasses

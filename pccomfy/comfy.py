@@ -110,7 +110,8 @@ class ComfyUI:
         self._gen = 0                  # grows with every new address: an open connection of an older one is dropped
         self._set_target(url)
         self._cache: dict = {}
-        self._cache_lock = threading.RLock()
+        self._cache_lock = threading.RLock()       # held only for the dict and the address, never across a network request
+        self._fetch_lock = threading.Lock()        # one reader of a cached list at a time; a new one per address (set_url)
         self.client_id = uuid.uuid4().hex
         self.name_fixer: Callable[[dict], object] | None = None   # called with every graph before it is queued (see inventory.apply_names)
         self.log_file: Path | None = None    # connection log (set by the Bridge: exchange/comfy-net.log); None = no log
@@ -152,10 +153,11 @@ class ComfyUI:
 
     def set_url(self, url: str) -> None:
         """Talk to another server from now on (Other settings > ComfyUI address): the lists of the old one are forgotten."""
-        with self._cache_lock:
-            self._gen += 1
-            self._set_target(url)
+        with self._cache_lock:          # short: a reader still waiting for the old server keeps its own fetch lock (window
+            self._gen += 1              # test E, 11.11.: the switch from a network address back to the local one froze the
+            self._set_target(url)       # window for a minute, 2 x 30 s of a request to the old server)
             self._cache.clear()
+            self._fetch_lock = threading.Lock()
 
     def invalidate(self) -> None:
         """Forget the cached lists (a file was just added)."""
@@ -213,13 +215,18 @@ class ComfyUI:
         data = None if payload is None else json.dumps(payload).encode()
         headers = {"Content-Type": "application/json"} if data else {}
         if data is None and path.startswith(self._CACHED):
-            with self._cache_lock:        # one reader at a time: a second thread gets the first one's answer
-                hit = self._cache.get(path)
-                if hit is not None and time.monotonic() - hit[0] < self.CACHE_SECONDS:
-                    return hit[1]
+            with self._cache_lock:
+                fetch, gen = self._fetch_lock, self._gen
+            with fetch:                   # one reader at a time per address: a second thread gets the first one's answer
+                with self._cache_lock:
+                    hit = self._cache.get(path) if gen == self._gen else None
+                    if hit is not None and time.monotonic() - hit[0] < self.CACHE_SECONDS:
+                        return hit[1]
                 raw = self._request(path, None, headers)
                 out = json.loads(raw) if raw else None
-                self._cache[path] = (time.monotonic(), out)
+                with self._cache_lock:
+                    if gen == self._gen:      # an answer of the old server is not kept for the new one
+                        self._cache[path] = (time.monotonic(), out)
                 return out
         raw = self._request(path, data, headers)
         return json.loads(raw) if raw else None

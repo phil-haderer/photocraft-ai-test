@@ -1,0 +1,68 @@
+{
+ "note": "The styles of Edit canvas and Sketch to image (plan B, docs/plan-edit-sketch-stile.md). Each style keeps only its look; tools/build_style_looks.py puts it into the frame sentence of each tab (models.EDIT_FRAME, models.SKETCH_FRAME) and writes the modes edit and sketch of pccomfy/assets/styles.json. tabs: where the style is offered. fixed: a tested sentence kept word for word (a name in pccomfy/models.py). Tested in the style pilot 10.11.2026 (Flux 3 + Qwen, docs/tests/stil-pilot-ergebnis.md): the styles with tested true; the others were chosen by the user on 10.11.2026, untested.",
+ "groups": [
+  {"name": "Photo", "styles": [
+   {"name": "Realistic photo", "tabs": ["edit", "sketch"], "fixed": {"sketch": "SKETCH_PHOTO"}, "look": "a realistic photograph with natural light, real materials and fine detail"},
+   {"name": "Studio portrait", "tabs": ["edit", "sketch"], "tested": true, "look": "a professional studio portrait photograph with soft key light, a seamless grey backdrop and natural skin texture"},
+   {"name": "Studio product photo", "tabs": ["edit", "sketch"], "tested": true, "look": "a clean commercial studio product photograph on a seamless white background with soft diffused light and gentle shadows"},
+   {"name": "Stock photo (lifestyle)", "tabs": ["edit", "sketch"], "tested": true, "look": "a bright lifestyle stock photograph with soft natural window light, warm natural tones and a candid feel"},
+   {"name": "Golden hour travel photo", "tabs": ["edit", "sketch"], "look": "a travel photograph in golden hour light with a warm amber glow and long soft shadows"},
+   {"name": "Vintage black-and-white photo", "tabs": ["edit", "sketch"], "tested": true, "look": "a vintage black-and-white film photograph with visible grain, soft contrast and slightly faded tones"},
+   {"name": "Black and white, hard light", "tabs": ["edit", "sketch"], "look": "a high-contrast black-and-white photograph with hard directional light, deep shadows and fine film grain"},
+   {"name": "Cyanotype", "tabs": ["edit", "sketch"], "look": "a cyanotype print in shades of Prussian blue and white with grainy texture and glowing highlights"}
+  ]},
+  {"name": "Film look", "styles": [
+   {"name": "Film look, warm dusk", "tabs": ["edit", "sketch"], "look": "a cinematic film still at dusk with warm amber light, deep blue shadows and 35 mm film grain"},
+   {"name": "Film look, cool blue night", "tabs": ["edit", "sketch"], "look": "a cinematic film still at night with cool cyan tones, moonlit light and grainy film texture"},
+   {"name": "Film noir, teal and fog", "tabs": ["edit", "sketch"], "look": "a film noir still with deep indigo and teal tones, low-key light, soft fog and heavy film grain"},
+   {"name": "1970s film, muted greens", "tabs": ["edit", "sketch"], "look": "a 1970s film photograph with muted green and earth tones, overcast diffused light and vintage grain"}
+  ]},
+  {"name": "Painting", "styles": [
+   {"name": "Watercolor", "tabs": ["edit", "sketch"], "tested": true, "look": "a watercolor painting with soft washes, gentle colour bleeds and visible paper texture"},
+   {"name": "Oil painting", "tabs": ["edit", "sketch"], "tested": true, "look": "an oil painting with visible brushstrokes, rich colours and canvas texture"},
+   {"name": "Impressionist painting", "tabs": ["edit", "sketch"], "look": "an impressionist oil painting with dappled light, textured brushstrokes and a soft pastel palette"},
+   {"name": "Gouache", "tabs": ["edit", "sketch"], "look": "a gouache painting with flat matte colour areas, muted earth tones and a grainy paper texture"},
+   {"name": "Watercolor storybook", "tabs": ["edit", "sketch"], "look": "a storybook watercolor illustration with delicate ink outlines, soft washes and muted warm colours"},
+   {"name": "Japanese ink wash", "tabs": ["edit", "sketch"], "look": "a Japanese ink wash painting in black ink with bleeding washes, translucent layers and open white space"},
+   {"name": "Oil pastel", "tabs": ["edit", "sketch"], "look": "an oil pastel drawing with bold fauvist colours, gestural strokes and textured paper"},
+   {"name": "Naive folk art", "tabs": ["edit", "sketch"], "look": "a naive folk art painting with bold black outlines, flat perspective and saturated acrylic colours"},
+   {"name": "Swirling night-sky painting", "tabs": ["edit", "sketch"], "look": "a post-impressionist night-sky painting with swirling thick brushstrokes in cobalt blue and gold"}
+  ]},
+  {"name": "Drawing & print", "styles": [
+   {"name": "Pencil drawing", "tabs": ["edit", "sketch"], "tested": true, "look": "a detailed graphite pencil drawing with fine hatching and soft shading on white paper"},
+   {"name": "Pencil gesture sketch", "tabs": ["edit"], "look": "a loose pencil gesture sketch with expressive lines and visible construction lines on textured paper"},
+   {"name": "Linocut", "tabs": ["edit", "sketch"], "look": "a linocut print with bold carved lines, grainy ink and textured cream paper"},
+   {"name": "Etching, cross-hatched", "tabs": ["edit", "sketch"], "look": "a monochrome etching with fine cross-hatching, stippled shading and aged paper"},
+   {"name": "Minimal line art, flat colours", "tabs": ["edit", "sketch"], "look": "minimal line art with bold ink outlines and a few flat colour fields"}
+  ]},
+  {"name": "Anime & comic", "styles": [
+   {"name": "Animated film", "tabs": ["edit", "sketch"], "tested": true, "fixed": {"sketch": "SKETCH_ILLUSTRATION"}, "look": "a still from a classic hand-drawn animated film with clean outlines, soft cel shading and warm colours"},
+   {"name": "Anime", "tabs": ["edit", "sketch"], "tested": true, "look": "a modern anime illustration with clean line art, cel shading and vivid colours"},
+   {"name": "Retro anime, pastel", "tabs": ["edit", "sketch"], "look": "a retro anime illustration with clean ink lines, soft cel shading and a muted pastel palette"},
+   {"name": "90s anime, VHS grain", "tabs": ["edit", "sketch"], "look": "a 1990s hand-painted anime cel with moody colours and vintage VHS grain"},
+   {"name": "Ink comic", "tabs": ["edit", "sketch"], "look": "a manga-style ink illustration with bold black line art and flat colour blocks"},
+   {"name": "Clear-line comic", "tabs": ["edit", "sketch"], "look": "a clear-line comic illustration with even black outlines, flat colours and no hatching"},
+   {"name": "Modern comic, cel shaded", "tabs": ["edit", "sketch"], "look": "a modern comic illustration with bold line art, cel shading and a vivid high-contrast palette"},
+   {"name": "1930s rubber-hose cartoon", "tabs": ["edit", "sketch"], "look": "a 1930s rubber-hose cartoon with bold ink outlines, halftone shading and a vintage print texture"}
+  ]},
+  {"name": "Graphic & poster", "styles": [
+   {"name": "Flat vector", "tabs": ["edit", "sketch"], "look": "a flat vector illustration with clean shapes, hard-edged shadows and a warm sunny palette"},
+   {"name": "Mid-century travel poster", "tabs": ["edit", "sketch"], "look": "a mid-century travel poster with bold colour blocks, simple geometric shapes and sharp graphic shadows"},
+   {"name": "Risograph", "tabs": ["edit", "sketch"], "look": "a risograph print in a cobalt blue and yellow duotone with grainy texture and slightly misregistered layers"}
+  ]},
+  {"name": "3D & craft", "styles": [
+   {"name": "3D render", "tabs": ["sketch"], "tested": true, "look": "a stylized 3D render with soft global illumination, smooth materials and gentle depth of field"},
+   {"name": "3D clay render", "tabs": ["sketch"], "look": "a 3D clay render with matte surfaces, soft rounded shapes and soft studio light"},
+   {"name": "Claymation toy figures", "tabs": ["sketch"], "look": "a claymation scene with tactile toy-like figures, matte and plush textures and a soft pastel palette"},
+   {"name": "Stop-motion, felt and clay", "tabs": ["sketch"], "look": "a stop-motion scene made of felt and clay with bright primary colours, miniature scale and soft studio light"},
+   {"name": "Voxel diorama", "tabs": ["sketch"], "look": "an isometric voxel diorama with small cubes, pastel colours and soft light"},
+   {"name": "Low-poly game look", "tabs": ["sketch"], "look": "a low-poly 3D game scene with flat-shaded facets and soft warm light"}
+  ]},
+  {"name": "Retro & vintage", "styles": [
+   {"name": "Pixel art", "tabs": ["edit", "sketch"], "tested": true, "look": "16-bit pixel art with a limited colour palette and crisp square pixels"},
+   {"name": "Technicolor, 1950s print", "tabs": ["edit", "sketch"], "look": "a 1950s Technicolor print with saturated colours, halftone texture and heavy grain"},
+   {"name": "Synthwave", "tabs": ["edit", "sketch"], "look": "a synthwave image with neon magenta and cyan light, CRT scanlines and analog grain"},
+   {"name": "1980s airbrush", "tabs": ["edit", "sketch"], "look": "a 1980s airbrush illustration with smooth gradients, a soft glow and lens flares"}
+  ]}
+ ]
+}

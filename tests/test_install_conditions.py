@@ -119,7 +119,10 @@ def my_settings_checks():
     except (OSError, subprocess.SubprocessError):
         return                                                       # no git here (a ZIP copy): nothing to check
     if tracked.returncode == 0:
-        assert tracked.stdout.strip() == "", f"tracked user data: {tracked.stdout}"
+        # the only exception: test pictures of the Sketch rounds, tracked with -f to travel between the PCs (user 10.11.);
+        # the release export leaves data/ out (tools/export_release.py)
+        user = [p for p in tracked.stdout.split() if not p.startswith("data/sketch-test/")]
+        assert not user, f"tracked user data: {user}"
     from pccomfy import config
     assert config.SETTINGS_FILE.name == "settings.json"
 
